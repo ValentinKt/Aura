@@ -19,59 +19,72 @@ struct CommandPaletteView: View {
                     paletteShape.fill(.regularMaterial)
                 }
         } else {
-            paletteBase
-                .glassEffect(.regular.interactive(), in: paletteShape)
+            GlassEffectContainer {
+                paletteBase
+                    .glassEffect(.regular, in: paletteShape)
+            }
         }
     }
 
     private var paletteBase: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .font(.title3)
+            HStack(spacing: 16) {
+                Image("AuraCircle")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 28, height: 28)
+                    .shadow(color: .cyan.opacity(0.4), radius: 8, x: 0, y: 0)
                 
                 TextField("Search moods, playlists, settings...", text: $query)
                     .textFieldStyle(.plain)
                     .focused($isFocused)
-                    .font(.title3)
+                    .font(.system(size: 22, weight: .light))
                     .onChange(of: query) {
                         selectedIndex = 0
                     }
             }
-            .padding(20)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
             
             Divider()
+                .opacity(0.5)
             
             if filteredItems.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "questionmark.circle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
+                VStack(spacing: 16) {
+                    Image("AuraCircle")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 48, height: 48)
+                        .opacity(0.3)
                     Text("No results for \"\(query)\"")
+                        .font(.title3)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 200)
+                .frame(maxWidth: .infinity, minHeight: 240)
             } else {
                 ScrollViewReader { proxy in
-                    List(Array(filteredItems.enumerated()), id: \.offset) { index, item in
-                        CommandItemRow(item: item, isSelected: index == selectedIndex)
-                            .id(index)
-                            .onTapGesture {
-                                item.action()
-                                appModel.showCommandPalette = false
+                    ScrollView {
+                        LazyVStack(spacing: 4) {
+                            ForEach(Array(filteredItems.enumerated()), id: \.offset) { index, item in
+                                CommandItemRow(item: item, isSelected: index == selectedIndex)
+                                    .id(index)
+                                    .onTapGesture {
+                                        item.action()
+                                        appModel.showCommandPalette = false
+                                    }
                             }
+                        }
+                        .padding(12)
                     }
-                    .listStyle(.plain)
-                    .frame(height: 300)
+                    .frame(height: 360)
                     .onChange(of: selectedIndex) {
                         proxy.scrollTo(selectedIndex, anchor: .center)
                     }
                 }
             }
         }
-        .frame(width: 500)
-        .shadow(color: .black.opacity(0.3), radius: 40, y: 20)
+        .frame(width: 600)
+        .shadow(color: .black.opacity(0.4), radius: 50, y: 25)
         .onAppear {
             isFocused = true
         }
@@ -81,7 +94,7 @@ struct CommandPaletteView: View {
     }
 
     private var paletteShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
     }
 
     private func handleKeyEvent(_ event: NSEvent) {
@@ -175,53 +188,48 @@ private struct CommandItemRow: View {
 
     @ViewBuilder
     private var rowSurface: some View {
-        if isSelected {
-            if reduceTransparency {
-                rowBase
-                    .background {
-                        rowShape.fill(.regularMaterial)
-                    }
-            } else {
-                rowBase
-                    .glassEffect(.regular.interactive(), in: rowShape)
+        rowBase
+            .background {
+                if isSelected {
+                    rowShape
+                        .fill(Color.accentColor.opacity(0.2))
+                }
             }
-        } else {
-            rowBase
-        }
     }
 
     private var rowBase: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             Image(systemName: item.icon)
+                .font(.system(size: 16, weight: .medium))
                 .frame(width: 24, height: 24)
-                .foregroundStyle(isSelected ? .white : .accentColor)
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isSelected ? .white : .primary)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.primary.opacity(0.8)))
                 
                 Text(item.category)
-                    .font(.system(size: 11))
-                    .foregroundStyle(isSelected ? .white.opacity(0.7) : .secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.secondary) : AnyShapeStyle(.secondary.opacity(0.7)))
             }
             
             Spacer()
             
             if isSelected {
                 Image(systemName: "return")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
         .contentShape(Rectangle())
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 
     private var rowShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
     }
 }
 
