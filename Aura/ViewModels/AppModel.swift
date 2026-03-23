@@ -151,7 +151,7 @@ final class DownloadManager {
     }
     
     func download(_ resource: String) async {
-        guard let url = URL(string: "\(baseURL)\(resource).zip") else {
+        guard let url = URL(string: "\(baseURL)\(resource)") else {
             downloadStates[resource] = .failed(error: "Invalid URL")
             return
         }
@@ -161,34 +161,87 @@ final class DownloadManager {
         downloadStates[resource] = .downloading(progress: 0.0)
         
         do {
-            let (tempURL, response) = try await URLSession.shared.download(from: url)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                downloadStates[resource] = .failed(error: "Server returned error")
-                return
+            let wrapper = DownloadTaskWrapper()
+            let tempURL = try await wrapper.download(url: url) { progress in
+                Task { @MainActor in
+                    if case .downloading = self.downloadStates[resource] {
+                        self.downloadStates[resource] = .downloading(progress: progress)
+                    }
+                }
             }
             
             let fileManager = FileManager.default
-            let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            let targetURL = cachesDirectory.appendingPathComponent("AuraExtractedMedia").appendingPathComponent("\(resource).zip")
+            guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                throw NSError(domain: "DownloadManager", code: -3, userInfo: [NSLocalizedDescriptionKey: "Application Support directory not found"])
+            }
             
-            try? fileManager.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
+            try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true, attributes: nil)
+            
+            let targetURL = videosDir.appendingPathComponent(resource)
+            
             if fileManager.fileExists(atPath: targetURL.path) {
                 try fileManager.removeItem(at: targetURL)
             }
             try fileManager.moveItem(at: tempURL, to: targetURL)
             
-            // Extract it
-            if let _ = MediaUtils.extractZip(targetURL, originalResource: resource) {
-                print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
-                downloadStates[resource] = .downloaded
-            } else {
-                print("❌ [DownloadManager] Extraction failed for: \(resource)")
-                downloadStates[resource] = .failed(error: "Extraction failed")
-            }
+            print("✅ [DownloadManager] Successfully downloaded and saved to: \(targetURL.path)")
+            downloadStates[resource] = .downloaded
             
         } catch {
             print("❌ [DownloadManager] Download failed with error: \(error.localizedDescription)")
             downloadStates[resource] = .failed(error: error.localizedDescription)
+        }
+    }
+}
+
+class DownloadTaskWrapper: NSObject {
+    private var observation: NSKeyValueObservation?
+    
+    func download(url: URL, progressHandler: @escaping (Double) -> Void) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let task = URLSession.shared.downloadTask(with: url) { localURL, response, error in
+                self.observation?.invalidate()
+                self.observation = nil
+                
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    continuation.resume(throwing: NSError(domain: "DownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"]))
+                    return
+                }
+                
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let statusCode = httpResponse.statusCode
+                    continuation.resume(throwing: NSError(domain: "DownloadManager", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(statusCode)"]))
+                    return
+                }
+                
+                guard let localURL = localURL else {
+                    continuation.resume(throwing: NSError(domain: "DownloadManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "No data received"]))
+                    return
+                }
+                
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                do {
+                    if FileManager.default.fileExists(atPath: tempURL.path) {
+                        try FileManager.default.removeItem(at: tempURL)
+                    }
+                    try FileManager.default.moveItem(at: localURL, to: tempURL)
+                    continuation.resume(returning: tempURL)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            self.observation = task.progress.observe(\.fractionCompleted) { progress, _ in
+                progressHandler(progress.fractionCompleted)
+            }
+            
+            task.resume()
         }
     }
 }

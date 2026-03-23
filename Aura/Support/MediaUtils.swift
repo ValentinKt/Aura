@@ -14,12 +14,12 @@ enum MediaUtils {
         
         let fileManager = FileManager.default
         
-        // 1.5 Check if it's already downloaded in Caches
-        if let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
-            let extractedURL = cachesDirectory.appendingPathComponent("AuraExtractedMedia").appendingPathComponent(resource)
-            if fileManager.fileExists(atPath: extractedURL.path) {
-                print("🟢 [MediaUtils] Found downloaded resource at \(extractedURL.path)")
-                return extractedURL
+        // 1.5 Check if it's already downloaded in Application Support
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let videoURL = appSupport.appendingPathComponent("Aura/Videos").appendingPathComponent(resource)
+            if fileManager.fileExists(atPath: videoURL.path) {
+                print("🟢 [MediaUtils] Found downloaded resource at \(videoURL.path)")
+                return videoURL
             }
         }
         
