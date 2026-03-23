@@ -297,6 +297,18 @@ struct MoodCard: View {
                                 .padding(14)
                         }
                     }
+                } else if case .failed = downloadState {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Image(systemName: "exclamationmark.icloud")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.red)
+                                .shadow(radius: 2)
+                                .padding(14)
+                        }
+                    }
                 }
             }
         }

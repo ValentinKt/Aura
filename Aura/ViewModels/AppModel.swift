@@ -102,19 +102,45 @@ final class DownloadManager {
     
     private init() {}
     
+    func isDownloaded(resource: String) -> Bool {
+        if downloadStates[resource] == nil {
+            if MediaUtils.resolveResourceURL(resource) != nil {
+                downloadStates[resource] = .downloaded
+            } else {
+                downloadStates[resource] = .notDownloaded
+            }
+        }
+        return downloadStates[resource] == .downloaded
+    }
+    
     func checkStatus(for resource: String) {
-        if MediaUtils.resolveResourceURL(resource) != nil {
-            downloadStates[resource] = .downloaded
-        } else {
-            downloadStates[resource] = .notDownloaded
+        _ = isDownloaded(resource: resource)
+        
+        if downloadStates[resource] == .notDownloaded {
+            // Auto-download the first video of each mood if not downloaded
+            let name = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent
+            if name.hasSuffix("_1") || name == "Donkey_Kong" || name == "Mario_Pixel_Room" || name == "Pixel_Cosmic" {
+                Task {
+                    await downloadIfNeeded(resource)
+                }
+            }
         }
     }
     
-    func isDownloaded(resource: String) -> Bool {
-        if downloadStates[resource] == nil {
-            checkStatus(for: resource)
+    func downloadIfNeeded(_ resource: String) async -> Bool {
+        if isDownloaded(resource: resource) { return true }
+        
+        // Prevent concurrent downloads of the same resource
+        if case .downloading = downloadStates[resource] {
+            // Wait for it to finish (simple polling for now)
+            while case .downloading = downloadStates[resource] {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+            return isDownloaded(resource: resource)
         }
-        return downloadStates[resource] == .downloaded
+        
+        await download(resource)
+        return isDownloaded(resource: resource)
     }
     
     func download(_ resource: String) async {

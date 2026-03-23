@@ -115,6 +115,14 @@ final class MoodEngine {
         transitionTask = Task {
             state = .transitioning
             
+            // Ensure wallpaper is downloaded before applying
+            if let primaryResource = mood.wallpaper.resources.first, mood.wallpaper.type == .animated {
+                let name = URL(fileURLWithPath: primaryResource).deletingPathExtension().lastPathComponent
+                if name.hasSuffix("_1") || name == "Donkey_Kong" || name == "Mario_Pixel_Room" || name == "Pixel_Cosmic" {
+                    _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
+                }
+            }
+            
             let settings = settingsEngine.loadSettings()
             let duration = settings.transitionDuration
             
