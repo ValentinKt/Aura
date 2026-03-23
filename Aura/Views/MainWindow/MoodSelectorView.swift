@@ -353,29 +353,46 @@ struct MoodCard: View {
 
         let loadedImage = await Task(priority: .utility) { () -> NSImage? in
             if Task.isCancelled { return nil }
-            guard let url = MediaUtils.resolveResourceURL(resource) else {
-                return NSImage(named: resource)
-            }
-
-            if url.isFileURL {
-                let path = url.path
-                let exists = FileManager.default.fileExists(atPath: path)
-                guard exists else {
-                    return NSImage(named: resource)
+            
+            // First check if the resource is an un-downloaded file from the Github release.
+            // Try to resolve the URL, but don't fail immediately if it's nil.
+            let resolvedURL = MediaUtils.resolveResourceURL(resource)
+            
+            // Check if it's a known video file format that we might need to load from local cache or bundle
+            let ext = (resolvedURL?.pathExtension ?? (resource as NSString).pathExtension).lowercased()
+            let isVideo = ["mp4", "mov"].contains(ext)
+            
+            if let url = resolvedURL {
+                if url.isFileURL {
+                    let path = url.path
+                    let exists = FileManager.default.fileExists(atPath: path)
+                    
+                    if exists {
+                        if isVideo {
+                            let poster = await MediaUtils.videoPosterImage(from: url)
+                            if let poster = poster {
+                                return poster
+                            }
+                        } else if let img = NSImage(contentsOf: url) {
+                            return img
+                        }
+                    }
                 }
-
-                let ext = url.pathExtension.lowercased()
-                if ["mp4", "mov"].contains(ext) {
-                    let poster = await MediaUtils.videoPosterImage(from: url)
-                    print("🟢 [MoodCard] poster for \(resource) is \(poster == nil ? "nil" : "present")")
-                    return poster ?? NSImage(named: resource)
-                } else if let img = NSImage(contentsOf: url) {
-                    return img
-                }
-                return NSImage(named: resource)
-            } else {
-                return NSImage(named: resource)
             }
+            
+            // Fallback: If URL resolution failed or file doesn't exist locally,
+            // try to load an image with the same base name from the asset catalog (as a placeholder)
+            let baseName = (resource as NSString).deletingPathExtension
+            if let image = NSImage(named: baseName) {
+                return image
+            }
+            
+            // If we have an image in the asset catalog matching the exact resource name
+            if let image = NSImage(named: resource) {
+                return image
+            }
+            
+            return nil
         }.value
 
         guard !Task.isCancelled else { return }
