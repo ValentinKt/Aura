@@ -138,16 +138,22 @@ enum MediaUtils {
         return nil
     }
     
-    nonisolated static func extractZip(_ zipURL: URL, originalResource: String) -> URL? {
+    nonisolated static func extractZip(_ zipURL: URL, originalResource: String, destinationDir: URL? = nil) -> URL? {
         let fileManager = FileManager.default
-        let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        let extractedDir = cachesDirectory.appendingPathComponent("AuraExtractedMedia")
         
-        if !fileManager.fileExists(atPath: extractedDir.path) {
-            try? fileManager.createDirectory(at: extractedDir, withIntermediateDirectories: true)
+        let targetDir: URL
+        if let providedDir = destinationDir {
+            targetDir = providedDir
+        } else {
+            let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+            targetDir = cachesDirectory.appendingPathComponent("AuraExtractedMedia")
         }
         
-        let destinationURL = extractedDir.appendingPathComponent(originalResource)
+        if !fileManager.fileExists(atPath: targetDir.path) {
+            try? fileManager.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        }
+        
+        let destinationURL = targetDir.appendingPathComponent(originalResource)
         
         // If already extracted, just return it
         if fileManager.fileExists(atPath: destinationURL.path) {
@@ -157,7 +163,7 @@ enum MediaUtils {
         // Use Process to unzip
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", zipURL.path, "-d", extractedDir.path]
+        process.arguments = ["-o", zipURL.path, "-d", targetDir.path]
         
         do {
             try process.run()

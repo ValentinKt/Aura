@@ -151,7 +151,7 @@ final class DownloadManager {
     }
     
     func download(_ resource: String) async {
-        guard let url = URL(string: "\(baseURL)\(resource)") else {
+        guard let url = URL(string: "\(baseURL)\(resource).zip") else {
             downloadStates[resource] = .failed(error: "Invalid URL")
             return
         }
@@ -178,15 +178,25 @@ final class DownloadManager {
             let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
             try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true, attributes: nil)
             
-            let targetURL = videosDir.appendingPathComponent(resource)
+            let targetURL = videosDir.appendingPathComponent("\(resource).zip")
             
             if fileManager.fileExists(atPath: targetURL.path) {
                 try fileManager.removeItem(at: targetURL)
             }
             try fileManager.moveItem(at: tempURL, to: targetURL)
             
-            print("✅ [DownloadManager] Successfully downloaded and saved to: \(targetURL.path)")
-            downloadStates[resource] = .downloaded
+            // Extract it
+            if MediaUtils.extractZip(targetURL, originalResource: resource, destinationDir: videosDir) != nil {
+                print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
+                
+                // Clean up the zip file after successful extraction
+                try? fileManager.removeItem(at: targetURL)
+                
+                downloadStates[resource] = .downloaded
+            } else {
+                print("❌ [DownloadManager] Extraction failed for: \(resource)")
+                downloadStates[resource] = .failed(error: "Extraction failed")
+            }
             
         } catch {
             print("❌ [DownloadManager] Download failed with error: \(error.localizedDescription)")
