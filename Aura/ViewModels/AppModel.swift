@@ -123,6 +123,8 @@ final class DownloadManager {
             return
         }
         
+        print("⬇️ [DownloadManager] Starting download for wallpaper from: \(url.absoluteString)")
+        
         downloadStates[resource] = .downloading(progress: 0.0)
         
         do {
@@ -144,12 +146,15 @@ final class DownloadManager {
             
             // Extract it
             if let _ = MediaUtils.extractZip(targetURL, originalResource: resource) {
+                print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
                 downloadStates[resource] = .downloaded
             } else {
+                print("❌ [DownloadManager] Extraction failed for: \(resource)")
                 downloadStates[resource] = .failed(error: "Extraction failed")
             }
             
         } catch {
+            print("❌ [DownloadManager] Download failed with error: \(error.localizedDescription)")
             downloadStates[resource] = .failed(error: error.localizedDescription)
         }
     }

@@ -12,6 +12,17 @@ enum MediaUtils {
             }
         }
         
+        let fileManager = FileManager.default
+        
+        // 1.5 Check if it's already downloaded in Caches
+        if let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            let extractedURL = cachesDirectory.appendingPathComponent("AuraExtractedMedia").appendingPathComponent(resource)
+            if fileManager.fileExists(atPath: extractedURL.path) {
+                print("🟢 [MediaUtils] Found downloaded resource at \(extractedURL.path)")
+                return extractedURL
+            }
+        }
+        
         let bundle = Bundle.main
         
         // Split name and extension if needed
@@ -19,12 +30,17 @@ enum MediaUtils {
         let name = resourceURL.deletingPathExtension().lastPathComponent
         let ext = resourceURL.pathExtension.isEmpty ? nil : resourceURL.pathExtension
         
+        // Force download for non-first wallpapers (videos)
+        let isVideo = ext?.lowercased() == "mov" || ext?.lowercased() == "mp4"
+        if isVideo && !name.hasSuffix("_1") {
+            print("🟥 [MediaUtils] Ignoring bundled video \(resource) to force download from URL.")
+            return nil
+        }
+        
         // 2. Check in various potential subdirectories
         let subdirs = [
-            "Resources/Wallpapers",
             "Assets/Submoods",
             "Submoods",
-            "Wallpapers",
             "Audio"
         ]
         
