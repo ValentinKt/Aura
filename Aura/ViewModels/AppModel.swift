@@ -144,7 +144,7 @@ final class DownloadManager {
     }
     
     func download(_ resource: String) async {
-        guard let url = URL(string: "\(baseURL)\(resource).zip") else {
+        guard let url = URL(string: "\(baseURL)\(resource)") else {
             downloadStates[resource] = .failed(error: "Invalid URL")
             return
         }
@@ -162,7 +162,7 @@ final class DownloadManager {
             
             let fileManager = FileManager.default
             let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            let targetURL = cachesDirectory.appendingPathComponent("AuraExtractedMedia").appendingPathComponent("\(resource).zip")
+            let targetURL = cachesDirectory.appendingPathComponent("AuraExtractedMedia").appendingPathComponent(resource)
             
             try? fileManager.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fileManager.fileExists(atPath: targetURL.path) {
@@ -170,14 +170,8 @@ final class DownloadManager {
             }
             try fileManager.moveItem(at: tempURL, to: targetURL)
             
-            // Extract it
-            if let _ = MediaUtils.extractZip(targetURL, originalResource: resource) {
-                print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
-                downloadStates[resource] = .downloaded
-            } else {
-                print("❌ [DownloadManager] Extraction failed for: \(resource)")
-                downloadStates[resource] = .failed(error: "Extraction failed")
-            }
+            print("✅ [DownloadManager] Successfully downloaded wallpaper from: \(url.absoluteString)")
+            downloadStates[resource] = .downloaded
             
         } catch {
             print("❌ [DownloadManager] Download failed with error: \(error.localizedDescription)")
