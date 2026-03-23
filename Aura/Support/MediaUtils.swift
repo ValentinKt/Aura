@@ -33,7 +33,7 @@ enum MediaUtils {
         // Force download for non-first wallpapers (videos)
         let isVideo = ext?.lowercased() == "mov" || ext?.lowercased() == "mp4"
         if isVideo && !name.hasSuffix("_1") {
-            print("🟥 [MediaUtils] Ignoring bundled video \(resource) to force download from URL.")
+            // No warning here, this is expected for non-first items
             return nil
         }
         
@@ -132,7 +132,9 @@ enum MediaUtils {
             }
         }
         
-        print("🟥 [MediaUtils] Warning - Could not resolve resource: \(resource)")
+        if !isVideo {
+            print("🟥 [MediaUtils] Warning - Could not resolve resource: \(resource)")
+        }
         return nil
     }
     

@@ -118,7 +118,27 @@ final class MoodEngine {
             // Ensure wallpaper is downloaded before applying
             if let primaryResource = mood.wallpaper.resources.first, mood.wallpaper.type == .animated {
                 let name = URL(fileURLWithPath: primaryResource).deletingPathExtension().lastPathComponent
-                if name.hasSuffix("_1") || name == "Donkey_Kong" || name == "Mario_Pixel_Room" || name == "Pixel_Cosmic" {
+                let isFirst = name.hasSuffix("_1") || 
+                             name == "Donkey_Kong" || 
+                             name == "Mario_Pixel_Room" || 
+                             name == "Pixel_Cosmic" ||
+                             name == "Mindfulness_1" ||
+                             name == "Waterfall_1" ||
+                             name == "Wild_1" ||
+                             name == "Storm_1" ||
+                             name == "Rest_1" ||
+                             name == "Forest_1" ||
+                             name == "Flow_1" ||
+                             name == "Desert_1" ||
+                             name == "DeepFocus_1" ||
+                             name == "Concentration_1" ||
+                             name == "Aurora_1" ||
+                             name == "Autumn_1" ||
+                             name == "CoffeeShop_1" ||
+                             name == "Color_1" ||
+                             name == "Fractal_1"
+                
+                if isFirst {
                     _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
                 }
             }

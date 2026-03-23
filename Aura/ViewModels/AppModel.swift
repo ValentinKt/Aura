@@ -118,13 +118,20 @@ final class DownloadManager {
         
         if downloadStates[resource] == .notDownloaded {
             // Auto-download the first video of each mood if not downloaded
-            let name = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent
-            if name.hasSuffix("_1") || name == "Donkey_Kong" || name == "Mario_Pixel_Room" || name == "Pixel_Cosmic" {
+            if DownloadManager.isFirstVideo(resource) {
                 Task {
                     await downloadIfNeeded(resource)
                 }
             }
         }
+    }
+
+    static func isFirstVideo(_ resource: String) -> Bool {
+        let name = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent
+        return name.hasSuffix("_1") || 
+               name == "Donkey_Kong" || 
+               name == "Mario_Pixel_Room" || 
+               name == "Pixel_Cosmic"
     }
     
     func downloadIfNeeded(_ resource: String) async -> Bool {
