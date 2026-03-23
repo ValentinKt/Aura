@@ -1,0 +1,94 @@
+[
+  {
+    "id": "A1B2C3D4-E5F6-4789-8091-A2B3C4D5E6F7",
+    "name": "Stormy Night",
+    "moodID": "midnight_rain",
+    "layerConfig": {
+      "rain": 0.8,
+      "fire": 0.3,
+      "wind": 0.5
+    },
+    "createdAt": "2026-03-14T10:00:00Z",
+    "isFavorite": true
+  },
+  {
+    "id": "B2C3D4E5-F6A7-4890-91A2-B3C4D5E6F7A8",
+    "name": "Sunny Forest",
+    "moodID": "quiet_mind",
+    "layerConfig": {
+      "forest": 0.9,
+      "piano": 0.3,
+      "wind": 0.2
+    },
+    "createdAt": "2026-03-14T10:05:00Z",
+    "isFavorite": false
+  },
+  {
+    "id": "C3D4E5F6-A7B8-4901-A2B3-C4D5E6F7A8B9",
+    "name": "Lofi Cafe",
+    "moodID": "minimalist",
+    "layerConfig": {
+      "cafe": 0.8
+    },
+    "createdAt": "2026-03-14T10:10:00Z",
+    "isFavorite": true
+  },
+  {
+    "id": "D4E5F6A7-B8C9-4012-B3C4-D5E6F7A8B9C0",
+    "name": "Deep Ocean",
+    "moodID": "mountain_stream",
+    "layerConfig": {
+      "ocean": 0.8,
+      "wind": 0.3,
+      "rain": 0.2
+    },
+    "createdAt": "2026-03-14T10:15:00Z",
+    "isFavorite": false
+  },
+  {
+    "id": "E5F6A7B8-C9D0-4123-B3C4-D5E6F7A8B9C1",
+    "name": "Reading Room",
+    "moodID": "focus",
+    "layerConfig": {
+      "cafe": 0.5,
+      "piano": 0.4
+    },
+    "createdAt": "2026-03-14T10:20:00Z",
+    "isFavorite": false
+  },
+  {
+    "id": "F6A7B8C9-D0E1-4234-B3C4-D5E6F7A8B9C2",
+    "name": "Zen Garden",
+    "moodID": "meditation",
+    "layerConfig": {
+      "forest": 0.6,
+      "piano": 0.5,
+      "wind": 0.4
+    },
+    "createdAt": "2026-03-14T10:25:00Z",
+    "isFavorite": true
+  },
+  {
+    "id": "A7B8C9D0-E1F2-4345-B3C4-D5E6F7A8B9C3",
+    "name": "City Rain",
+    "moodID": "deep_blue",
+    "layerConfig": {
+      "rain": 0.9,
+      "cafe": 0.2
+    },
+    "createdAt": "2026-03-14T10:30:00Z",
+    "isFavorite": false
+  },
+  {
+    "id": "B8C9D0E1-F2A3-4456-B3C4-D5E6F7A8B9C4",
+    "name": "Summer Breeze",
+    "moodID": "vitality",
+    "layerConfig": {
+      "ocean": 0.5,
+      "wind": 0.6,
+      "forest": 0.3
+    },
+    "createdAt": "2026-03-14T10:35:00Z",
+    "isFavorite": false
+  }
+]

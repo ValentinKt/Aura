@@ -1,0 +1,45 @@
+# Xcode
+## User settings
+xcuserdata/
+
+## Build generated
+build/
+DerivedData/
+
+## Obj-C/Swift specific
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+.build/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Media files
+*.mov
+*.mp4
+*.mkv
+
+# Temporary/Test scripts and logs
+*.log
+test_*.swift
+check_*.swift
+test_duration
+
+# Ignore Submoods folder completely
+Aura/Assets/Submoods/
+*.zip
+
+.trae
+.trae/

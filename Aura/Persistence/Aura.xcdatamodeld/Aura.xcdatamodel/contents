@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model name="Aura" userDefinedModelVersionIdentifier="" type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24000" systemVersion="26.0" minimumToolsVersion="Automatic" sourceLanguage="Swift" usesScalarValueType="YES">
+    <entity name="Preset" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="createdAt" attributeType="Date" optional="NO"/>
+        <attribute name="id" attributeType="UUID" optional="NO"/>
+        <attribute name="isFavorite" attributeType="Boolean" optional="NO" defaultValueString="NO"/>
+        <attribute name="layerConfig" attributeType="Binary"/>
+        <attribute name="moodID" attributeType="String" optional="NO"/>
+        <attribute name="name" attributeType="String" optional="NO"/>
+    </entity>
+    <entity name="Playlist" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="createdAt" attributeType="Date" optional="NO"/>
+        <attribute name="entries" attributeType="Binary" optional="NO"/>
+        <attribute name="id" attributeType="UUID" optional="NO"/>
+        <attribute name="name" attributeType="String" optional="NO"/>
+        <attribute name="scheduleTime" attributeType="Date"/>
+    </entity>
+    <entity name="UserSettings" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="defaultMoodID" attributeType="String" optional="NO"/>
+        <attribute name="lastUsedMoodID" attributeType="String"/>
+        <attribute name="randomAmbienceInterval" attributeType="Double" optional="NO" defaultValueString="300"/>
+        <attribute name="transitionDuration" attributeType="Double" optional="NO" defaultValueString="2.5"/>
+        <attribute name="weatherSyncEnabled" attributeType="Boolean" optional="NO" defaultValueString="NO"/>
+    </entity>
+    <entity name="CustomMood" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="id" attributeType="String" optional="NO"/>
+        <attribute name="layerMix" attributeType="Binary"/>
+        <attribute name="name" attributeType="String" optional="NO"/>
+        <attribute name="palette" attributeType="Binary"/>
+        <attribute name="subtheme" attributeType="String"/>
+        <attribute name="theme" attributeType="String"/>
+        <attribute name="wallpaper" attributeType="Binary"/>
+    </entity>
+</model>
