@@ -81,3 +81,76 @@ final class AppModel {
     }
 }
 
+import Foundation
+import Observation
+
+enum DownloadState: Equatable {
+    case notDownloaded
+    case downloading(progress: Double)
+    case downloaded
+    case failed(error: String)
+}
+
+@MainActor
+@Observable
+final class DownloadManager {
+    static let shared = DownloadManager()
+    
+    var downloadStates: [String: DownloadState] = [:]
+    
+    private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.0/"
+    
+    private init() {}
+    
+    func checkStatus(for resource: String) {
+        if MediaUtils.resolveResourceURL(resource) != nil {
+            downloadStates[resource] = .downloaded
+        } else {
+            downloadStates[resource] = .notDownloaded
+        }
+    }
+    
+    func isDownloaded(resource: String) -> Bool {
+        if downloadStates[resource] == nil {
+            checkStatus(for: resource)
+        }
+        return downloadStates[resource] == .downloaded
+    }
+    
+    func download(_ resource: String) async {
+        guard let url = URL(string: "\(baseURL)\(resource).zip") else {
+            downloadStates[resource] = .failed(error: "Invalid URL")
+            return
+        }
+        
+        downloadStates[resource] = .downloading(progress: 0.0)
+        
+        do {
+            let (tempURL, response) = try await URLSession.shared.download(from: url)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                downloadStates[resource] = .failed(error: "Server returned error")
+                return
+            }
+            
+            let fileManager = FileManager.default
+            let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+            let targetURL = cachesDirectory.appendingPathComponent("AuraExtractedMedia").appendingPathComponent("\(resource).zip")
+            
+            try? fileManager.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if fileManager.fileExists(atPath: targetURL.path) {
+                try fileManager.removeItem(at: targetURL)
+            }
+            try fileManager.moveItem(at: tempURL, to: targetURL)
+            
+            // Extract it
+            if let _ = MediaUtils.extractZip(targetURL, originalResource: resource) {
+                downloadStates[resource] = .downloaded
+            } else {
+                downloadStates[resource] = .failed(error: "Extraction failed")
+            }
+            
+        } catch {
+            downloadStates[resource] = .failed(error: error.localizedDescription)
+        }
+    }
+}

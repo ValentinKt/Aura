@@ -120,7 +120,7 @@ enum MediaUtils {
         return nil
     }
     
-    nonisolated private static func extractZip(_ zipURL: URL, originalResource: String) -> URL? {
+    nonisolated static func extractZip(_ zipURL: URL, originalResource: String) -> URL? {
         let fileManager = FileManager.default
         let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
         let extractedDir = cachesDirectory.appendingPathComponent("AuraExtractedMedia")

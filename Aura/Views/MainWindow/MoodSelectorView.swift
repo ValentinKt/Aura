@@ -127,9 +127,13 @@ struct MoodCard: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     static let imageCache = NSCache<NSString, NSImage>()
 
+    private var primaryResource: String {
+        mood.wallpaper.resources.first ?? ""
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Button(action: action) {
+            Button(action: handleAction) {
                 if #available(macOS 16.0, *) {
                     cardContent
                         .background {
@@ -191,7 +195,17 @@ struct MoodCard: View {
                 .onEnded { _ in isPressed = false }
         )
         .task {
+            if !primaryResource.isEmpty {
+                DownloadManager.shared.checkStatus(for: primaryResource)
+            }
             await loadPreview()
+        }
+        .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
+            if newState == .downloaded {
+                Task {
+                    await loadPreview()
+                }
+            }
         }
     }
     
@@ -256,9 +270,58 @@ struct MoodCard: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.white.opacity(0.1))
             }
+
+            // Download Status Overlay
+            if mood.wallpaper.type != .time, !primaryResource.isEmpty {
+                let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
+                if downloadState == .notDownloaded {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Image(systemName: "icloud.and.arrow.down")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                                .shadow(radius: 2)
+                                .padding(14)
+                        }
+                    }
+                } else if case .downloading(let progress) = downloadState {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            ProgressView(value: progress)
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.8)
+                                .padding(14)
+                        }
+                    }
+                }
+            }
         }
         .frame(width: 240, height: 160)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func handleAction() {
+        if mood.wallpaper.type == .time || primaryResource.isEmpty {
+            action()
+            return
+        }
+        
+        let isDownloaded = DownloadManager.shared.isDownloaded(resource: primaryResource)
+        if isDownloaded {
+            action()
+        } else {
+            Task {
+                await DownloadManager.shared.download(primaryResource)
+                if DownloadManager.shared.isDownloaded(resource: primaryResource) {
+                    await loadPreview()
+                    action()
+                }
+            }
+        }
     }
     
     @MainActor
