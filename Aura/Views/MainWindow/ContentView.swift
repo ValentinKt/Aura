@@ -525,6 +525,7 @@ private struct GlassNavLink: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
             .background {
                 if showGlass {
                     if reduceTransparency {
@@ -589,6 +590,7 @@ struct SidebarItem: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
             .background {
                 if isSelected || isHovering {
                     if reduceTransparency {
