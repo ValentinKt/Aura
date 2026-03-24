@@ -229,6 +229,7 @@ final class PlaylistEngine {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "Playlist")
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+        request.fetchBatchSize = 20
         
         do {
             let results = try context.fetch(request)
@@ -287,13 +288,15 @@ final class PlaylistEngine {
         }
     }
 
+    private static let entriesDecoder = JSONDecoder()
+
     private func playlist(from object: NSManagedObject) -> Playlist? {
         guard let id = object.value(forKey: "id") as? UUID,
               let name = object.value(forKey: "name") as? String,
               let entriesData = object.value(forKey: "entries") as? Data else {
             return nil
         }
-        let entries = (try? JSONDecoder().decode([PlaylistEntry].self, from: entriesData)) ?? []
+        let entries = (try? Self.entriesDecoder.decode([PlaylistEntry].self, from: entriesData)) ?? []
         let scheduleTime = object.value(forKey: "scheduleTime") as? Date
         return Playlist(id: id, name: name, entries: entries, scheduleTime: scheduleTime)
     }
