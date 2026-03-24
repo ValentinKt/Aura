@@ -232,7 +232,7 @@ struct MenuBarPopoverView: View {
                     MoodCarouselCard(
                         mood: mood,
                         isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
-                        onDelete: mood.id.count > 15 ? {
+                        onDelete: UUID(uuidString: mood.id) != nil ? {
                             withAnimation { appModel.moodViewModel.removeMood(mood) }
                         } : nil
                     ) {
