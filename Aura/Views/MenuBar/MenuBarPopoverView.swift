@@ -527,6 +527,14 @@ private struct MoodCarouselCard: View {
             TimeWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
                 .frame(width: 140, height: 220)
                 .clipped()
+        } else if mood.wallpaper.type == .quote {
+            QuoteWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
+                .frame(width: 140, height: 220)
+                .clipped()
+        } else if mood.wallpaper.type == .zen {
+            ZenWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
+                .frame(width: 140, height: 220)
+                .clipped()
         } else if isSelected,
                   let resource = mood.wallpaper.resources.first,
                   let url = MediaUtils.resolveResourceURL(resource),

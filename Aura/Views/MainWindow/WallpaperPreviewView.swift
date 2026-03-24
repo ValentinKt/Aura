@@ -78,6 +78,30 @@ struct WallpaperPreviewView: View {
                         TimeWallpaperView(style: "minimal", palette: mood.palette)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .quote {
+                    if let style = mood.wallpaper.resources.first {
+                        QuoteWallpaperView(style: style, palette: mood.palette)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        QuoteWallpaperView(style: "motivational", palette: mood.palette)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .zen {
+                    if let style = mood.wallpaper.resources.first {
+                        ZenWallpaperView(style: style, palette: mood.palette)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ZenWallpaperView(style: "breathing", palette: mood.palette)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .sunset {
+                    if let style = mood.wallpaper.resources.first {
+                        SunsetWallpaperView(style: style, palette: mood.palette)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        SunsetWallpaperView(style: "dusk", palette: mood.palette)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     // Fallback to gradient
                     RoundedRectangle(cornerRadius: 8)

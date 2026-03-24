@@ -216,6 +216,10 @@ struct MoodCard: View {
             if mood.wallpaper.type == .time {
                 // Time wallpaper specific preview
                 TimeWallpaperPreview(mood: mood, isPressed: isPressed)
+            } else if mood.wallpaper.type == .quote {
+                QuoteWallpaperPreview(mood: mood, isPressed: isPressed)
+            } else if mood.wallpaper.type == .zen {
+                ZenWallpaperPreview(mood: mood, isPressed: isPressed)
             } else if let image = image {
                 Image(nsImage: image)
                     .resizable()
@@ -430,6 +434,58 @@ struct TimeWallpaperPreview: View {
                 let scale = max(scaleX, scaleY)
                 
                 TimeWallpaperView(style: style, palette: mood.palette)
+                    .frame(width: baseSize.width, height: baseSize.height)
+                    .scaleEffect(scale)
+                    .frame(width: targetSize.width, height: targetSize.height)
+                    .clipped()
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: targetSize.width, height: targetSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+struct QuoteWallpaperPreview: View {
+    let mood: Mood
+    let isPressed: Bool
+    var targetSize: CGSize = CGSize(width: 240, height: 160)
+    
+    var body: some View {
+        ZStack {
+            if let style = mood.wallpaper.resources.first {
+                let baseSize = CGSize(width: 1920, height: 1080)
+                let scaleX = targetSize.width / baseSize.width
+                let scaleY = targetSize.height / baseSize.height
+                let scale = max(scaleX, scaleY)
+                
+                QuoteWallpaperView(style: style, palette: mood.palette)
+                    .frame(width: baseSize.width, height: baseSize.height)
+                    .scaleEffect(scale)
+                    .frame(width: targetSize.width, height: targetSize.height)
+                    .clipped()
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: targetSize.width, height: targetSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+struct ZenWallpaperPreview: View {
+    let mood: Mood
+    let isPressed: Bool
+    var targetSize: CGSize = CGSize(width: 240, height: 160)
+    
+    var body: some View {
+        ZStack {
+            if let style = mood.wallpaper.resources.first {
+                let baseSize = CGSize(width: 1920, height: 1080)
+                let scaleX = targetSize.width / baseSize.width
+                let scaleY = targetSize.height / baseSize.height
+                let scale = max(scaleX, scaleY)
+                
+                ZenWallpaperView(style: style, palette: mood.palette)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)
