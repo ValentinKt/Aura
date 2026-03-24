@@ -350,11 +350,20 @@ struct QuotesManagerView: View {
 
             Text(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Your quote preview" : newQuoteText)
                 .font(previewFont)
-                .foregroundStyle(selectedTextColor)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            selectedTextColor,
+                            selectedTextColor.opacity(0.7)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .multilineTextAlignment(.center)
                 .padding(24)
                 .minimumScaleFactor(0.5)
-                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .shadow(color: selectedTextColor.opacity(0.2), radius: 10, x: 0, y: 5)
         }
         .frame(maxWidth: .infinity, minHeight: 170)
         .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), opacity: 0.1, interactive: false)
@@ -363,13 +372,13 @@ struct QuotesManagerView: View {
     private var previewFont: Font {
         switch selectedFontStyle {
         case .system:
-            .system(size: selectedFontSize, weight: .bold, design: .default)
+            .system(size: selectedFontSize, weight: .light, design: .default)
         case .serif:
-            .system(size: selectedFontSize, weight: .bold, design: .serif)
+            .system(size: selectedFontSize, weight: .medium, design: .serif)
         case .rounded:
-            .system(size: selectedFontSize, weight: .bold, design: .rounded)
+            .system(size: selectedFontSize, weight: .semibold, design: .rounded)
         case .monospaced:
-            .system(size: selectedFontSize, weight: .bold, design: .monospaced)
+            .system(size: selectedFontSize, weight: .heavy, design: .monospaced)
         }
     }
 
