@@ -12,7 +12,6 @@ final class AppModel {
     let moodEngine: MoodEngine
     let playlistEngine: PlaylistEngine
     let weatherEngine: WeatherEngine
-    let travelEngine: TravelEngine
     let presetEngine: PresetEngine
 
     var moodViewModel: MoodViewModel
@@ -30,7 +29,6 @@ final class AppModel {
         let moodEngine = MoodEngine(soundEngine: soundEngine, wallpaperEngine: wallpaperEngine, themeManager: themeManager, settingsEngine: settingsEngine)
         let playlistEngine = PlaylistEngine(moodEngine: moodEngine, persistence: persistence)
         let weatherEngine = WeatherEngine(moodEngine: moodEngine, settingsEngine: settingsEngine)
-        let travelEngine = TravelEngine(moodEngine: moodEngine, wallpaperEngine: wallpaperEngine)
         let presetEngine = PresetEngine(persistence: persistence)
 
         self.persistence = persistence
@@ -41,7 +39,6 @@ final class AppModel {
         self.moodEngine = moodEngine
         self.playlistEngine = playlistEngine
         self.weatherEngine = weatherEngine
-        self.travelEngine = travelEngine
         self.presetEngine = presetEngine
 
         let playerViewModel = PlayerViewModel(soundEngine: soundEngine, settingsEngine: settingsEngine, moodEngine: moodEngine)

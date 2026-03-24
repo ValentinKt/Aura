@@ -103,12 +103,6 @@ struct ImmersiveModeView: View {
             Text(currentStatusLabel)
                 .font(.title3.weight(.medium))
                 .foregroundStyle(.primary)
-            
-            if let travelPack = appModel.travelEngine.activePack {
-                Text(travelPack.label)
-                    .font(.headline.weight(.light))
-                    .foregroundStyle(.secondary)
-            }
         }
         .transition(.scale.combined(with: .opacity))
     }

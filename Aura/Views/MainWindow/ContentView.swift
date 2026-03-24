@@ -16,7 +16,7 @@ struct ContentView: View {
     @State private var selectedPlaylistID: UUID?
 
     enum Tab: String, CaseIterable, Identifiable {
-        case moods, playlists, travel, settings
+        case moods, playlists, settings
         var id: String { rawValue }
     }
 
@@ -31,7 +31,7 @@ struct ContentView: View {
         ZStack {
             // Background Layer
             if let tab = selectedTab {
-                if tab == .moods || tab == .travel || tab == .playlists || tab == .settings {
+                if tab == .moods || tab == .playlists || tab == .settings {
                     WallpaperPreviewView(appModel: appModel, showOverlay: false)
                         .ignoresSafeArea()
                         .overlay(Color.black.opacity(0.4))
@@ -261,22 +261,6 @@ struct ContentView: View {
                         }
                     }
 
-                    // Library Section
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Library")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
-
-                        GlassNavLink(
-                            tab: .travel,
-                            selectedTab: $selectedTab,
-                            label: "Travel",
-                            systemImage: "airplane"
-                        )
-                    }
-
                     // App Section
                     VStack(alignment: .leading, spacing: 8) {
                         Text("App")
@@ -306,8 +290,6 @@ struct ContentView: View {
             mainMoodView
         case .playlists:
             PlaylistView(appModel: appModel)
-        case .travel:
-            TravelView(appModel: appModel)
         case .settings:
             SettingsView(appModel: appModel)
         }
