@@ -26,9 +26,14 @@ final class MoodViewModel {
         }
     }
 
-    func addCustomMood(name: String, theme: String = "Custom", subtheme: String = "Personal", wallpaperPath: String, layerMix: [String: Float]) {
-        let isHeicOrImage = ["heic", "heif", "jpg", "jpeg", "png"].contains((wallpaperPath as NSString).pathExtension.lowercased())
-        let type: WallpaperType = isHeicOrImage ? .dynamic : .animated
+    func addCustomMood(name: String, theme: String = "Custom", subtheme: String = "Personal", wallpaperPath: String, layerMix: [String: Float], type: WallpaperType? = nil) {
+        let finalType: WallpaperType
+        if let type = type {
+            finalType = type
+        } else {
+            let isHeicOrImage = ["heic", "heif", "jpg", "jpeg", "png"].contains((wallpaperPath as NSString).pathExtension.lowercased())
+            finalType = isHeicOrImage ? .dynamic : .animated
+        }
         
         let newMood = Mood(
             id: UUID().uuidString,
@@ -36,7 +41,7 @@ final class MoodViewModel {
             theme: theme,
             subtheme: subtheme,
             layerMix: layerMix,
-            wallpaper: WallpaperDescriptor(type: type, resources: [wallpaperPath]),
+            wallpaper: WallpaperDescriptor(type: finalType, resources: [wallpaperPath]),
             palette: ThemePalette(
                 primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.1),
                 secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.2),
