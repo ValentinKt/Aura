@@ -201,7 +201,7 @@ struct ContentView: View {
                             withAnimation { isMoodsExpanded.toggle() }
                         } label: {
                             HStack {
-                                Label("Moods", systemImage: "sparkles")
+                                Label("Moods", systemImage: "square.grid.2x2.fill")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.8))
                                 Spacer()
