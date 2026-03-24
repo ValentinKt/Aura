@@ -268,8 +268,12 @@ struct MoodCard: View {
             
             // Selection indicator
             if isSelected {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.1))
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.white, lineWidth: 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(0.1))
+                    )
             }
 
             // Download Status Overlay
