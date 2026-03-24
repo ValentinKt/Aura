@@ -71,8 +71,21 @@ struct ContentView: View {
         .frame(minWidth: 950, minHeight: 800)
         .overlay {
             if appModel.showCommandPalette {
-                CommandPaletteView(appModel: appModel)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                ZStack {
+                    Color.black.opacity(0.001)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation {
+                                appModel.showCommandPalette = false
+                            }
+                        }
+
+                    CommandPaletteView(appModel: appModel)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+                .zIndex(99)
             }
             if appModel.showImmersive {
                 ImmersiveModeView(appModel: appModel)

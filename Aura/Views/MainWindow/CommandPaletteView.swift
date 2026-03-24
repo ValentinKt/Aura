@@ -88,6 +88,9 @@ struct CommandPaletteView: View {
         .onAppear {
             isFocused = true
         }
+        .onExitCommand {
+            appModel.showCommandPalette = false
+        }
         .onKeyDown { event in
             handleKeyEvent(event)
         }
