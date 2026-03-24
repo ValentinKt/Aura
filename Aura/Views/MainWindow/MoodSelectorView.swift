@@ -188,6 +188,7 @@ struct MoodCard: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .onHover { isHovered = $0 }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)

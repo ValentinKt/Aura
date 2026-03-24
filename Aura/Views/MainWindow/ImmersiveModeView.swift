@@ -149,6 +149,7 @@ struct ImmersiveModeView: View {
         .padding(24)
         .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: false, variant: .regular)
         .shadow(color: .black.opacity(0.15), radius: 30, y: 15)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onHover { isHoveringControls = $0 }
     }
     

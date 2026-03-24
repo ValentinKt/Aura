@@ -169,6 +169,7 @@ struct LayerCard: View {
                         .glassEffect(isHovered ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
             }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .scaleEffect(isHovered ? 1.02 : 1.0)
             .onHover { isHovered = $0 }
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)

@@ -482,6 +482,7 @@ private struct MoodCarouselCard: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onHover { isHovered = $0 }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)

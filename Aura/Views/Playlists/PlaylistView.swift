@@ -264,6 +264,7 @@ struct PlaylistCard: View {
                 )
                 .blendMode(isActive ? .normal : .plusLighter)
         }
+        .contentShape(cardShape)
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .onHover { isHovered = $0 }
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isHovered)
