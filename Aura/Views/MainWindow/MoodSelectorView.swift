@@ -137,39 +137,20 @@ struct CreateQuoteCard: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    Color.clear
-                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
+            VStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
 
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(reduceTransparency ? 0.16 : 0.2),
-                        Color.white.opacity(reduceTransparency ? 0.06 : 0.1)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-                VStack(spacing: 10) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.95))
-
-                    Text("Create a\nnew Quote")
-                        .font(.system(size: 14, weight: .bold))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-                }
-                .padding(16)
+                Text("Create a\nnew Quote")
+                    .font(.system(size: 14, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
             }
+            .padding(16)
             .frame(width: 120, height: 160)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), opacity: 0.2, interactive: true, variant: .regular)
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
