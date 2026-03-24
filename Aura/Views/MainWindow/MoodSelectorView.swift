@@ -38,6 +38,7 @@ struct MoodSelectorView: View {
 struct SubthemeRow: View {
     let subtheme: String
     @Bindable var appModel: AppModel
+    @State private var showingQuotesManager = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -82,6 +83,9 @@ struct SubthemeRow: View {
                 }
             }
         }
+        .sheet(isPresented: $showingQuotesManager) {
+            QuotesManagerView(appModel: appModel)
+        }
     }
     
     @ViewBuilder
@@ -101,6 +105,12 @@ struct SubthemeRow: View {
                 )
                 .id(mood.id)
             }
+
+            if subtheme.caseInsensitiveCompare("Quotes") == .orderedSame {
+                CreateQuoteCard {
+                    showingQuotesManager = true
+                }
+            }
         }
         .padding(.horizontal, 40)
         .padding(.vertical, 4)
@@ -112,6 +122,72 @@ struct SubthemeRow: View {
             appModel.moodViewModel.selectMood(mood)
             appModel.moodViewModel.selectedSubtheme = nil
         }
+    }
+}
+
+struct CreateQuoteCard: View {
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var isPressed = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if reduceTransparency {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(.regularMaterial)
+                } else {
+                    Color.clear
+                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(reduceTransparency ? 0.16 : 0.2),
+                        Color.white.opacity(reduceTransparency ? 0.06 : 0.1)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(spacing: 10) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.95))
+
+                    Text("Create a\nnew Quote")
+                        .font(.system(size: 14, weight: .bold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+                }
+                .padding(16)
+            }
+            .frame(width: 120, height: 160)
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
+            }
+            .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .onHover { isHovered = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+        .accessibilityLabel("Create a new quote")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
