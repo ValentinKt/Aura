@@ -7,13 +7,9 @@ struct CreateMoodView: View {
     @Bindable var appModel: AppModel
     
     @State private var moodName: String = ""
-    @State private var wallpaperTypeSelection: Int = 0 // 0 = Media, 1 = Time
     @State private var selectedFileURL: URL?
-    @State private var selectedTimeStyle: String = "minimal"
     @State private var isShowingFilePicker = false
     @State private var errorMessage: String?
-    
-    private let timeStyles = ["minimal", "analog", "typographic", "binary", "solar", "glass_blocks", "words", "orbit", "neon", "fluid"]
     
     var body: some View {
         GlassEffectContainer {
@@ -81,59 +77,13 @@ struct CreateMoodView: View {
     
     private var videoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Wallpaper Type")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .kerning(1)
-                
-                Spacer()
-                
-                Picker("", selection: $wallpaperTypeSelection) {
-                    Text("Media").tag(0)
-                    Text("Time").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-            }
+            Text("Wallpaper")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .kerning(1)
             
-            if wallpaperTypeSelection == 0 {
-                mediaPickerSection
-            } else {
-                timeStylePickerSection
-            }
-        }
-    }
-    
-    private var timeStylePickerSection: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Time Style")
-                    .font(.system(size: 13, weight: .medium))
-                Spacer()
-                Picker("", selection: $selectedTimeStyle) {
-                    ForEach(timeStyles, id: \.self) { style in
-                        Text(style.capitalized).tag(style)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 150)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background {
-                if reduceTransparency {
-                    buttonShape.fill(.regularMaterial)
-                } else {
-                    Color.clear.glassEffect(.regular, in: buttonShape)
-                }
-            }
-            
-            // Preview
-            TimeWallpaperView(style: selectedTimeStyle, palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.2), accent: ColorComponents(red: 0.9, green: 0.9, blue: 0.9)))
-                .frame(height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            mediaPickerSection
         }
     }
     
@@ -263,7 +213,7 @@ struct CreateMoodView: View {
                 }
                 .buttonStyle(.plain)
                 
-                let isFormValid = !moodName.isEmpty && (wallpaperTypeSelection == 1 || selectedFileURL != nil)
+                let isFormValid = !moodName.isEmpty && selectedFileURL != nil
                 
                 Button(action: createMood) {
                     Text("Create Mood")
@@ -307,24 +257,14 @@ struct CreateMoodView: View {
     
     private func createMood() {
         do {
-            let wallpaperPath: String
-            let type: WallpaperType?
-            
-            if wallpaperTypeSelection == 0 {
-                guard let url = selectedFileURL else { return }
-                wallpaperPath = try CustomAssetManager.saveCustomWallpaper(from: url)
-                type = nil // Let MoodViewModel infer type
-            } else {
-                wallpaperPath = selectedTimeStyle
-                type = .time
-            }
+            guard let url = selectedFileURL else { return }
+            let wallpaperPath = try CustomAssetManager.saveCustomWallpaper(from: url)
             
             // Add the mood to the model
             appModel.moodViewModel.addCustomMood(
                 name: moodName,
                 wallpaperPath: wallpaperPath,
-                layerMix: appModel.playerViewModel.layerVolumes,
-                type: type
+                layerMix: appModel.playerViewModel.layerVolumes
             )
             
             dismiss()
