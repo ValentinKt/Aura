@@ -5,6 +5,10 @@ struct QuoteWallpaperView: View {
     let style: String
     let palette: ThemePalette
     @State private var desktopImage: NSImage? = nil
+    @State private var quoteTextValue: String = ""
+    
+    // We instantiate QuoteEngine locally or pass it down. Since it requires PersistenceController.shared, we can do it here.
+    private let quoteEngine = QuoteEngine(persistence: PersistenceController.shared)
     
     var primaryColor: Color {
         Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue)
@@ -31,20 +35,30 @@ struct QuoteWallpaperView: View {
             }
             
             VStack {
-                Text(quoteText(for: style))
-                    .font(.system(size: 48, weight: .bold, design: .serif))
-                    .foregroundStyle(primaryColor)
-                    .multilineTextAlignment(.center)
-                    .shadow(color: secondaryColor.opacity(0.5), radius: 10, x: 0, y: 5)
-                    .padding()
+                        Text(quoteTextValue.isEmpty ? quoteText(for: style) : quoteTextValue)
+                            .font(.system(size: 48, weight: .bold, design: .serif))
+                            .foregroundStyle(primaryColor)
+                            .multilineTextAlignment(.center)
+                            .shadow(color: secondaryColor.opacity(0.5), radius: 10, x: 0, y: 5)
+                            .padding()
+                    }
+                }
+                .onAppear {
+                    loadDesktopImage()
+                    loadCustomQuote()
+                }
             }
-        }
-        .onAppear {
-            loadDesktopImage()
-        }
-    }
-    
-    private func quoteText(for style: String) -> String {
+            
+            private func loadCustomQuote() {
+                let quotes = quoteEngine.loadQuotes(for: style)
+                if let randomQuote = quotes.randomElement() {
+                    quoteTextValue = randomQuote.text
+                } else {
+                    quoteTextValue = quoteText(for: style)
+                }
+            }
+            
+            private func quoteText(for style: String) -> String {
         switch style {
         case "motivational": return "Keep pushing forward."
         case "philosophical": return "I think, therefore I am."

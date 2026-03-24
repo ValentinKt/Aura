@@ -134,7 +134,17 @@ final class PersistenceController {
             binaryData("layerMix", optional: false, allowsExternalStorage: true)
         ]
 
-        model.entities = [preset, playlist, settings, customMood, moodMix]
+        let customQuote = NSEntityDescription()
+        customQuote.name = "CustomQuote"
+        customQuote.managedObjectClassName = "NSManagedObject"
+        customQuote.properties = [
+            attribute("id", .UUIDAttributeType, optional: false),
+            attribute("text", .stringAttributeType, optional: false),
+            attribute("style", .stringAttributeType, optional: false),
+            attribute("createdAt", .dateAttributeType, optional: false)
+        ]
+
+        model.entities = [preset, playlist, settings, customMood, moodMix, customQuote]
         return model
     }
 
@@ -166,3 +176,88 @@ final class PersistenceController {
         return attribute
     }
 }
+
+// MARK: - Custom Quotes
+
+struct CustomQuoteModel: Identifiable, Codable, Hashable {
+    let id: UUID
+    var text: String
+    var style: String
+    var createdAt: Date
+
+    init(id: UUID = UUID(), text: String, style: String, createdAt: Date = Date()) {
+        self.id = id
+        self.text = text
+        self.style = style
+        self.createdAt = createdAt
+    }
+}
+
+@MainActor
+final class QuoteEngine {
+    private let persistence: PersistenceController
+
+    init(persistence: PersistenceController) {
+        self.persistence = persistence
+    }
+
+    func loadQuotes(for style: String? = nil) -> [CustomQuoteModel] {
+        let context = persistence.viewContext
+        let request = NSFetchRequest<NSManagedObject>(entityName: "CustomQuote")
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        
+        if let style = style {
+            request.predicate = NSPredicate(format: "style == %@", style)
+        }
+
+        do {
+            let results = try context.fetch(request)
+            return results.compactMap { entity in
+                guard let id = entity.value(forKey: "id") as? UUID,
+                      let text = entity.value(forKey: "text") as? String,
+                      let entityStyle = entity.value(forKey: "style") as? String,
+                      let createdAt = entity.value(forKey: "createdAt") as? Date else {
+                    return nil
+                }
+                return CustomQuoteModel(id: id, text: text, style: entityStyle, createdAt: createdAt)
+            }
+        } catch {
+            print("🟥 [QuoteEngine] Failed to load quotes: \(error)")
+            return []
+        }
+    }
+
+    func saveQuote(_ quote: CustomQuoteModel) {
+        let context = persistence.viewContext
+        let request = NSFetchRequest<NSManagedObject>(entityName: "CustomQuote")
+        request.predicate = NSPredicate(format: "id == %@", quote.id as CVarArg)
+
+        do {
+            let entity = try context.fetch(request).first ?? NSEntityDescription.insertNewObject(forEntityName: "CustomQuote", into: context)
+            entity.setValue(quote.id, forKey: "id")
+            entity.setValue(quote.text, forKey: "text")
+            entity.setValue(quote.style, forKey: "style")
+            entity.setValue(quote.createdAt, forKey: "createdAt")
+            
+            try context.save()
+        } catch {
+            print("🟥 [QuoteEngine] Failed to save quote: \(error)")
+        }
+    }
+
+    func deleteQuote(id: UUID) {
+        let context = persistence.viewContext
+        let request = NSFetchRequest<NSManagedObject>(entityName: "CustomQuote")
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+
+        do {
+            if let entity = try context.fetch(request).first {
+                context.delete(entity)
+                try context.save()
+            }
+        } catch {
+            print("🟥 [QuoteEngine] Failed to delete quote: \(error)")
+        }
+    }
+}
+

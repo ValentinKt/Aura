@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var appModel: AppModel
+    @State private var showingQuotesManager = false
 
     var body: some View {
         ScrollView {
@@ -41,6 +42,24 @@ struct SettingsView: View {
                             }
                         }
                         .toggleStyle(.switch)
+                    }
+                }
+
+                SectionView(title: "Custom Content") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Manage Custom Quotes")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("Create and edit your own quotes for the Quotes theme.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Manage") {
+                                showingQuotesManager = true
+                            }
+                        }
                     }
                 }
 
@@ -86,6 +105,116 @@ struct SettingsView: View {
             }
             .padding(40)
         }
+        .sheet(isPresented: $showingQuotesManager) {
+            QuotesManagerView(appModel: appModel)
+        }
+    }
+}
+
+struct QuotesManagerView: View {
+    @Bindable var appModel: AppModel
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var quotes: [CustomQuoteModel] = []
+    @State private var newQuoteText: String = ""
+    @State private var selectedStyle: String = "motivational"
+    
+    let availableStyles = ["motivational", "philosophical", "minimal", "bold"]
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Manage Custom Quotes")
+                .font(.title2.weight(.bold))
+                .padding(.top, 20)
+            
+            HStack(alignment: .top, spacing: 20) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Add New Quote")
+                        .font(.headline)
+                    
+                    TextField("Quote text...", text: $newQuoteText)
+                        .textFieldStyle(.roundedBorder)
+                    
+                    Picker("Style", selection: $selectedStyle) {
+                        ForEach(availableStyles, id: \.self) { style in
+                            Text(style.capitalized).tag(style)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    
+                    Button("Add Quote") {
+                        addQuote()
+                    }
+                    .disabled(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlBackgroundColor)))
+                
+                VStack(alignment: .leading) {
+                    Text("Your Quotes")
+                        .font(.headline)
+                    
+                    List {
+                        ForEach(quotes, id: \.id) { quote in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(quote.text)
+                                        .font(.system(size: 14, weight: .medium))
+                                    Text(quote.style.capitalized)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button {
+                                    deleteQuote(quote)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .listStyle(.bordered)
+                    .cornerRadius(8)
+                }
+            }
+            .padding(.horizontal, 20)
+            
+            HStack {
+                Spacer()
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .padding()
+            }
+        }
+        .frame(width: 600, height: 400)
+        .onAppear {
+            loadQuotes()
+        }
+    }
+    
+    private func loadQuotes() {
+        quotes = appModel.quoteEngine.loadQuotes()
+    }
+    
+    private func addQuote() {
+        let trimmed = newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        let newQuote = CustomQuoteModel(text: trimmed, style: selectedStyle)
+        appModel.quoteEngine.saveQuote(newQuote)
+        newQuoteText = ""
+        loadQuotes()
+    }
+    
+    private func deleteQuote(_ quote: CustomQuoteModel) {
+        appModel.quoteEngine.deleteQuote(id: quote.id)
+        loadQuotes()
     }
 }
 
