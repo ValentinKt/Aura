@@ -150,7 +150,15 @@ struct CreateQuoteCard: View {
             }
             .padding(16)
             .frame(width: 120, height: 160)
-            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), opacity: 0.2, interactive: true, variant: .regular)
+            .background {
+                if reduceTransparency {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(.regularMaterial)
+                } else {
+                    Color.clear
+                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
