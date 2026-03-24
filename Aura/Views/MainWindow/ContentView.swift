@@ -409,7 +409,13 @@ struct ContentView: View {
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background {
+                    if reduceTransparency {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial)
+                    } else {
+                        Color.clear.glassEffect(.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
                 .help("Search (⌘K)")
 
                 // Settings button
@@ -423,7 +429,13 @@ struct ContentView: View {
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background {
+                    if reduceTransparency {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial)
+                    } else {
+                        Color.clear.glassEffect(.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                }
                 .help("Settings")
             }
         }
@@ -464,7 +476,10 @@ struct ContentView: View {
                 .contentShape(newMoodButtonShape)
         } else {
             newMoodButtonBase
-                .glassEffect(.regular.interactive(), in: newMoodButtonShape)
+                .background {
+                    Color.clear
+                        .glassEffect(.clear, in: newMoodButtonShape)
+                }
                 .contentShape(newMoodButtonShape)
         }
     }
