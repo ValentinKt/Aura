@@ -104,8 +104,18 @@ final class DownloadManager {
     
     func isDownloaded(resource: String) -> Bool {
         if downloadStates[resource] == nil {
-            if MediaUtils.resolveResourceURL(resource) != nil {
-                downloadStates[resource] = .downloaded
+            if let url = MediaUtils.resolveResourceURL(resource) {
+                let expectedExt = (resource as NSString).pathExtension.lowercased()
+                let resolvedExt = url.pathExtension.lowercased()
+                let isVideoResource = ["mov", "mp4"].contains(expectedExt)
+                let isURLVideo = ["mov", "mp4"].contains(resolvedExt)
+                
+                if isVideoResource && !isURLVideo {
+                    // It resolved to an image fallback, so the video is not actually downloaded
+                    downloadStates[resource] = .notDownloaded
+                } else {
+                    downloadStates[resource] = .downloaded
+                }
             } else {
                 downloadStates[resource] = .notDownloaded
             }
