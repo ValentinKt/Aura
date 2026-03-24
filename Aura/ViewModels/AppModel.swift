@@ -20,6 +20,7 @@ final class AppModel {
     var settingsViewModel: SettingsViewModel
     var showImmersive: Bool = false
     var showCommandPalette: Bool = false
+    var isReady: Bool = false
 
     init(persistence: PersistenceController) {
         let themeManager = ThemeManager()
@@ -66,6 +67,7 @@ final class AppModel {
             print("🟢 [AppModel] Randomization started.")
         }
         print("🟢 [AppModel] Start complete.")
+        isReady = true
     }
 
     func toggleWeatherSync(_ enabled: Bool) {

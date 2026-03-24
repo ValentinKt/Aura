@@ -43,19 +43,35 @@ struct AuraApp: App {
     
     var body: some Scene {
         Window("Aura", id: "main") {
-            ContentView()
-                .environment(appModel)
-                .onAppear {
-                    appDelegate.appModel = appModel
-                    
-                    // Ensure any existing windows are not restorable
-                    for window in NSApp.windows {
-                        window.isRestorable = false
+            ZStack {
+                if appModel.isReady {
+                    ContentView()
+                        .environment(appModel)
+                } else {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading Aura...")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // We need to provide the environment to the progress view too, 
+                    // or just the whole ZStack.
                 }
-                .task {
-                    await appModel.start()
+            }
+            .environment(appModel)
+            .onAppear {
+                appDelegate.appModel = appModel
+                
+                // Ensure any existing windows are not restorable
+                for window in NSApp.windows {
+                    window.isRestorable = false
                 }
+            }
+            .task {
+                await appModel.start()
+            }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)

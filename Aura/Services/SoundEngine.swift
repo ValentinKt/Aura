@@ -274,9 +274,18 @@ final class SoundEngine {
     }
 
     private func preloadBuffers() async throws {
-        for id in SoundLayerID.allCases.map(\.rawValue) {
-            if let buffer = await assetManager.loadAudioBuffer(named: id) {
-                buffers[id] = buffer
+        await withTaskGroup(of: (String, AVAudioPCMBuffer?).self) { group in
+            for id in SoundLayerID.allCases.map(\.rawValue) {
+                group.addTask {
+                    let buffer = await self.assetManager.loadAudioBuffer(named: id)
+                    return (id, buffer)
+                }
+            }
+            
+            for await (id, buffer) in group {
+                if let buffer = buffer {
+                    buffers[id] = buffer
+                }
             }
         }
     }
