@@ -1048,6 +1048,51 @@ final class MoodEngine {
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["ripple"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.3, blue: 0.3), secondary: ColorComponents(red: 0.2, green: 0.4, blue: 0.4), accent: ColorComponents(red: 0.4, green: 0.9, blue: 0.8))
             ),
+            Mood(
+                id: "zen_orb",
+                name: "Energy Orb",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["hum": 0.3, "wind": 0.2],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["orb"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.8, green: 0.3, blue: 0.1), secondary: ColorComponents(red: 0.9, green: 0.5, blue: 0.2), accent: ColorComponents(red: 1.0, green: 0.8, blue: 0.4))
+            ),
+            Mood(
+                id: "zen_lotus",
+                name: "Lotus Flower",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["stream": 0.2, "piano": 0.1],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["lotus"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.9, green: 0.4, blue: 0.6), secondary: ColorComponents(red: 0.8, green: 0.3, blue: 0.5), accent: ColorComponents(red: 1.0, green: 0.7, blue: 0.8))
+            ),
+            Mood(
+                id: "zen_waves",
+                name: "Ocean Waves",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["rain": 0.3, "wind": 0.2],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["waves"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.4, blue: 0.7), secondary: ColorComponents(red: 0.2, green: 0.5, blue: 0.8), accent: ColorComponents(red: 0.6, green: 0.8, blue: 0.9))
+            ),
+            Mood(
+                id: "zen_eclipse",
+                name: "Solar Eclipse",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["night": 0.4, "hum": 0.2],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["eclipse"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.2), accent: ColorComponents(red: 0.9, green: 0.9, blue: 0.7))
+            ),
+            Mood(
+                id: "zen_particles",
+                name: "Stardust",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["wind": 0.3, "piano": 0.2],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["particles"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.2, green: 0.1, blue: 0.4), secondary: ColorComponents(red: 0.3, green: 0.2, blue: 0.5), accent: ColorComponents(red: 0.8, green: 0.6, blue: 0.9))
+            ),
             // Quote Subthemes
             Mood(
                 id: "quote_motivational",
