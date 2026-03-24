@@ -29,6 +29,7 @@ final class PlayerViewModel {
         self.soundEngine = soundEngine
         self.settingsEngine = settingsEngine
         self.moodEngine = moodEngine
+        
         let settings = settingsEngine.loadSettings()
         self.randomizeInterval = settings.randomAmbienceInterval
         self.soundEngine.masterVolume = settings.masterVolume

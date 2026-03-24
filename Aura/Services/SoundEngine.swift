@@ -123,6 +123,9 @@ final class SoundEngine {
 
     func resume() {
         guard state == .paused || state == .ready else { return }
+        if !engine.isRunning {
+            try? engine.start()
+        }
         for (id, node) in layerNodes {
             if let vol = volumes[id], vol > 0 {
                 if !node.player.isPlaying {
@@ -183,11 +186,16 @@ final class SoundEngine {
         let shouldPlay = clampedVolume > 0 && state == .playing
         let shouldPause = clampedVolume <= 0
         if shouldPlay {
+            if !engine.isRunning {
+                try? engine.start()
+            }
             if !node.player.isPlaying {
+                print("🟢 [SoundEngine] Playing node for \(id)")
                 node.player.play()
             }
         } else if shouldPause {
             if node.player.isPlaying {
+                print("🟢 [SoundEngine] Pausing node for \(id)")
                 node.player.pause()
             }
         }
