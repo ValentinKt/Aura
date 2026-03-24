@@ -62,9 +62,6 @@ final class WallpaperEngine {
         case .zen:
             startZen(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
-        case .sunset:
-            startSunset(descriptor)
-            result = WallpaperApplyResult(success: true, permissionDenied: false)
         }
 
         return result
@@ -200,13 +197,6 @@ final class WallpaperEngine {
         let palette = themeManager.palette
         let zenView = ZenWallpaperView(style: style, palette: palette)
         wallpaperWindowController.showSwiftUIView(zenView)
-    }
-
-    private func startSunset(_ descriptor: WallpaperDescriptor) {
-        let style = descriptor.resources.first ?? "dusk"
-        let palette = themeManager.palette
-        let sunsetView = SunsetWallpaperView(style: style, palette: palette)
-        wallpaperWindowController.showSwiftUIView(sunsetView)
     }
 
     private func applyImageURLs(_ urls: [URL]) -> WallpaperApplyResult {

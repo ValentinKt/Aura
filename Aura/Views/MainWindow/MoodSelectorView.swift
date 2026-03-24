@@ -281,7 +281,7 @@ struct MoodCard: View {
             }
 
             // Download Status Overlay
-            if mood.wallpaper.type != .time, !primaryResource.isEmpty {
+            if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, !primaryResource.isEmpty {
                 let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
                 if downloadState == .notDownloaded {
                     VStack {
@@ -326,7 +326,7 @@ struct MoodCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
             action()
             return
         }
@@ -347,8 +347,8 @@ struct MoodCard: View {
     
     @MainActor
     private func loadPreview() async {
-        if mood.wallpaper.type == .time {
-            // No preview image needed for time wallpapers, they render directly
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote {
+            // No preview image needed for programmatic wallpapers, they render directly
             return
         }
         

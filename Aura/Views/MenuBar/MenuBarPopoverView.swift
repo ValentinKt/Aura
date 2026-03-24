@@ -338,6 +338,8 @@ struct MenuBarPopoverView: View {
     private func loadBackgroundMedia() async {
         guard let mood = appModel.moodViewModel.currentMood,
               mood.wallpaper.type != .time,
+              mood.wallpaper.type != .zen,
+              mood.wallpaper.type != .quote,
               let resource = mood.wallpaper.resources.first else {
             withAnimation(.easeInOut(duration: 0.4)) {
                 backgroundImage = nil
@@ -433,7 +435,7 @@ private struct MoodCarouselCard: View {
                 }
                 .overlay {
                     // Download Status Overlay
-                    if mood.wallpaper.type != .time, !primaryResource.isEmpty {
+                    if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, !primaryResource.isEmpty {
                         let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
                         if downloadState == .notDownloaded {
                             VStack {
@@ -502,7 +504,7 @@ private struct MoodCarouselCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
             action()
             return
         }
@@ -554,7 +556,7 @@ private struct MoodCarouselCard: View {
 
     @MainActor
     private func loadPreviewImage() async {
-        guard mood.wallpaper.type != .time,
+        guard mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote,
               let resource = mood.wallpaper.resources.first else { return }
 
         if let cached = MoodCard.imageCache.object(forKey: resource as NSString) {

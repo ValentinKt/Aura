@@ -94,14 +94,6 @@ struct WallpaperPreviewView: View {
                         ZenWallpaperView(style: "breathing", palette: mood.palette)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .sunset {
-                    if let style = mood.wallpaper.resources.first {
-                        SunsetWallpaperView(style: style, palette: mood.palette)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        SunsetWallpaperView(style: "dusk", palette: mood.palette)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
                 } else {
                     // Fallback to gradient
                     RoundedRectangle(cornerRadius: 8)

@@ -1020,25 +1020,6 @@ final class MoodEngine {
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["fluid"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.4, blue: 0.6), secondary: ColorComponents(red: 0.2, green: 0.5, blue: 0.8), accent: ColorComponents(red: 0.4, green: 0.8, blue: 1.0))
             ),
-            // Sunset Subthemes
-            Mood(
-                id: "sunset_dusk",
-                name: "Dusk",
-                theme: "Utility",
-                subtheme: "Sunset",
-                layerMix: ["wind": 0.2, "night": 0.1],
-                wallpaper: WallpaperDescriptor(type: .sunset, resources: ["dusk"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.8, green: 0.4, blue: 0.2), secondary: ColorComponents(red: 0.6, green: 0.3, blue: 0.4), accent: ColorComponents(red: 1.0, green: 0.8, blue: 0.5))
-            ),
-            Mood(
-                id: "sunset_horizon",
-                name: "Horizon",
-                theme: "Utility",
-                subtheme: "Sunset",
-                layerMix: ["ocean": 0.3, "wind": 0.2],
-                wallpaper: WallpaperDescriptor(type: .sunset, resources: ["horizon"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.2), secondary: ColorComponents(red: 0.5, green: 0.3, blue: 0.4), accent: ColorComponents(red: 0.9, green: 0.5, blue: 0.3))
-            ),
             // Zen Subthemes
             Mood(
                 id: "zen_breathing",
