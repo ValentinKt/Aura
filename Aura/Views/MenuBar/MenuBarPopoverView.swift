@@ -151,7 +151,7 @@ struct MenuBarPopoverView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: Circle())
+            .background(Color.clear)
             .focusable(false)
         }
     }
@@ -289,7 +289,7 @@ struct MenuBarPopoverView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.clear)
 
             Button {
                 appModel.showCommandPalette.toggle()
@@ -304,7 +304,7 @@ struct MenuBarPopoverView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.clear)
             .help("Search")
 
             Button { NSApp.terminate(nil) } label: {
@@ -315,7 +315,7 @@ struct MenuBarPopoverView: View {
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.clear)
             .help("Quit Aura")
         }
     }
