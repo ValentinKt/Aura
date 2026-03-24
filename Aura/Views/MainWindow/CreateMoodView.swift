@@ -108,18 +108,25 @@ struct CreateMoodView: View {
     
     private var timeStylePickerSection: some View {
         VStack(spacing: 12) {
-            Picker("Time Style", selection: $selectedTimeStyle) {
-                ForEach(timeStyles, id: \.self) { style in
-                    Text(style.capitalized).tag(style)
+            HStack {
+                Text("Time Style")
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                Picker("", selection: $selectedTimeStyle) {
+                    ForEach(timeStyles, id: \.self) { style in
+                        Text(style.capitalized).tag(style)
+                    }
                 }
+                .pickerStyle(.menu)
+                .frame(width: 150)
             }
-            .pickerStyle(.menu)
-            .padding()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .background {
                 if reduceTransparency {
                     buttonShape.fill(.regularMaterial)
                 } else {
-                    Color.clear.glassEffect(.regular.interactive(), in: buttonShape)
+                    Color.clear.glassEffect(.regular, in: buttonShape)
                 }
             }
             
