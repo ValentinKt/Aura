@@ -349,6 +349,7 @@ struct PlaylistCard: View {
         .font(.subheadline.bold())
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
+        .contentShape(Rectangle())
         .foregroundStyle(isActive ? Color.primary : Color.white)
     }
 

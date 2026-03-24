@@ -38,31 +38,6 @@ struct SoundLayerMixerView: View {
                 Spacer()
 
                 HStack(spacing: 12) {
-                    // Reset Button
-                    Button {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                            let zeroMix: [String: Float] = Dictionary(uniqueKeysWithValues: SoundLayerID.allCases.map { ($0.rawValue, Float(0)) })
-                            appModel.playerViewModel.applyMix(zeroMix)
-                        }
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .padding(8)
-                            .background {
-                                if reduceTransparency {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(.regularMaterial)
-                                } else {
-                                    Color.clear
-                                        .glassEffect(.clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .help("Reset All Volumes")
-
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             appModel.playerViewModel.togglePlayback()
@@ -80,18 +55,18 @@ struct SoundLayerMixerView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
+                        .contentShape(Rectangle())
                         .background {
                             if reduceTransparency {
-                                RoundedRectangle(cornerRadius: 0, style: .continuous)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .fill(.regularMaterial)
                             } else {
                                 Color.clear
-                                    .glassEffect(.clear.interactive(), in: RoundedRectangle(cornerRadius: 0, style: .continuous))
+                                    .glassEffect(.clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
                         }
                     }
                     .buttonStyle(.plain)
-                    .contentShape(Rectangle())
                 }
             }
 
