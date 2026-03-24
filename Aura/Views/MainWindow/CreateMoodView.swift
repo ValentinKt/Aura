@@ -5,17 +5,17 @@ struct CreateMoodView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Bindable var appModel: AppModel
-    
+
     @State private var moodName: String = ""
     @State private var selectedFileURL: URL?
     @State private var isShowingFilePicker = false
     @State private var errorMessage: String?
-    
+
     var body: some View {
         GlassEffectContainer {
             VStack(spacing: 24) {
                 header
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         nameSection
@@ -25,7 +25,7 @@ struct CreateMoodView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
                 }
-                
+
                 footer
             }
             .frame(width: 480, height: 650)
@@ -41,7 +41,7 @@ struct CreateMoodView: View {
         .presentationBackground(.clear)
         .shadow(color: .black.opacity(0.3), radius: 50, y: 25)
     }
-    
+
     private var header: some View {
         VStack(spacing: 4) {
             Text("Create Custom Mood")
@@ -52,7 +52,7 @@ struct CreateMoodView: View {
         }
         .padding(.top, 24)
     }
-    
+
     private var nameSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Mood Name")
@@ -60,7 +60,7 @@ struct CreateMoodView: View {
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .kerning(1)
-            
+
             TextField("e.g. Rainy Night, Study Focus...", text: $moodName)
                 .textFieldStyle(.plain)
                 .padding(14)
@@ -74,7 +74,7 @@ struct CreateMoodView: View {
                 }
         }
     }
-    
+
     private var videoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Wallpaper")
@@ -82,11 +82,11 @@ struct CreateMoodView: View {
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .kerning(1)
-            
+
             mediaPickerSection
         }
     }
-    
+
     private var mediaPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let url = selectedFileURL {
@@ -110,12 +110,12 @@ struct CreateMoodView: View {
                                 .overlay(Text("Unsupported format").foregroundStyle(.secondary))
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
-                        
+
                         Text(url.lastPathComponent)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     Button {
                         selectedFileURL = nil
                     } label: {
@@ -169,24 +169,24 @@ struct CreateMoodView: View {
             }
         }
     }
-    
+
     private var audioSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Audio Mix")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
-            
+
             Text("Adjust the levels below to set the default mix for this mood.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            
+
             SoundLayerMixerView(appModel: appModel, isScrollable: false)
                 .scaleEffect(0.9)
                 .padding(.top, -10)
         }
     }
-    
+
     private var footer: some View {
         VStack(spacing: 12) {
             if let error = errorMessage {
@@ -194,7 +194,7 @@ struct CreateMoodView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
-            
+
             HStack(spacing: 16) {
                 Button(action: { dismiss() }) {
                     Text("Cancel")
@@ -212,9 +212,9 @@ struct CreateMoodView: View {
                         .contentShape(buttonShape)
                 }
                 .buttonStyle(.plain)
-                
+
                 let isFormValid = !moodName.isEmpty && selectedFileURL != nil
-                
+
                 Button(action: createMood) {
                     Text("Create Mood")
                         .font(.headline)
@@ -254,19 +254,19 @@ struct CreateMoodView: View {
     private var buttonShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
     }
-    
+
     private func createMood() {
         do {
             guard let url = selectedFileURL else { return }
             let wallpaperPath = try CustomAssetManager.saveCustomWallpaper(from: url)
-            
+
             // Add the mood to the model
             appModel.moodViewModel.addCustomMood(
                 name: moodName,
                 wallpaperPath: wallpaperPath,
                 layerMix: appModel.playerViewModel.layerVolumes
             )
-            
+
             dismiss()
         } catch {
             print("🟥 [CreateMoodView] Failed to save wallpaper: \(error.localizedDescription)")

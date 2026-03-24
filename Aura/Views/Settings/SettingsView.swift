@@ -92,7 +92,7 @@ struct SettingsView: View {
                         )
                     }
                 }
-                
+
                 SectionView(title: "About") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Aura v1.0.0")
@@ -114,34 +114,61 @@ struct SettingsView: View {
 struct QuotesManagerView: View {
     @Bindable var appModel: AppModel
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var quotes: [CustomQuoteModel] = []
     @State private var newQuoteText: String = ""
     @State private var selectedStyle: String = "motivational"
-    
+    @State private var selectedTextColor: Color = .white
+    @State private var selectedFontSize: Double = 48
+    @State private var selectedFontStyle: QuoteFontStyle = .serif
+
     let availableStyles = ["motivational", "philosophical", "minimal", "bold"]
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Manage Custom Quotes")
                 .font(.title2.weight(.bold))
                 .padding(.top, 20)
-            
+
             HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Add New Quote")
                         .font(.headline)
-                    
+
                     TextField("Quote text...", text: $newQuoteText)
                         .textFieldStyle(.roundedBorder)
-                    
+
                     Picker("Style", selection: $selectedStyle) {
                         ForEach(availableStyles, id: \.self) { style in
                             Text(style.capitalized).tag(style)
                         }
                     }
                     .pickerStyle(.menu)
-                    
+
+                    ColorPicker("Text Color", selection: $selectedTextColor, supportsOpacity: true)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Font Size")
+                            Spacer()
+                            Text("\(Int(selectedFontSize)) pt")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Slider(value: $selectedFontSize, in: 28...96, step: 1)
+                    }
+
+                    Picker("Font", selection: $selectedFontStyle) {
+                        ForEach(QuoteFontStyle.allCases, id: \.self) { fontStyle in
+                            Text(fontStyle.displayName).tag(fontStyle)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    quotePreview
+                        .padding(.top, 4)
+
                     Button("Add Quote") {
                         addQuote()
                     }
@@ -150,11 +177,11 @@ struct QuotesManagerView: View {
                 }
                 .padding()
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlBackgroundColor)))
-                
+
                 VStack(alignment: .leading) {
                     Text("Your Quotes")
                         .font(.headline)
-                    
+
                     List {
                         ForEach(quotes, id: \.id) { quote in
                             HStack {
@@ -164,6 +191,19 @@ struct QuotesManagerView: View {
                                     Text(quote.style.capitalized)
                                         .font(.system(size: 11))
                                         .foregroundStyle(.secondary)
+                                    HStack(spacing: 8) {
+                                        Circle()
+                                            .fill(Color(
+                                                red: quote.textColor.red,
+                                                green: quote.textColor.green,
+                                                blue: quote.textColor.blue,
+                                                opacity: quote.textColor.alpha
+                                            ))
+                                            .frame(width: 10, height: 10)
+                                        Text("\(quote.fontStyle.displayName) • \(Int(quote.fontSize)) pt")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                                 Spacer()
                                 Button {
@@ -182,10 +222,11 @@ struct QuotesManagerView: View {
                 }
             }
             .padding(.horizontal, 20)
-            
+
             HStack {
                 Spacer()
                 Button("Done") {
+                    appModel.moodViewModel.refreshQuoteMoods()
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -196,25 +237,78 @@ struct QuotesManagerView: View {
         .onAppear {
             loadQuotes()
         }
+        .onDisappear {
+            appModel.moodViewModel.refreshQuoteMoods()
+        }
     }
-    
+
     private func loadQuotes() {
         quotes = appModel.quoteEngine.loadQuotes()
     }
-    
+
+    private var quotePreview: some View {
+        ZStack {
+            (colorScheme == .dark ? Color.black : Color.white)
+
+            Text(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Your quote preview" : newQuoteText)
+                .font(previewFont)
+                .foregroundStyle(selectedTextColor)
+                .multilineTextAlignment(.center)
+                .padding(24)
+                .minimumScaleFactor(0.5)
+        }
+        .frame(maxWidth: .infinity, minHeight: 170)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private var previewFont: Font {
+        switch selectedFontStyle {
+        case .system:
+            .system(size: selectedFontSize, weight: .bold, design: .default)
+        case .serif:
+            .system(size: selectedFontSize, weight: .bold, design: .serif)
+        case .rounded:
+            .system(size: selectedFontSize, weight: .bold, design: .rounded)
+        case .monospaced:
+            .system(size: selectedFontSize, weight: .bold, design: .monospaced)
+        }
+    }
+
     private func addQuote() {
         let trimmed = newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
-        let newQuote = CustomQuoteModel(text: trimmed, style: selectedStyle)
+
+        let newQuote = CustomQuoteModel(
+            text: trimmed,
+            style: selectedStyle,
+            textColor: colorComponents(from: selectedTextColor),
+            fontSize: selectedFontSize,
+            fontStyle: selectedFontStyle
+        )
         appModel.quoteEngine.saveQuote(newQuote)
         newQuoteText = ""
         loadQuotes()
+        appModel.moodViewModel.refreshQuoteMoods()
     }
-    
+
     private func deleteQuote(_ quote: CustomQuoteModel) {
         appModel.quoteEngine.deleteQuote(id: quote.id)
         loadQuotes()
+        appModel.moodViewModel.refreshQuoteMoods()
+    }
+
+    private func colorComponents(from color: Color) -> ColorComponents {
+        let nsColor = NSColor(color).usingColorSpace(.deviceRGB) ?? .white
+        return ColorComponents(
+            red: Double(nsColor.redComponent),
+            green: Double(nsColor.greenComponent),
+            blue: Double(nsColor.blueComponent),
+            alpha: Double(nsColor.alphaComponent)
+        )
     }
 }
 
@@ -257,7 +351,7 @@ struct SettingSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     let format: String
-    var zeroLabel: String? = nil
+    var zeroLabel: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -269,10 +363,10 @@ struct SettingSlider: View {
                     .font(.system(size: 12).monospaced())
                     .foregroundStyle(Color.accentColor)
             }
-            
+
             Slider(value: $value, in: range)
                 .controlSize(.small)
-            
+
             Text(description)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)

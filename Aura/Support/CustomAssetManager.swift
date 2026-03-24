@@ -2,7 +2,7 @@ import Foundation
 
 enum CustomAssetManager {
     static let fileManager = FileManager.default
-    
+
     static var appSupportDirectory: URL {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let appDir = appSupport.appendingPathComponent("Aura", isDirectory: true)
@@ -11,7 +11,7 @@ enum CustomAssetManager {
         }
         return appDir
     }
-    
+
     static var customWallpapersDirectory: URL {
         let customDir = appSupportDirectory.appendingPathComponent("CustomWallpapers", isDirectory: true)
         if !fileManager.fileExists(atPath: customDir.path) {
@@ -19,7 +19,7 @@ enum CustomAssetManager {
         }
         return customDir
     }
-    
+
     static var subthemeAssetsDirectory: URL {
         let assetsDir = appSupportDirectory.appendingPathComponent("SubthemeAssets", isDirectory: true)
         if !fileManager.fileExists(atPath: assetsDir.path) {
@@ -27,7 +27,7 @@ enum CustomAssetManager {
         }
         return assetsDir
     }
-    
+
     static var customAudioDirectory: URL {
         let audioDir = appSupportDirectory.appendingPathComponent("CustomAudio", isDirectory: true)
         if !fileManager.fileExists(atPath: audioDir.path) {
@@ -43,14 +43,14 @@ enum CustomAssetManager {
                 url.stopAccessingSecurityScopedResource()
             }
         }
-        
+
         let filename = "\(UUID().uuidString).\(url.pathExtension)"
         let destination = customWallpapersDirectory.appendingPathComponent(filename)
-        
+
         if fileManager.fileExists(atPath: destination.path) {
             try fileManager.removeItem(at: destination)
         }
-        
+
         try fileManager.copyItem(at: url, to: destination)
         return destination.path
     }
@@ -62,14 +62,14 @@ enum CustomAssetManager {
                 url.stopAccessingSecurityScopedResource()
             }
         }
-        
+
         let filename = "\(UUID().uuidString).\(url.pathExtension)"
         let destination = customAudioDirectory.appendingPathComponent(filename)
-        
+
         if fileManager.fileExists(atPath: destination.path) {
             try fileManager.removeItem(at: destination)
         }
-        
+
         try fileManager.copyItem(at: url, to: destination)
         return destination.path
     }
@@ -79,10 +79,10 @@ enum CustomAssetManager {
         if !fileManager.fileExists(atPath: subthemeDir.path) {
             try fileManager.createDirectory(at: subthemeDir, withIntermediateDirectories: true)
         }
-        
+
         let filename = "\(UUID().uuidString).\(url.pathExtension)"
         let destination = subthemeDir.appendingPathComponent(filename)
-        
+
         try fileManager.copyItem(at: url, to: destination)
         return destination.path
     }

@@ -6,18 +6,33 @@ import Observation
 final class MoodViewModel {
     private let moodEngine: MoodEngine
     private let playerViewModel: PlayerViewModel
-    
+    private let quoteEngine: QuoteEngine
+    private var quoteRefreshToken = 0
+
+    private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
+        uniqueKeysWithValues: MoodEngine.builtInMoods()
+            .filter { $0.wallpaper.type == .quote }
+            .compactMap { mood in
+                guard let style = mood.wallpaper.resources.first else {
+                    return nil
+                }
+                return (style, mood)
+            }
+    )
+
     var moods: [Mood] {
-        moodEngine.moods
+        _ = quoteRefreshToken
+        return moodEngine.moods + customQuoteMoods()
     }
-    
+
     var currentMood: Mood? {
         moodEngine.currentMood
     }
 
-    init(moodEngine: MoodEngine, playerViewModel: PlayerViewModel) {
+    init(moodEngine: MoodEngine, playerViewModel: PlayerViewModel, quoteEngine: QuoteEngine) {
         self.moodEngine = moodEngine
         self.playerViewModel = playerViewModel
+        self.quoteEngine = quoteEngine
     }
 
     func selectMood(_ mood: Mood) {
@@ -34,7 +49,7 @@ final class MoodViewModel {
             let isHeicOrImage = ["heic", "heif", "jpg", "jpeg", "png"].contains((wallpaperPath as NSString).pathExtension.lowercased())
             finalType = isHeicOrImage ? .dynamic : .animated
         }
-        
+
         let newMood = Mood(
             id: UUID().uuidString,
             name: name,
@@ -62,16 +77,20 @@ final class MoodViewModel {
     func mood(for id: String) -> Mood? {
         moods.first { $0.id == id }
     }
-    
+
+    func refreshQuoteMoods() {
+        quoteRefreshToken += 1
+    }
+
     var moodsBySubtheme: [String: [Mood]] {
         Dictionary(grouping: moods, by: { $0.subtheme })
     }
-    
+
     var subthemes: [String] {
         moodsBySubtheme.keys.sorted()
     }
-    
-    var selectedSubtheme: String? = nil
+
+    var selectedSubtheme: String?
 
     func selectNextMood() {
         guard let current = currentMood,
@@ -82,7 +101,7 @@ final class MoodViewModel {
             }
             return
         }
-        
+
         if index + 1 < subthemeMoods.count {
             selectMood(subthemeMoods[index + 1])
         } else {
@@ -90,7 +109,7 @@ final class MoodViewModel {
             selectNextSubtheme()
         }
     }
-    
+
     func selectPreviousMood() {
         guard let current = currentMood,
               let subthemeMoods = moodsBySubtheme[current.subtheme],
@@ -100,7 +119,7 @@ final class MoodViewModel {
             }
             return
         }
-        
+
         if index > 0 {
             selectMood(subthemeMoods[index - 1])
         } else {
@@ -117,19 +136,19 @@ final class MoodViewModel {
             }
             return
         }
-        
+
         let currentSubtheme = current.subtheme
         guard let currentIndex = subthemes.firstIndex(of: currentSubtheme) else { return }
-        
+
         let nextIndex = (currentIndex + 1) % subthemes.count
         let nextSubtheme = subthemes[nextIndex]
         selectedSubtheme = nextSubtheme
-        
+
         if let firstMoodInNextSubtheme = moodsBySubtheme[nextSubtheme]?.first {
             selectMood(firstMoodInNextSubtheme)
         }
     }
-    
+
     func selectPreviousSubtheme() {
         guard let current = currentMood else {
             if let last = moods.last {
@@ -138,16 +157,36 @@ final class MoodViewModel {
             }
             return
         }
-        
+
         let currentSubtheme = current.subtheme
         guard let currentIndex = subthemes.firstIndex(of: currentSubtheme) else { return }
-        
+
         let prevIndex = (currentIndex - 1 + subthemes.count) % subthemes.count
         let prevSubtheme = subthemes[prevIndex]
         selectedSubtheme = prevSubtheme
-        
+
         if let firstMoodInPrevSubtheme = moodsBySubtheme[prevSubtheme]?.first {
             selectMood(firstMoodInPrevSubtheme)
+        }
+    }
+
+    private func customQuoteMoods() -> [Mood] {
+        quoteEngine.loadQuotes().map { quote in
+            let template = Self.quoteTemplatesByStyle[quote.style]
+
+            return Mood(
+                id: "custom_quote_\(quote.id.uuidString)",
+                name: quote.text,
+                theme: template?.theme ?? "Utility",
+                subtheme: "Quotes",
+                layerMix: template?.layerMix ?? [:],
+                wallpaper: WallpaperDescriptor(type: .quote, resources: [quote.style, quote.id.uuidString]),
+                palette: template?.palette ?? ThemePalette(
+                    primary: ColorComponents(red: 0.95, green: 0.95, blue: 0.95),
+                    secondary: ColorComponents(red: 0.75, green: 0.75, blue: 0.75),
+                    accent: ColorComponents(red: 0.5, green: 0.5, blue: 0.5)
+                )
+            )
         }
     }
 }

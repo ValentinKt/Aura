@@ -5,20 +5,20 @@ import Observation
 @Observable
 final class PlaylistViewModel {
     private let playlistEngine: PlaylistEngine
-    
+
     var playlists: [Playlist] {
         playlistEngine.playlists
     }
-    
+
     var state: PlaylistState {
         playlistEngine.state
     }
-    
+
     var shuffleEnabled: Bool {
         get { playlistEngine.shuffleEnabled }
         set { playlistEngine.shuffleEnabled = newValue }
     }
-    
+
     var repeatMode: RepeatMode {
         get { playlistEngine.repeatMode }
         set { playlistEngine.repeatMode = newValue }
@@ -36,7 +36,7 @@ final class PlaylistViewModel {
     func pause() {
         playlistEngine.pause()
     }
-    
+
     func resume() {
         playlistEngine.resume()
     }
@@ -44,7 +44,7 @@ final class PlaylistViewModel {
     func skip() {
         playlistEngine.skip()
     }
-    
+
     func previous() {
         playlistEngine.previous()
     }
@@ -52,7 +52,7 @@ final class PlaylistViewModel {
     func restart() {
         playlistEngine.restart()
     }
-    
+
     func stop() {
         playlistEngine.stop()
     }

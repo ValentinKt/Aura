@@ -7,12 +7,12 @@ struct LiquidGlassLayer<S: Shape>: View {
     let variant: GlassVariant
     let lensing: Bool
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     enum GlassVariant {
         case regular
         case clear
     }
-    
+
     init(shape: S, opacity: Double = 0.7, interactive: Bool = true, variant: GlassVariant = .regular, lensing: Bool = true) {
         self.shape = shape
         self.opacity = opacity
@@ -20,7 +20,7 @@ struct LiquidGlassLayer<S: Shape>: View {
         self.variant = variant
         self.lensing = lensing
     }
-    
+
     var body: some View {
         if reduceTransparency {
             shape.fill(.regularMaterial).opacity(opacity)
@@ -91,12 +91,12 @@ struct GlassEffectContainer<Content: View, S: Shape>: View {
     let shape: S
     let content: () -> Content
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     init(shape: S, @ViewBuilder content: @escaping () -> Content) {
         self.shape = shape
         self.content = content
     }
-    
+
     var body: some View {
         content()
             .background {

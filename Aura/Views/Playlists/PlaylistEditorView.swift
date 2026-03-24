@@ -5,7 +5,7 @@ struct PlaylistEditorView: View {
     @Bindable var appModel: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     let originalPlaylist: Playlist?
     @State private var name: String
     @State private var entries: [PlaylistEntry]
@@ -21,7 +21,7 @@ struct PlaylistEditorView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     nameField
@@ -29,7 +29,7 @@ struct PlaylistEditorView: View {
                 }
                 .padding(24)
             }
-            
+
             footer
         }
         .frame(width: 480, height: 560)
@@ -51,7 +51,7 @@ struct PlaylistEditorView: View {
             handleAudioImport(result)
         }
     }
-    
+
     private var header: some View {
         HStack {
             Text(originalPlaylist == nil ? "New Playlist" : "Edit Playlist")
@@ -81,7 +81,7 @@ struct PlaylistEditorView: View {
                 .frame(height: 1)
         }
     }
-    
+
     private var nameField: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Playlist Name")
@@ -92,7 +92,7 @@ struct PlaylistEditorView: View {
                 .controlSize(.large)
         }
     }
-    
+
     private var entriesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -102,7 +102,7 @@ struct PlaylistEditorView: View {
                 Spacer()
                 addEntryMenu
             }
-            
+
             if entries.isEmpty {
                 emptyEntriesView
             } else {
@@ -112,7 +112,7 @@ struct PlaylistEditorView: View {
             }
         }
     }
-    
+
     private var addEntryMenu: some View {
         Menu {
             Section("Moods") {
@@ -122,7 +122,7 @@ struct PlaylistEditorView: View {
                     }
                 }
             }
-            
+
             Section("Local Music") {
                 Button(action: { isImportingAudio = true }) {
                     Label("Add from Mac...", systemImage: "music.note")
@@ -134,7 +134,7 @@ struct PlaylistEditorView: View {
         .buttonStyle(.bordered)
         .controlSize(.small)
     }
-    
+
     private var emptyEntriesView: some View {
         VStack(spacing: 12) {
             Image(systemName: "music.note.list")
@@ -161,7 +161,7 @@ struct PlaylistEditorView: View {
         HStack(spacing: 12) {
             Image(systemName: "line.3.horizontal")
                 .foregroundStyle(.secondary)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 if let audioPath = entry.wrappedValue.customAudioPath {
                     Text(entry.wrappedValue.name ?? "Custom Audio")
@@ -179,7 +179,7 @@ struct PlaylistEditorView: View {
                         .font(.body)
                         .bold()
                 }
-                
+
                 HStack {
                     Picker("Duration", selection: entry.duration) {
                         Text("15 min").tag(TimeInterval(900))
@@ -192,10 +192,10 @@ struct PlaylistEditorView: View {
                     .labelsHidden()
                     .controlSize(.small)
                     .frame(width: 80)
-                    
+
                     Text("•")
                         .foregroundStyle(.secondary)
-                    
+
                     Picker("Style", selection: entry.transitionStyle) {
                         ForEach(TransitionStyle.allCases, id: \.self) { style in
                             Text(style.rawValue.capitalized).tag(style)
@@ -206,9 +206,9 @@ struct PlaylistEditorView: View {
                     .frame(width: 80)
                 }
             }
-            
+
             Spacer()
-            
+
             Button(role: .destructive, action: {
                 if let path = entry.wrappedValue.customAudioPath {
                     CustomAssetManager.removeCustomAudio(atPath: path)
@@ -232,7 +232,7 @@ struct PlaylistEditorView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
-    
+
     private func handleAudioImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -253,14 +253,14 @@ struct PlaylistEditorView: View {
             print("🟥 [PlaylistEditorView] Audio import failed: \(error)")
         }
     }
-    
+
     private var footer: some View {
         HStack {
             Spacer()
             Button("Cancel") { dismiss() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-            
+
             Button(action: save) {
                 Text("Save Playlist")
                     .bold()
@@ -293,7 +293,7 @@ struct PlaylistEditorView: View {
                 .frame(height: 1)
         }
     }
-    
+
     private func save() {
         let playlist = Playlist(
             id: originalPlaylist?.id ?? UUID(),

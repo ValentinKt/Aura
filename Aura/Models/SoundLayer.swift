@@ -29,11 +29,4 @@ struct SoundLayer: Identifiable, Codable, Hashable {
     var volume: Float
     var pan: Float
     var lowPassCutoff: Float
-
-    init(id: String, volume: Float, pan: Float, lowPassCutoff: Float) {
-        self.id = id
-        self.volume = volume
-        self.pan = pan
-        self.lowPassCutoff = lowPassCutoff
-    }
 }

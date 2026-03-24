@@ -34,7 +34,7 @@ struct CommandPaletteView: View {
                     .scaledToFit()
                     .frame(width: 28, height: 28)
                     .shadow(color: .cyan.opacity(0.4), radius: 8, x: 0, y: 0)
-                
+
                 TextField("Search moods, playlists, settings...", text: $query)
                     .textFieldStyle(.plain)
                     .focused($isFocused)
@@ -45,10 +45,10 @@ struct CommandPaletteView: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
-            
+
             Divider()
                 .opacity(0.5)
-            
+
             if filteredItems.isEmpty {
                 VStack(spacing: 16) {
                     Image("AuraCircle")
@@ -123,43 +123,43 @@ struct CommandPaletteView: View {
         if query.isEmpty {
             return items
         }
-        
+
         let lowerQuery = query.lowercased()
-        
+
         // Priority 1: Exact prefix match
         let prefixMatches = items.filter { $0.title.lowercased().hasPrefix(lowerQuery) }
-        
+
         // Priority 2: Case-insensitive contains match (excluding prefix matches)
-        let containsMatches = items.filter { 
-            $0.title.lowercased().contains(lowerQuery) && 
-            !$0.title.lowercased().hasPrefix(lowerQuery) 
+        let containsMatches = items.filter {
+            $0.title.lowercased().contains(lowerQuery) &&
+                !$0.title.lowercased().hasPrefix(lowerQuery)
         }
-        
+
         return prefixMatches + containsMatches
     }
 
     private var commandItems: [CommandItem] {
         var items: [CommandItem] = []
-        
+
         // Moods
         items.append(contentsOf: appModel.moodViewModel.moods.map { mood in
             CommandItem(id: "mood-\(mood.id)", title: "Mood: \(mood.name)", category: "Moods", icon: "sparkles") {
                 appModel.moodViewModel.selectMood(mood)
             }
         })
-        
+
         // Playlists
         items.append(contentsOf: appModel.playlistViewModel.playlists.map { playlist in
             CommandItem(id: "playlist-\(playlist.id.uuidString)", title: "Playlist: \(playlist.name)", category: "Playlists", icon: "music.note.list") {
                 appModel.playlistViewModel.play(playlist)
             }
         })
-        
+
         // Settings/Global
         items.append(CommandItem(id: "toggle-weather", title: "Toggle Weather Sync", category: "Settings", icon: "cloud.sun") {
             appModel.toggleWeatherSync(!appModel.settingsViewModel.settings.weatherSyncEnabled)
         })
-        
+
         items.append(CommandItem(id: "open-settings", title: "Open Settings", category: "Settings", icon: "gearshape") {
             // Logic to open settings if needed
         })
@@ -167,7 +167,7 @@ struct CommandPaletteView: View {
         items.append(CommandItem(id: "toggle-immersive", title: "Toggle Immersive Mode", category: "View", icon: "macwindow.on.rectangle") {
             appModel.showImmersive.toggle()
         })
-        
+
         return items
     }
 }
@@ -184,7 +184,7 @@ private struct CommandItemRow: View {
     let item: CommandItem
     let isSelected: Bool
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     var body: some View {
         rowSurface
     }
@@ -206,19 +206,19 @@ private struct CommandItemRow: View {
                 .font(.system(size: 16, weight: .medium))
                 .frame(width: 24, height: 24)
                 .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.primary.opacity(0.8)))
-                
+
                 Text(item.category)
                     .font(.system(size: 12))
                     .foregroundStyle(isSelected ? AnyShapeStyle(.secondary) : AnyShapeStyle(.secondary.opacity(0.7)))
             }
-            
+
             Spacer()
-            
+
             if isSelected {
                 Image(systemName: "return")
                     .font(.system(size: 14, weight: .medium))

@@ -33,8 +33,14 @@
     </entity>
     <entity name="CustomQuote" representedClassName="NSManagedObject" syncable="YES">
         <attribute name="createdAt" attributeType="Date" optional="NO"/>
+        <attribute name="fontSize" attributeType="Double"/>
+        <attribute name="fontStyle" attributeType="String"/>
         <attribute name="id" attributeType="UUID" optional="NO"/>
         <attribute name="style" attributeType="String" optional="NO" defaultValueString="motivational"/>
         <attribute name="text" attributeType="String" optional="NO"/>
+        <attribute name="textColorAlpha" attributeType="Double"/>
+        <attribute name="textColorBlue" attributeType="Double"/>
+        <attribute name="textColorGreen" attributeType="Double"/>
+        <attribute name="textColorRed" attributeType="Double"/>
     </entity>
 </model>

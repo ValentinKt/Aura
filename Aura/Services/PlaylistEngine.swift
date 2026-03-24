@@ -113,13 +113,13 @@ final class PlaylistEngine {
             let entity = try context.fetch(request).first ?? NSEntityDescription.insertNewObject(forEntityName: "Playlist", into: context)
             entity.setValue(playlist.id, forKey: "id")
             entity.setValue(playlist.name, forKey: "name")
-            
+
             if let encodedEntries = try? JSONEncoder().encode(playlist.entries) {
                 entity.setValue(encodedEntries, forKey: "entries")
             }
             entity.setValue(playlist.scheduleTime, forKey: "scheduleTime")
             entity.setValue(Date(), forKey: "createdAt")
-            
+
             try context.save()
             playlists = loadPlaylists()
             startScheduling()
@@ -133,19 +133,19 @@ final class PlaylistEngine {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "Playlist")
         request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-        
+
         do {
             if let entity = try context.fetch(request).first {
                 context.delete(entity)
                 try context.save()
                 playlists = loadPlaylists()
-                
+
                 if case .playing(let p, _) = state, p.id == id {
                     stop()
                 } else if case .paused(let p, _) = state, p.id == id {
                     stop()
                 }
-                
+
                 startScheduling()
             }
         } catch {
@@ -156,14 +156,14 @@ final class PlaylistEngine {
 
     private func startPlayback() {
         stopPlayback()
-        
+
         guard case .playing(let playlist, let index) = state else { return }
-        
+
         playbackTask = Task { [weak self] in
             guard let self else { return }
-            
+
             let entry = playlist.entries[index]
-            
+
             if let audioPath = entry.customAudioPath {
                 let url = URL(fileURLWithPath: audioPath)
                 await moodEngine.playCustomAudio(url: url)
@@ -182,13 +182,13 @@ final class PlaylistEngine {
                 }
                 return
             }
-            
+
             // If duration is 0, we stay on this mood until manual skip
             if entry.duration <= 0 { return }
-            
+
             // Wait for duration
             try? await Task.sleep(nanoseconds: UInt64(entry.duration * 1_000_000_000))
-            
+
             if !Task.isCancelled {
                 await MainActor.run {
                     self.advance()
@@ -204,9 +204,9 @@ final class PlaylistEngine {
 
     private func advance() {
         guard case .playing(let playlist, let index) = state else { return }
-        
+
         var nextIndex = index + 1
-        
+
         if shuffleEnabled {
             nextIndex = Int.random(in: 0..<playlist.entries.count)
         } else if nextIndex >= playlist.entries.count {
@@ -220,7 +220,7 @@ final class PlaylistEngine {
                 nextIndex = 0
             }
         }
-        
+
         state = .playing(playlist, nextIndex)
         startPlayback()
     }
@@ -230,7 +230,7 @@ final class PlaylistEngine {
         let request = NSFetchRequest<NSManagedObject>(entityName: "Playlist")
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
         request.fetchBatchSize = 20
-        
+
         do {
             let results = try context.fetch(request)
             return results.compactMap { playlist(from: $0) }
@@ -249,13 +249,13 @@ final class PlaylistEngine {
         scheduleTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { break }
-                
+
                 // Check if any playlist is scheduled for now
                 let now = Date()
                 let playlistToStart = await MainActor.run { () -> Playlist? in
                     self.playlists.first { p in
                         guard let schedule = p.scheduleTime else { return false }
-                        
+
                         // Check if we already started this today within the last hour
                         if self.lastScheduledPlaylistID == p.id,
                            let lastDate = self.lastScheduledDate,
@@ -268,12 +268,12 @@ final class PlaylistEngine {
                         let calendar = Calendar.current
                         let nowComponents = calendar.dateComponents([.hour, .minute], from: now)
                         let scheduleComponents = calendar.dateComponents([.hour, .minute], from: schedule)
-                        
-                        return nowComponents.hour == scheduleComponents.hour && 
-                               nowComponents.minute == scheduleComponents.minute
+
+                        return nowComponents.hour == scheduleComponents.hour &&
+                            nowComponents.minute == scheduleComponents.minute
                     }
                 }
-                
+
                 if let playlistToStart {
                     await MainActor.run {
                         self.lastScheduledPlaylistID = playlistToStart.id
@@ -281,7 +281,7 @@ final class PlaylistEngine {
                         self.play(playlistToStart)
                     }
                 }
-                
+
                 // Sleep for 30 seconds before next check
                 try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
             }

@@ -179,16 +179,50 @@ final class PersistenceController {
 
 // MARK: - Custom Quotes
 
+enum QuoteFontStyle: String, Codable, CaseIterable, Hashable {
+    case system
+    case serif
+    case rounded
+    case monospaced
+
+    var displayName: String {
+        switch self {
+        case .system:
+            "System"
+        case .serif:
+            "Serif"
+        case .rounded:
+            "Rounded"
+        case .monospaced:
+            "Monospaced"
+        }
+    }
+}
+
 struct CustomQuoteModel: Identifiable, Codable, Hashable {
     let id: UUID
     var text: String
     var style: String
+    var textColor: ColorComponents
+    var fontSize: Double
+    var fontStyle: QuoteFontStyle
     var createdAt: Date
 
-    init(id: UUID = UUID(), text: String, style: String, createdAt: Date = Date()) {
+    init(
+        id: UUID = UUID(),
+        text: String,
+        style: String,
+        textColor: ColorComponents = ColorComponents(red: 0.95, green: 0.95, blue: 0.95),
+        fontSize: Double = 48,
+        fontStyle: QuoteFontStyle = .serif,
+        createdAt: Date = Date()
+    ) {
         self.id = id
         self.text = text
         self.style = style
+        self.textColor = textColor
+        self.fontSize = fontSize
+        self.fontStyle = fontStyle
         self.createdAt = createdAt
     }
 }
@@ -205,7 +239,7 @@ final class QuoteEngine {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "CustomQuote")
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-        
+
         if let style = style {
             request.predicate = NSPredicate(format: "style == %@", style)
         }
@@ -213,13 +247,29 @@ final class QuoteEngine {
         do {
             let results = try context.fetch(request)
             return results.compactMap { entity in
-                guard let id = entity.value(forKey: "id") as? UUID,
+                guard let id = quoteID(from: entity),
                       let text = entity.value(forKey: "text") as? String,
                       let entityStyle = entity.value(forKey: "style") as? String,
                       let createdAt = entity.value(forKey: "createdAt") as? Date else {
                     return nil
                 }
-                return CustomQuoteModel(id: id, text: text, style: entityStyle, createdAt: createdAt)
+                let textColor = ColorComponents(
+                    red: entity.value(forKey: "textColorRed") as? Double ?? 0.95,
+                    green: entity.value(forKey: "textColorGreen") as? Double ?? 0.95,
+                    blue: entity.value(forKey: "textColorBlue") as? Double ?? 0.95,
+                    alpha: entity.value(forKey: "textColorAlpha") as? Double ?? 1
+                )
+                let fontSize = entity.value(forKey: "fontSize") as? Double ?? 48
+                let fontStyle = QuoteFontStyle(rawValue: entity.value(forKey: "fontStyle") as? String ?? "") ?? .serif
+                return CustomQuoteModel(
+                    id: id,
+                    text: text,
+                    style: entityStyle,
+                    textColor: textColor,
+                    fontSize: fontSize,
+                    fontStyle: fontStyle,
+                    createdAt: createdAt
+                )
             }
         } catch {
             print("🟥 [QuoteEngine] Failed to load quotes: \(error)")
@@ -230,16 +280,23 @@ final class QuoteEngine {
     func saveQuote(_ quote: CustomQuoteModel) {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "CustomQuote")
-        request.predicate = NSPredicate(format: "id == %@", quote.id as CVarArg)
 
         do {
-            let entity = try context.fetch(request).first ?? NSEntityDescription.insertNewObject(forEntityName: "CustomQuote", into: context)
-            entity.setValue(quote.id, forKey: "id")
+            let entity = try context.fetch(request).first(where: { quoteID(from: $0) == quote.id })
+                ?? NSEntityDescription.insertNewObject(forEntityName: "CustomQuote", into: context)
+            setQuoteID(quote.id, on: entity)
             entity.setValue(quote.text, forKey: "text")
             entity.setValue(quote.style, forKey: "style")
+            entity.setValue(quote.textColor.red, forKey: "textColorRed")
+            entity.setValue(quote.textColor.green, forKey: "textColorGreen")
+            entity.setValue(quote.textColor.blue, forKey: "textColorBlue")
+            entity.setValue(quote.textColor.alpha, forKey: "textColorAlpha")
+            entity.setValue(quote.fontSize, forKey: "fontSize")
+            entity.setValue(quote.fontStyle.rawValue, forKey: "fontStyle")
             entity.setValue(quote.createdAt, forKey: "createdAt")
-            
+
             try context.save()
+            NotificationCenter.default.post(name: Notification.Name("quotesDidChange"), object: quote.style)
         } catch {
             print("🟥 [QuoteEngine] Failed to save quote: \(error)")
         }
@@ -248,16 +305,39 @@ final class QuoteEngine {
     func deleteQuote(id: UUID) {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "CustomQuote")
-        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
 
         do {
-            if let entity = try context.fetch(request).first {
+            if let entity = try context.fetch(request).first(where: { quoteID(from: $0) == id }) {
+                let style = entity.value(forKey: "style") as? String
                 context.delete(entity)
                 try context.save()
+                NotificationCenter.default.post(name: Notification.Name("quotesDidChange"), object: style)
             }
         } catch {
             print("🟥 [QuoteEngine] Failed to delete quote: \(error)")
         }
     }
-}
 
+    private func quoteID(from entity: NSManagedObject) -> UUID? {
+        let rawID = entity.value(forKey: "id")
+        if let id = rawID as? UUID {
+            return id
+        }
+        if let id = rawID as? NSUUID {
+            return id as UUID
+        }
+        if let stringID = rawID as? String {
+            return UUID(uuidString: stringID)
+        }
+        return nil
+    }
+
+    private func setQuoteID(_ id: UUID, on entity: NSManagedObject) {
+        let attributeType = entity.entity.attributesByName["id"]?.attributeType
+        if attributeType == .stringAttributeType {
+            entity.setValue(id.uuidString, forKey: "id")
+        } else {
+            entity.setValue(id, forKey: "id")
+        }
+    }
+}

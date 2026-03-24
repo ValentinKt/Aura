@@ -30,7 +30,7 @@ struct ImmersiveModeView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var backgroundLayer: some View {
         // Subtle tint over the wallpaper that aligns with the current mood
@@ -48,14 +48,14 @@ struct ImmersiveModeView: View {
                 .ignoresSafeArea()
         }
     }
-    
+
     @ViewBuilder
     private var contentLayer: some View {
         VStack {
             Spacer()
             clockSection
             Spacer()
-            
+
             if showControls {
                 Group {
                     controlsSection
@@ -65,7 +65,7 @@ struct ImmersiveModeView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var clockSection: some View {
         VStack(spacing: 8) {
@@ -75,7 +75,7 @@ struct ImmersiveModeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .tracking(4)
-                
+
                 Text(context.date, format: .dateTime.weekday(.wide).day().month(.wide))
                     .font(.title.weight(.light))
                     .foregroundStyle(.secondary)
@@ -87,7 +87,7 @@ struct ImmersiveModeView: View {
         .blur(radius: showControls ? 4 : 0)
         .animation(.spring(response: 0.6, dampingFraction: 0.8), value: showControls)
     }
-    
+
     @ViewBuilder
     private var controlsSection: some View {
         VStack(spacing: 24) {
@@ -96,7 +96,7 @@ struct ImmersiveModeView: View {
             exitButton
         }
     }
-    
+
     @ViewBuilder
     private var statusInfo: some View {
         VStack(spacing: 8) {
@@ -106,7 +106,7 @@ struct ImmersiveModeView: View {
         }
         .transition(.scale.combined(with: .opacity))
     }
-    
+
     @ViewBuilder
     private var mixerPanel: some View {
         VStack(spacing: 20) {
@@ -129,7 +129,7 @@ struct ImmersiveModeView: View {
                 }
                 .buttonStyle(.plain)
             }
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 24) {
                     ForEach(SoundLayerID.allCases) { layer in
@@ -146,14 +146,14 @@ struct ImmersiveModeView: View {
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onHover { isHoveringControls = $0 }
     }
-    
+
     @ViewBuilder
     private func layerSlider(for layer: SoundLayerID) -> some View {
         VStack(spacing: 8) {
             Image(systemName: layerIcon(for: layer))
                 .font(.title3)
                 .foregroundStyle(appModel.playerViewModel.layerVolumes[layer.rawValue] ?? 0 > 0 ? Color.accentColor : .secondary)
-            
+
             Slider(value: Binding(
                 get: { Double(appModel.playerViewModel.layerVolumes[layer.rawValue] ?? 0) },
                 set: { appModel.playerViewModel.setVolume(for: layer.rawValue, volume: Float($0)) }
@@ -162,12 +162,12 @@ struct ImmersiveModeView: View {
             .controlSize(.mini)
         }
     }
-    
+
     @ViewBuilder
     private var exitButton: some View {
-        Button(action: { 
+        Button(action: {
             withAnimation {
-                appModel.showImmersive = false 
+                appModel.showImmersive = false
             }
         }) {
             Label("Exit Immersive Mode", systemImage: "arrow.down.right.and.arrow.up.left")
@@ -179,7 +179,7 @@ struct ImmersiveModeView: View {
         }
         .buttonStyle(.plain)
     }
-    
+
     private var currentStatusLabel: String {
         if let playlist = appModel.playlistViewModel.statePlaylist {
             return "Playlist: \(playlist.name)"

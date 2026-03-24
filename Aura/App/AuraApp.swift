@@ -12,13 +12,13 @@ import AppKit
 struct AuraApp: App {
     @State private var appModel = AppModel()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    
+
     init() {
         // Disable os_log to fix "Logging Error: Failed to receive 1 log messages"
         setenv("OS_ACTIVITY_MODE", "disable", 1)
-        
+
         print("🟢 [AuraApp] Initialization started")
-        
+
         // Disable state restoration to prevent NSPersistentUIRemoteStorage errors
         UserDefaults.standard.register(defaults: [
             "NSQuitAlwaysKeepsWindows": false,
@@ -30,9 +30,9 @@ struct AuraApp: App {
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
-        
+
         print("🟢 [AuraApp] State restoration disabled")
-        
+
         // Remove any previously saved restoration data
         if let bundleID = Bundle.main.bundleIdentifier,
            let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
@@ -40,7 +40,7 @@ struct AuraApp: App {
             try? FileManager.default.removeItem(at: restorationDir)
         }
     }
-    
+
     var body: some Scene {
         Window("Aura", id: "main") {
             ZStack {
@@ -56,14 +56,14 @@ struct AuraApp: App {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    // We need to provide the environment to the progress view too, 
+                    // We need to provide the environment to the progress view too,
                     // or just the whole ZStack.
                 }
             }
             .environment(appModel)
             .onAppear {
                 appDelegate.appModel = appModel
-                
+
                 // Ensure any existing windows are not restorable
                 for window in NSApp.windows {
                     window.isRestorable = false
@@ -117,7 +117,7 @@ struct AuraApp: App {
                 .keyboardShortcut("k", modifiers: .command)
             }
         }
-        
+
         MenuBarExtra {
             MenuBarPopoverView(appModel: appModel)
         } label: {
@@ -127,4 +127,3 @@ struct AuraApp: App {
         .menuBarExtraStyle(.window)
     }
 }
-

@@ -74,7 +74,7 @@ final class PresetEngine {
 
         let bundle = Bundle.main
         guard let url = bundle.url(forResource: "default_presets", withExtension: "json", subdirectory: "Resources/Presets") ??
-                          bundle.url(forResource: "default_presets", withExtension: "json"),
+                bundle.url(forResource: "default_presets", withExtension: "json"),
               let data = try? Data(contentsOf: url) else {
             return
         }

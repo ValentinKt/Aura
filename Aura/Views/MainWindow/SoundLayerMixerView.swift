@@ -4,7 +4,7 @@ struct SoundLayerMixerView: View {
     @Bindable var appModel: AppModel
     var isScrollable: Bool = true
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     let columns = [
         GridItem(.adaptive(minimum: 160, maximum: 180), spacing: 16)
     ]
@@ -84,7 +84,7 @@ struct SoundLayerMixerView: View {
         .padding(.bottom, 24)
         .padding(.top, 8)
     }
-    
+
     private var layersGrid: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
             ForEach(SoundLayerID.allCases) { layer in
@@ -129,7 +129,7 @@ struct LayerCard: View {
     let id: String
     @Binding var volume: Double
     let icon: String
-    
+
     @State private var isHovered = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -159,13 +159,13 @@ struct LayerCard: View {
                     .font(.system(size: 16))
                     .foregroundStyle(volume > 0 ? Color.accentColor : .white.opacity(0.4))
                     .frame(width: 32, height: 32)
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(id.capitalized)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(volume > 0 ? .white : .white.opacity(0.8))
                         .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                    
+
                     if volume > 0 {
                         Text("\(Int(volume * 100))%")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -174,10 +174,10 @@ struct LayerCard: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
-                
+
                 Spacer()
             }
-            
+
             CustomSlider(value: $volume)
                 .frame(height: 6)
         }
@@ -189,9 +189,9 @@ struct CustomSlider: View {
     @Binding var value: Double
     @State private var isDragging = false
     @State private var trackWidth: CGFloat = 0
-    
+
     private let thumbSize: CGFloat = 14
-    
+
     var body: some View {
         ZStack(alignment: .leading) {
             // Track with subtle background
@@ -207,11 +207,11 @@ struct CustomSlider: View {
                             }
                     }
                 )
-            
+
             if trackWidth > 0 {
                 let availableWidth = max(0, trackWidth - thumbSize)
                 let currentOffset = availableWidth * CGFloat(value)
-                
+
                 // Progress with accent and glow
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(
@@ -223,7 +223,7 @@ struct CustomSlider: View {
                     )
                     .frame(width: currentOffset + (thumbSize / 2), height: 6)
                     .shadow(color: Color.accentColor.opacity(0.5), radius: 6)
-                
+
                 // Glass Thumb
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(.white)

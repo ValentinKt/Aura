@@ -4,16 +4,16 @@ import Combine
 struct ZenWallpaperView: View {
     let style: String
     let palette: ThemePalette
-    @State private var desktopImage: NSImage? = nil
-    
+    @State private var desktopImage: NSImage?
+
     var primaryColor: Color {
         Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue)
     }
-    
+
     var secondaryColor: Color {
         Color(red: palette.secondary.red, green: palette.secondary.green, blue: palette.secondary.blue)
     }
-    
+
     var accentColor: Color {
         Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue)
     }
@@ -29,7 +29,7 @@ struct ZenWallpaperView: View {
             } else {
                 Color.black.ignoresSafeArea()
             }
-            
+
             // Render specific style
             switch style {
             case "breathing":
@@ -46,7 +46,7 @@ struct ZenWallpaperView: View {
             loadDesktopImage()
         }
     }
-    
+
     private func loadDesktopImage() {
         if let screen = NSScreen.main,
            let url = NSWorkspace.shared.desktopImageURL(for: screen),
@@ -62,12 +62,12 @@ struct BreathingZenView: View {
     let accentColor: Color
     @State private var isInhaling = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     var body: some View {
         ZStack {
             // Dark overlay to focus
             Color.black.opacity(0.4).ignoresSafeArea()
-            
+
             VStack(spacing: 60) {
                 ZStack {
                     // Outer glow
@@ -75,7 +75,7 @@ struct BreathingZenView: View {
                         .fill(accentColor.opacity(0.2))
                         .frame(width: isInhaling ? 400 : 200, height: isInhaling ? 400 : 200)
                         .blur(radius: 40)
-                    
+
                     // Main breathing circle
                     Circle()
                         .fill(LinearGradient(colors: [primaryColor, accentColor], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -86,7 +86,7 @@ struct BreathingZenView: View {
                                 .stroke(.white.opacity(0.3), lineWidth: 2)
                         )
                 }
-                
+
                 Text(isInhaling ? "Inhale" : "Exhale")
                     .font(.system(size: 40, weight: .light, design: .rounded))
                     .foregroundStyle(.white.opacity(0.8))
@@ -107,11 +107,11 @@ struct MandalaZenView: View {
     let accentColor: Color
     @State private var rotation: Double = 0
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.6).ignoresSafeArea()
-            
+
             ZStack {
                 ForEach(0..<8) { index in
                     Circle()
@@ -138,18 +138,18 @@ struct RippleZenView: View {
     let accentColor: Color
     @State private var rippleScale: CGFloat = 0.1
     @State private var rippleOpacity: Double = 1.0
-    
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.5).ignoresSafeArea()
-            
+
             ZStack {
                 Circle()
                     .stroke(accentColor, lineWidth: 2)
                     .frame(width: 100, height: 100)
                     .scaleEffect(rippleScale)
                     .opacity(rippleOpacity)
-                
+
                 Circle()
                     .fill(primaryColor)
                     .frame(width: 20, height: 20)

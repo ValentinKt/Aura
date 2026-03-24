@@ -8,28 +8,12 @@ struct Mood: Identifiable, Codable, Hashable {
     var layerMix: [String: Float]
     var wallpaper: WallpaperDescriptor
     var palette: ThemePalette
-
-    init(id: String, name: String, theme: String, subtheme: String, layerMix: [String: Float], wallpaper: WallpaperDescriptor, palette: ThemePalette) {
-        self.id = id
-        self.name = name
-        self.theme = theme
-        self.subtheme = subtheme
-        self.layerMix = layerMix
-        self.wallpaper = wallpaper
-        self.palette = palette
-    }
 }
 
 struct ThemePalette: Codable, Hashable {
     var primary: ColorComponents
     var secondary: ColorComponents
     var accent: ColorComponents
-
-    init(primary: ColorComponents, secondary: ColorComponents, accent: ColorComponents) {
-        self.primary = primary
-        self.secondary = secondary
-        self.accent = accent
-    }
 }
 
 struct ColorComponents: Codable, Hashable {

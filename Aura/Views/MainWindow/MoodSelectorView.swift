@@ -3,7 +3,7 @@ import AVFoundation
 
 struct MoodSelectorView: View {
     @Bindable var appModel: AppModel
-    
+
     var body: some View {
         ScrollViewReader { proxy in
             VStack(alignment: .leading, spacing: 24) {
@@ -31,6 +31,9 @@ struct MoodSelectorView: View {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("quotesDidChange"))) { _ in
+                appModel.moodViewModel.refreshQuoteMoods()
+            }
         }
     }
 }
@@ -39,7 +42,7 @@ struct SubthemeRow: View {
     let subtheme: String
     @Bindable var appModel: AppModel
     @State private var showingQuotesManager = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(subtheme.uppercased())
@@ -47,7 +50,7 @@ struct SubthemeRow: View {
                 .foregroundStyle(.white)
                 .kerning(1.2)
                 .padding(.horizontal, 40)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 ScrollViewReader { horizontalProxy in
                     moodList
@@ -87,7 +90,7 @@ struct SubthemeRow: View {
             QuotesManagerView(appModel: appModel)
         }
     }
-    
+
     @ViewBuilder
     private var moodList: some View {
         LazyHStack(spacing: 16) {
@@ -115,7 +118,7 @@ struct SubthemeRow: View {
         .padding(.horizontal, 40)
         .padding(.vertical, 4)
     }
-    
+
     private func selectMood(_ mood: Mood) {
         guard appModel.moodViewModel.currentMood?.id != mood.id else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -194,9 +197,9 @@ struct CreateQuoteCard: View {
 struct MoodCard: View {
     let mood: Mood
     let isSelected: Bool
-    var onDelete: (() -> Void)? = nil
+    var onDelete: (() -> Void)?
     let action: () -> Void
-    
+
     @State private var image: NSImage?
     @State private var isHovered = false
     @State private var isPressed = false
@@ -250,7 +253,7 @@ struct MoodCard: View {
             }
             .buttonStyle(.plain)
             .focusable(false)
-            
+
             if let onDelete = onDelete, isHovered {
                 Button(action: onDelete) {
                     Image(systemName: "minus.circle.fill")
@@ -285,7 +288,7 @@ struct MoodCard: View {
             }
         }
     }
-    
+
     private var cardContent: some View {
         ZStack(alignment: .bottomLeading) {
             // Background Image
@@ -321,20 +324,20 @@ struct MoodCard: View {
                 }
                 .frame(width: 240, height: 160)
                 .overlay {
-                        Circle()
-                            .trim(from: 0, to: 0.7)
-                            .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                            .frame(width: 20, height: 20)
-                            .rotationEffect(Angle(degrees: isPressed ? 360 : 0))
-                            .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: true)
-                    }
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                        .frame(width: 20, height: 20)
+                        .rotationEffect(Angle(degrees: isPressed ? 360 : 0))
+                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: true)
+                }
             }
-            
+
             // Hover Effect Overlay
             if isHovered && !isSelected {
                 Color.white.opacity(0.1)
             }
-            
+
             // Small label at the bottom-left as shown in the image
             Text(mood.name)
                 .font(.system(size: 11, weight: .bold))
@@ -345,7 +348,7 @@ struct MoodCard: View {
                 .background(Color.black.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 .padding(14)
-            
+
             // Selection indicator
             if isSelected {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -406,7 +409,7 @@ struct MoodCard: View {
             action()
             return
         }
-        
+
         let isDownloaded = DownloadManager.shared.isDownloaded(resource: primaryResource)
         if isDownloaded {
             action()
@@ -420,14 +423,14 @@ struct MoodCard: View {
             }
         }
     }
-    
+
     @MainActor
     private func loadPreview() async {
         if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote {
             // No preview image needed for programmatic wallpapers, they render directly
             return
         }
-        
+
         guard let resource = mood.wallpaper.resources.first, !resource.isEmpty else { return }
 
         // Return cached image if available
@@ -438,20 +441,20 @@ struct MoodCard: View {
 
         let loadedImage = await Task(priority: .utility) { () -> NSImage? in
             if Task.isCancelled { return nil }
-            
+
             // First check if the resource is an un-downloaded file from the Github release.
             // Try to resolve the URL, but don't fail immediately if it's nil.
             let resolvedURL = MediaUtils.resolveResourceURL(resource)
-            
+
             // Check if it's a known video file format that we might need to load from local cache or bundle
             let ext = (resolvedURL?.pathExtension ?? (resource as NSString).pathExtension).lowercased()
             let isVideo = ["mp4", "mov"].contains(ext)
-            
+
             if let url = resolvedURL {
                 if url.isFileURL {
                     let path = url.path
                     let exists = FileManager.default.fileExists(atPath: path)
-                    
+
                     if exists {
                         if isVideo {
                             let poster = await MediaUtils.videoPosterImage(from: url)
@@ -464,19 +467,19 @@ struct MoodCard: View {
                     }
                 }
             }
-            
+
             // Fallback: If URL resolution failed or file doesn't exist locally,
             // try to load an image with the same base name from the asset catalog (as a placeholder)
             let baseName = (resource as NSString).deletingPathExtension
             if let image = NSImage(named: baseName) {
                 return image
             }
-            
+
             // If we have an image in the asset catalog matching the exact resource name
             if let image = NSImage(named: resource) {
                 return image
             }
-            
+
             return nil
         }.value
 
@@ -497,18 +500,18 @@ struct TimeWallpaperPreview: View {
     let mood: Mood
     let isPressed: Bool
     var targetSize: CGSize = CGSize(width: 240, height: 160)
-    
+
     var body: some View {
         ZStack {
             if let style = mood.wallpaper.resources.first {
                 // Always render at a standard 16:9 landscape resolution
                 let baseSize = CGSize(width: 1920, height: 1080)
-                
+
                 // Calculate scale to aspect-fill the target size
                 let scaleX = targetSize.width / baseSize.width
                 let scaleY = targetSize.height / baseSize.height
                 let scale = max(scaleX, scaleY)
-                
+
                 TimeWallpaperView(style: style, palette: mood.palette)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
@@ -526,7 +529,7 @@ struct QuoteWallpaperPreview: View {
     let mood: Mood
     let isPressed: Bool
     var targetSize: CGSize = CGSize(width: 240, height: 160)
-    
+
     var body: some View {
         ZStack {
             if let style = mood.wallpaper.resources.first {
@@ -534,8 +537,12 @@ struct QuoteWallpaperPreview: View {
                 let scaleX = targetSize.width / baseSize.width
                 let scaleY = targetSize.height / baseSize.height
                 let scale = max(scaleX, scaleY)
-                
-                QuoteWallpaperView(style: style, palette: mood.palette)
+
+                QuoteWallpaperView(
+                    style: style,
+                    palette: mood.palette,
+                    quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
+                )
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)
@@ -552,7 +559,7 @@ struct ZenWallpaperPreview: View {
     let mood: Mood
     let isPressed: Bool
     var targetSize: CGSize = CGSize(width: 240, height: 160)
-    
+
     var body: some View {
         ZStack {
             if let style = mood.wallpaper.resources.first {
@@ -560,7 +567,7 @@ struct ZenWallpaperPreview: View {
                 let scaleX = targetSize.width / baseSize.width
                 let scaleY = targetSize.height / baseSize.height
                 let scale = max(scaleX, scaleY)
-                
+
                 ZenWallpaperView(style: style, palette: mood.palette)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)

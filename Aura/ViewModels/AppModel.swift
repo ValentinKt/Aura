@@ -46,7 +46,7 @@ final class AppModel {
         self.quoteEngine = quoteEngine
 
         let playerViewModel = PlayerViewModel(soundEngine: soundEngine, settingsEngine: settingsEngine, moodEngine: moodEngine)
-        let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel)
+        let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, quoteEngine: quoteEngine)
         self.playerViewModel = playerViewModel
         self.moodViewModel = moodViewModel
         self.playlistViewModel = PlaylistViewModel(playlistEngine: playlistEngine)
@@ -83,9 +83,6 @@ final class AppModel {
     }
 }
 
-import Foundation
-import Observation
-
 enum DownloadState: Equatable {
     case notDownloaded
     case downloading(progress: Double)
@@ -97,13 +94,13 @@ enum DownloadState: Equatable {
 @Observable
 final class DownloadManager {
     static let shared = DownloadManager()
-    
+
     var downloadStates: [String: DownloadState] = [:]
-    
+
     private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.0/"
-    
+
     private init() {}
-    
+
     func isDownloaded(resource: String) -> Bool {
         if downloadStates[resource] == nil {
             if let url = MediaUtils.resolveResourceURL(resource) {
@@ -111,7 +108,7 @@ final class DownloadManager {
                 let resolvedExt = url.pathExtension.lowercased()
                 let isVideoResource = ["mov", "mp4"].contains(expectedExt)
                 let isURLVideo = ["mov", "mp4"].contains(resolvedExt)
-                
+
                 if isVideoResource && !isURLVideo {
                     // It resolved to an image fallback, so the video is not actually downloaded
                     downloadStates[resource] = .notDownloaded
@@ -124,10 +121,10 @@ final class DownloadManager {
         }
         return downloadStates[resource] == .downloaded
     }
-    
+
     func checkStatus(for resource: String) {
         _ = isDownloaded(resource: resource)
-        
+
         if downloadStates[resource] == .notDownloaded {
             // Auto-download the first video of each mood if not downloaded
             if DownloadManager.isFirstVideo(resource) {
@@ -140,15 +137,15 @@ final class DownloadManager {
 
     static func isFirstVideo(_ resource: String) -> Bool {
         let name = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent
-        return name.hasSuffix("_1") || 
-               name == "Donkey_Kong" || 
-               name == "Mario_Pixel_Room" || 
-               name == "Pixel_Cosmic"
+        return name.hasSuffix("_1") ||
+            name == "Donkey_Kong" ||
+            name == "Mario_Pixel_Room" ||
+            name == "Pixel_Cosmic"
     }
-    
+
     func downloadIfNeeded(_ resource: String) async -> Bool {
         if isDownloaded(resource: resource) { return true }
-        
+
         // Prevent concurrent downloads of the same resource
         if case .downloading = downloadStates[resource] {
             // Wait for it to finish (simple polling for now)
@@ -157,21 +154,21 @@ final class DownloadManager {
             }
             return isDownloaded(resource: resource)
         }
-        
+
         await download(resource)
         return isDownloaded(resource: resource)
     }
-    
+
     func download(_ resource: String) async {
         guard let url = URL(string: "\(baseURL)\(resource).zip") else {
             downloadStates[resource] = .failed(error: "Invalid URL")
             return
         }
-        
+
         print("⬇️ [DownloadManager] Starting download for wallpaper from: \(url.absoluteString)")
-        
+
         downloadStates[resource] = .downloading(progress: 0.0)
-        
+
         do {
             let wrapper = DownloadTaskWrapper()
             let tempURL = try await wrapper.download(url: url) { progress in
@@ -181,35 +178,35 @@ final class DownloadManager {
                     }
                 }
             }
-            
+
             let fileManager = FileManager.default
             guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
                 throw NSError(domain: "DownloadManager", code: -3, userInfo: [NSLocalizedDescriptionKey: "Application Support directory not found"])
             }
-            
+
             let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
             try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true, attributes: nil)
-            
+
             let targetURL = videosDir.appendingPathComponent("\(resource).zip")
-            
+
             if fileManager.fileExists(atPath: targetURL.path) {
                 try fileManager.removeItem(at: targetURL)
             }
             try fileManager.moveItem(at: tempURL, to: targetURL)
-            
+
             // Extract it
             if MediaUtils.extractZip(targetURL, originalResource: resource, destinationDir: videosDir) != nil {
                 print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
-                
+
                 // Clean up the zip file after successful extraction
                 try? fileManager.removeItem(at: targetURL)
-                
+
                 downloadStates[resource] = .downloaded
             } else {
                 print("❌ [DownloadManager] Extraction failed for: \(resource)")
                 downloadStates[resource] = .failed(error: "Extraction failed")
             }
-            
+
         } catch {
             print("❌ [DownloadManager] Download failed with error: \(error.localizedDescription)")
             downloadStates[resource] = .failed(error: error.localizedDescription)
@@ -219,34 +216,34 @@ final class DownloadManager {
 
 class DownloadTaskWrapper: NSObject {
     private var observation: NSKeyValueObservation?
-    
+
     func download(url: URL, progressHandler: @escaping (Double) -> Void) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             let task = URLSession.shared.downloadTask(with: url) { localURL, response, error in
                 self.observation?.invalidate()
                 self.observation = nil
-                
+
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
                 }
-                
+
                 guard let httpResponse = response as? HTTPURLResponse else {
                     continuation.resume(throwing: NSError(domain: "DownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"]))
                     return
                 }
-                
+
                 if !(200...299).contains(httpResponse.statusCode) {
                     let statusCode = httpResponse.statusCode
                     continuation.resume(throwing: NSError(domain: "DownloadManager", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(statusCode)"]))
                     return
                 }
-                
+
                 guard let localURL = localURL else {
                     continuation.resume(throwing: NSError(domain: "DownloadManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "No data received"]))
                     return
                 }
-                
+
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
                 do {
                     if FileManager.default.fileExists(atPath: tempURL.path) {
@@ -258,11 +255,11 @@ class DownloadTaskWrapper: NSObject {
                     continuation.resume(throwing: error)
                 }
             }
-            
+
             self.observation = task.progress.observe(\.fractionCompleted) { progress, _ in
                 progressHandler(progress.fractionCompleted)
             }
-            
+
             task.resume()
         }
     }

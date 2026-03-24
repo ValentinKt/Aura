@@ -7,7 +7,7 @@ final class PlayerViewModel {
     private let soundEngine: SoundEngine
     private let settingsEngine: SettingsEngine
     private let moodEngine: MoodEngine
-    
+
     var isPlaying: Bool {
         soundEngine.state == .playing
     }
@@ -16,11 +16,11 @@ final class PlayerViewModel {
     var layerVolumes: [String: Float] {
         soundEngine.volumes
     }
-    
+
     var masterVolume: Float {
         get { soundEngine.masterVolume }
-        set { 
-            soundEngine.masterVolume = newValue 
+        set {
+            soundEngine.masterVolume = newValue
             settingsEngine.updateMasterVolume(newValue)
         }
     }
@@ -29,7 +29,7 @@ final class PlayerViewModel {
         self.soundEngine = soundEngine
         self.settingsEngine = settingsEngine
         self.moodEngine = moodEngine
-        
+
         let settings = settingsEngine.loadSettings()
         self.randomizeInterval = settings.randomAmbienceInterval
         self.soundEngine.masterVolume = settings.masterVolume

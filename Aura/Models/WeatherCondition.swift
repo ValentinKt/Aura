@@ -28,7 +28,7 @@ enum WeatherError: Error, LocalizedError, Equatable {
         case .unknown: return "An unknown error occurred."
         }
     }
-    
+
     static func == (lhs: WeatherError, rhs: WeatherError) -> Bool {
         switch (lhs, rhs) {
         case (.invalidURL, .invalidURL): return true

@@ -272,7 +272,7 @@ struct MenuBarPopoverView: View {
             Button {
                 NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: "main")
-                
+
                 // Ensure the window is un-minimized and brought to front
                 for window in NSApp.windows where window.identifier?.rawValue == "main" {
                     if window.isMiniaturized {
@@ -390,7 +390,7 @@ struct MenuBarPopoverView: View {
 private struct MoodCarouselCard: View {
     let mood: Mood
     let isSelected: Bool
-    var onDelete: (() -> Void)? = nil
+    var onDelete: (() -> Void)?
     let action: () -> Void
 
     @State private var image: NSImage?
@@ -508,7 +508,7 @@ private struct MoodCarouselCard: View {
             action()
             return
         }
-        
+
         let isDownloaded = DownloadManager.shared.isDownloaded(resource: primaryResource)
         if isDownloaded {
             action()

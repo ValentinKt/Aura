@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
-        
+
         print("🟢 [AppDelegate] applicationWillFinishLaunching")
     }
 
@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Disable state restoration to prevent "com.apple.appkit.restoration_storage" errors
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")
-        
+
         // Remove existing restoration data if any
         if let bundleID = Bundle.main.bundleIdentifier {
             let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
@@ -41,26 +41,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
-    
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         var didReopen = false
-        
-        for window in NSApp.windows {
-            if window.identifier?.rawValue == "main" {
-                if window.isMiniaturized {
-                    window.deminiaturize(nil)
-                }
-                window.makeKeyAndOrderFront(nil)
-                didReopen = true
+
+        for window in NSApp.windows where window.identifier?.rawValue == "main" {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
             }
+            window.makeKeyAndOrderFront(nil)
+            didReopen = true
         }
-        
+
         // If the window was completely closed, we should broadcast a notification
         // so that AuraApp can catch it and use openWindow(id: "main")
         if !didReopen && !flag {
             NotificationCenter.default.post(name: Notification.Name("ReopenMainWindow"), object: nil)
         }
-        
+
         return true
     }
 }

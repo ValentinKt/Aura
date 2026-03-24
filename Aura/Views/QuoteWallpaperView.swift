@@ -2,77 +2,108 @@ import SwiftUI
 import Combine
 
 struct QuoteWallpaperView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let style: String
     let palette: ThemePalette
-    @State private var desktopImage: NSImage? = nil
+    let quoteID: UUID?
     @State private var quoteTextValue: String = ""
-    
-    // We instantiate QuoteEngine locally or pass it down. Since it requires PersistenceController.shared, we can do it here.
+    @State private var quoteTextColor = Color.white
+    @State private var quoteFontSize: Double = 48
+    @State private var quoteFontStyle: QuoteFontStyle = .serif
+
     private let quoteEngine = QuoteEngine(persistence: PersistenceController.shared)
-    
-    var primaryColor: Color {
-        Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue)
-    }
-    
+
     var secondaryColor: Color {
         Color(red: palette.secondary.red, green: palette.secondary.green, blue: palette.secondary.blue)
     }
-    
+
     var accentColor: Color {
         Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue)
     }
 
+    init(style: String, palette: ThemePalette, quoteID: UUID? = nil) {
+        self.style = style
+        self.palette = palette
+        self.quoteID = quoteID
+    }
+
     var body: some View {
         ZStack {
-            if let image = desktopImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .ignoresSafeArea()
-                    .blur(radius: 20)
-            } else {
-                Color.black.ignoresSafeArea()
-            }
-            
+            (colorScheme == .dark ? Color.black : Color.white)
+                .ignoresSafeArea()
+
             VStack {
-                        Text(quoteTextValue.isEmpty ? quoteText(for: style) : quoteTextValue)
-                            .font(.system(size: 48, weight: .bold, design: .serif))
-                            .foregroundStyle(primaryColor)
-                            .multilineTextAlignment(.center)
-                            .shadow(color: secondaryColor.opacity(0.5), radius: 10, x: 0, y: 5)
-                            .padding()
-                    }
-                }
-                .onAppear {
-                    loadDesktopImage()
-                    loadCustomQuote()
-                }
+                Text(quoteTextValue.isEmpty ? quoteText(for: style) : quoteTextValue)
+                    .font(quoteFont)
+                    .foregroundStyle(quoteTextColor)
+                    .multilineTextAlignment(.center)
+                    .shadow(color: secondaryColor.opacity(0.5), radius: 10, x: 0, y: 5)
+                    .padding()
+                    .minimumScaleFactor(0.45)
             }
-            
-            private func loadCustomQuote() {
-                let quotes = quoteEngine.loadQuotes(for: style)
-                if let randomQuote = quotes.randomElement() {
-                    quoteTextValue = randomQuote.text
-                } else {
-                    quoteTextValue = quoteText(for: style)
-                }
+        }
+        .onAppear {
+            loadCustomQuote()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("quotesDidChange"))) { notification in
+            guard let updatedStyle = notification.object as? String else {
+                loadCustomQuote()
+                return
             }
-            
-            private func quoteText(for style: String) -> String {
+
+            if updatedStyle == style {
+                loadCustomQuote()
+            }
+        }
+    }
+
+    private func loadCustomQuote() {
+        let quotes = quoteEngine.loadQuotes(for: style)
+        if let quoteID, let selectedQuote = quotes.first(where: { $0.id == quoteID }) {
+            apply(quote: selectedQuote)
+        } else if let randomQuote = quotes.randomElement() {
+            apply(quote: randomQuote)
+        } else {
+            quoteTextValue = quoteText(for: style)
+            quoteTextColor = colorScheme == .dark ? .white : .black
+            quoteFontSize = 48
+            quoteFontStyle = .serif
+        }
+    }
+
+    private var quoteFont: Font {
+        switch quoteFontStyle {
+        case .system:
+            .system(size: quoteFontSize, weight: .bold, design: .default)
+        case .serif:
+            .system(size: quoteFontSize, weight: .bold, design: .serif)
+        case .rounded:
+            .system(size: quoteFontSize, weight: .bold, design: .rounded)
+        case .monospaced:
+            .system(size: quoteFontSize, weight: .bold, design: .monospaced)
+        }
+    }
+
+    private func apply(quote: CustomQuoteModel) {
+        quoteTextValue = quote.text
+        quoteTextColor = Color(
+            red: quote.textColor.red,
+            green: quote.textColor.green,
+            blue: quote.textColor.blue,
+            opacity: quote.textColor.alpha
+        )
+        quoteFontSize = quote.fontSize
+        quoteFontStyle = quote.fontStyle
+    }
+
+    private func quoteText(for style: String) -> String {
         switch style {
         case "motivational": return "Keep pushing forward."
         case "philosophical": return "I think, therefore I am."
         case "minimal": return "Less is more."
         case "bold": return "BE BOLD."
         default: return "Stay inspired."
-        }
-    }
-    
-    private func loadDesktopImage() {
-        if let screen = NSScreen.main,
-           let url = NSWorkspace.shared.desktopImageURL(for: screen),
-           let image = NSImage(contentsOf: url) {
-            desktopImage = image
         }
     }
 }

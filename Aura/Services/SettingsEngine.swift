@@ -103,9 +103,9 @@ final class SettingsEngine {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "MoodMix")
         request.predicate = NSPredicate(format: "moodID == %@", moodID)
-        
+
         let entity = (try? context.fetch(request))?.first ?? NSEntityDescription.insertNewObject(forEntityName: "MoodMix", into: context)
-        
+
         let encoder = JSONEncoder()
         if let data = try? encoder.encode(layerMix) {
             entity.setValue(moodID, forKey: "moodID")
@@ -113,15 +113,15 @@ final class SettingsEngine {
             persistence.saveContext()
         }
     }
-    
+
     func loadMoodMixes() -> [String: [String: Float]] {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "MoodMix")
         guard let entities = try? context.fetch(request) else { return [:] }
-        
+
         let decoder = JSONDecoder()
         var mixes: [String: [String: Float]] = [:]
-        
+
         for entity in entities {
             if let moodID = entity.value(forKey: "moodID") as? String,
                let data = entity.value(forKey: "layerMix") as? Data,
@@ -129,7 +129,7 @@ final class SettingsEngine {
                 mixes[moodID] = mix
             }
         }
-        
+
         return mixes
     }
 
@@ -137,7 +137,7 @@ final class SettingsEngine {
         let context = persistence.viewContext
         let request = NSFetchRequest<NSManagedObject>(entityName: "CustomMood")
         guard let entities = try? context.fetch(request) else { return [] }
-        
+
         return entities.compactMap { entity -> Mood? in
             guard let id = entity.value(forKey: "id") as? String,
                   let name = entity.value(forKey: "name") as? String,
@@ -146,29 +146,29 @@ final class SettingsEngine {
                   let paletteData = entity.value(forKey: "palette") as? Data else {
                 return nil
             }
-            
+
             let theme = entity.value(forKey: "theme") as? String ?? "Custom"
             let subtheme = entity.value(forKey: "subtheme") as? String ?? "Personal"
-            
+
             let decoder = JSONDecoder()
             guard let layerMix = try? decoder.decode([String: Float].self, from: layerMixData),
                   let wallpaper = try? decoder.decode(WallpaperDescriptor.self, from: wallpaperData),
                   let palette = try? decoder.decode(ThemePalette.self, from: paletteData) else {
                 return nil
             }
-            
+
             return Mood(id: id, name: name, theme: theme, subtheme: subtheme, layerMix: layerMix, wallpaper: wallpaper, palette: palette)
         }
     }
 
     func saveCustomMoods(_ moods: [Mood]) {
         let context = persistence.viewContext
-        
+
         // Delete all existing custom moods
         let deleteRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "CustomMood")
         let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteRequest)
         _ = try? context.execute(batchDelete)
-        
+
         // Save new moods
         let encoder = JSONEncoder()
         for mood in moods {
@@ -181,7 +181,7 @@ final class SettingsEngine {
             entity.setValue(try? encoder.encode(mood.wallpaper), forKey: "wallpaper")
             entity.setValue(try? encoder.encode(mood.palette), forKey: "palette")
         }
-        
+
         persistence.saveContext()
     }
 }

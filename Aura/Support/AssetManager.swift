@@ -28,7 +28,7 @@ actor AssetManager {
                 let absolutePath = "/Users/valentin/XCode/Aura/Aura/Resources/Audio/\(name).m4a"
                 return FileManager.default.fileExists(atPath: absolutePath) ? URL(fileURLWithPath: absolutePath) : nil
             }()
-        
+
         if let url {
             print("🟢 [AssetManager] Loading audio buffer for \(name) from \(url.path)")
             do {
@@ -51,7 +51,7 @@ actor AssetManager {
                 return makeSilentBuffer()
             }
         }
-        
+
         // Return silent buffer if file not found
         return makeSilentBuffer()
     }
@@ -67,4 +67,3 @@ actor AssetManager {
         return buffer
     }
 }
-

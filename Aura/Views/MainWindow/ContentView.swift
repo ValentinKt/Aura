@@ -55,7 +55,7 @@ struct ContentView: View {
                     .frame(width: 240)
                     .padding(.leading, 24)
                     .padding(.vertical, 24)
-                
+
                 if let selectedTab {
                     contentLayer(for: selectedTab)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -397,7 +397,7 @@ struct ContentView: View {
                 .scaleEffect(isHoveringNewMood ? 1.05 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHoveringNewMood)
                 .onHover { isHoveringNewMood = $0 }
-                
+
                 // Search button
                 Button {
                     appModel.showCommandPalette.toggle()

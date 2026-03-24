@@ -31,11 +31,11 @@ final class SoundEngine {
     private let audioMixer: AudioMixer
     private var layerNodes: [String: LayerNode] = [:]
     private var buffers: [String: AVAudioPCMBuffer] = [:]
-    
+
     // Custom audio player node for external files
     private let customPlayer = AVAudioPlayerNode()
     private let customEQ = AVAudioUnitEQ(numberOfBands: 1)
-    
+
     var state: EngineState = .uninitialized
     var volumes: [String: Float] = [:]
     var masterVolume: Float = 0.6 {
@@ -43,14 +43,14 @@ final class SoundEngine {
             engine.mainMixerNode.outputVolume = masterVolume
         }
     }
-    
+
     private var randomizationTask: Task<Void, Never>?
 
     init(assetManager: AssetManager, loopManager: LoopManager, audioMixer: AudioMixer) {
         self.assetManager = assetManager
         self.loopManager = loopManager
         self.audioMixer = audioMixer
-        
+
         engine.mainMixerNode.outputVolume = masterVolume
         for id in SoundLayerID.allCases.map(\.rawValue) {
             volumes[id] = 0
@@ -76,10 +76,10 @@ final class SoundEngine {
             let eq = AVAudioUnitEQ(numberOfBands: 1)
             engine.attach(player)
             engine.attach(eq)
-            
+
             // Use buffer format if available, otherwise default to stereo
             let format = buffers[id]?.format ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)
-            
+
             engine.connect(player, to: eq, format: format)
             engine.connect(eq, to: engine.mainMixerNode, format: format)
             layerNodes[id] = LayerNode(player: player, eq: eq)
@@ -145,10 +145,10 @@ final class SoundEngine {
         print("🟢 [SoundEngine] Playing custom audio from URL: \(url.path)")
         // Mute all other layers
         await crossfade(to: [:], duration: 1.0)
-        
+
         // Stop current custom audio if any
         customPlayer.stop()
-        
+
         let file: AVAudioFile
         do {
             file = try AVAudioFile(forReading: url)
@@ -157,19 +157,19 @@ final class SoundEngine {
             throw error
         }
         let format = file.processingFormat
-        
+
         // Reconnect with correct format if needed
         engine.disconnectNodeOutput(customPlayer)
         engine.disconnectNodeOutput(customEQ)
         engine.connect(customPlayer, to: customEQ, format: format)
         engine.connect(customEQ, to: engine.mainMixerNode, format: format)
-        
+
         await customPlayer.scheduleFile(file, at: nil)
-        
+
         if !engine.isRunning {
             try engine.start()
         }
-        
+
         customPlayer.volume = 1.0
         customPlayer.play()
         state = .playing
@@ -181,7 +181,7 @@ final class SoundEngine {
         let previousVolume = volumes[id] ?? 0
         volumes[id] = clampedVolume
         guard let node = layerNodes[id] else { return }
-        
+
         // Handle play/pause state based on volume
         let shouldPlay = clampedVolume > 0 && state == .playing
         let shouldPause = clampedVolume <= 0
@@ -213,7 +213,7 @@ final class SoundEngine {
         if state == .ready {
             resume()
         }
-        
+
         let safeDuration = max(0.1, duration)
         // Reduce the number of crossfade steps to lower CPU load and avoid HAL overload logs
         let steps = max(8, min(18, Int(safeDuration * 8)))
@@ -281,7 +281,7 @@ final class SoundEngine {
                     return (id, buffer)
                 }
             }
-            
+
             for await (id, buffer) in group {
                 if let buffer = buffer {
                     buffers[id] = buffer
@@ -304,4 +304,3 @@ final class SoundEngine {
     deinit {
     }
 }
-

@@ -9,11 +9,11 @@ struct PlaylistView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
-            
+
             if let activePlaylist = activePlaylist {
                 activePlaylistSection(activePlaylist)
             }
-            
+
             playlistList
         }
         .padding(24)
@@ -21,7 +21,7 @@ struct PlaylistView: View {
             PlaylistEditorView(appModel: appModel, playlist: selectedPlaylist)
         }
     }
-    
+
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -41,7 +41,7 @@ struct PlaylistView: View {
             .buttonStyle(.plain)
         }
     }
-    
+
     private var activePlaylist: Playlist? {
         switch appModel.playlistViewModel.state {
         case .playing(let playlist, _), .paused(let playlist, _):
@@ -50,7 +50,7 @@ struct PlaylistView: View {
             return nil
         }
     }
-    
+
     private var currentIndex: Int {
         switch appModel.playlistViewModel.state {
         case .playing(_, let index), .paused(_, let index):
@@ -59,7 +59,7 @@ struct PlaylistView: View {
             return 0
         }
     }
-    
+
     private func activePlaylistSection(_ playlist: Playlist) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -67,9 +67,9 @@ struct PlaylistView: View {
                     .font(.caption.bold())
                     .tracking(1.2)
                     .foregroundStyle(Color.accentColor)
-                
+
                 Spacer()
-                
+
                 if isPlaying {
                     HStack(spacing: 3) {
                         ForEach(0..<4) { i in
@@ -82,13 +82,13 @@ struct PlaylistView: View {
                     }
                 }
             }
-            
+
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(playlist.name)
                         .font(.title2)
                         .bold()
-                    
+
                     let entry = playlist.entries[currentIndex]
                     Group {
                         if entry.customAudioPath != nil {
@@ -129,7 +129,7 @@ struct PlaylistView: View {
                     .font(.title2)
             }
             .buttonStyle(.plain)
-            
+
             Button(action: {
                 if case .playing = appModel.playlistViewModel.state {
                     appModel.playlistViewModel.pause()
@@ -141,21 +141,21 @@ struct PlaylistView: View {
                     .font(.system(size: 24))
             }
             .buttonStyle(.plain)
-            
+
             Button(action: { appModel.playlistViewModel.skip() }) {
                 Image(systemName: "forward.fill")
                     .font(.title2)
             }
             .buttonStyle(.plain)
-            
+
             Divider().frame(height: 24)
-            
+
             Button(action: { appModel.playlistViewModel.toggleShuffle() }) {
                 Image(systemName: "shuffle")
                     .foregroundStyle(appModel.playlistViewModel.shuffleEnabled ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
-            
+
             Button(action: { appModel.playlistViewModel.cycleRepeatMode() }) {
                 Image(systemName: repeatIcon)
                     .foregroundStyle(appModel.playlistViewModel.repeatMode != .off ? Color.accentColor : .secondary)
@@ -163,14 +163,14 @@ struct PlaylistView: View {
             .buttonStyle(.plain)
         }
     }
-    
+
     private var isPlaying: Bool {
         if case .playing = appModel.playlistViewModel.state {
             return true
         }
         return false
     }
-    
+
     private var repeatIcon: String {
         switch appModel.playlistViewModel.repeatMode {
         case .off: return "repeat"
@@ -178,7 +178,7 @@ struct PlaylistView: View {
         case .all: return "repeat"
         }
     }
-    
+
     private var playlistList: some View {
         ScrollView {
             GlassEffectContainer {
@@ -233,10 +233,10 @@ struct PlaylistCard: View {
     let onPlay: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
-    
+
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var isHovered = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             cardContent
@@ -269,7 +269,7 @@ struct PlaylistCard: View {
         .onHover { isHovered = $0 }
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isHovered)
     }
-    
+
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -277,21 +277,21 @@ struct PlaylistCard: View {
                     .font(.title2)
                     .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
                     .symbolEffect(.bounce, value: isActive)
-                
+
                 Spacer()
-                
+
                 if isActive {
                     Circle()
                         .fill(Color.accentColor)
                         .frame(width: 8, height: 8)
                 }
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(playlist.name)
                     .font(.headline)
                     .lineLimit(1)
-                
+
                 Text("\(playlist.entries.count) segments")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -299,14 +299,14 @@ struct PlaylistCard: View {
         }
         .padding(20)
     }
-    
+
     private var footerActions: some View {
         HStack {
             Button(action: onPlay) {
                 playButtonLabel
             }
             .buttonStyle(.plain)
-            
+
             Menu {
                 Button(action: onEdit) {
                     Label("Edit", systemImage: "pencil")
@@ -322,7 +322,7 @@ struct PlaylistCard: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
     }
-    
+
     @ViewBuilder
     private var playButtonLabel: some View {
         if isActive {

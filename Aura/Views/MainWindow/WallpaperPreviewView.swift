@@ -4,7 +4,7 @@ import SwiftUI
 struct WallpaperPreviewView: View {
     @Bindable var appModel: AppModel
     var showOverlay: Bool = true
-    @State private var previewImage: NSImage? = nil
+    @State private var previewImage: NSImage?
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -27,7 +27,7 @@ struct WallpaperPreviewView: View {
                         .foregroundStyle(.white.opacity(0.7))
                     }
                 } else if let mood = appModel.moodViewModel.currentMood,
-                          (mood.wallpaper.type == .staticImage || mood.wallpaper.type == .dynamic || mood.wallpaper.type == .animated) {
+                          mood.wallpaper.type == .staticImage || mood.wallpaper.type == .dynamic || mood.wallpaper.type == .animated {
                     ZStack(alignment: .topTrailing) {
                         if mood.wallpaper.type == .animated, let resource = mood.wallpaper.resources.first, let url = MediaUtils.resolveResourceURL(resource) {
                             VideoBackgroundView(url: url)
@@ -41,7 +41,7 @@ struct WallpaperPreviewView: View {
                             // Fallback if image not found or loading
                             Color.black.opacity(0.3)
                         }
-                        
+
                         if mood.wallpaper.type == .dynamic && showOverlay {
                             HStack(spacing: 4) {
                                 Image(systemName: "clock.arrow.2.circlepath")
@@ -80,7 +80,11 @@ struct WallpaperPreviewView: View {
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .quote {
                     if let style = mood.wallpaper.resources.first {
-                        QuoteWallpaperView(style: style, palette: mood.palette)
+                        QuoteWallpaperView(
+                            style: style,
+                            palette: mood.palette,
+                            quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
+                        )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         QuoteWallpaperView(style: "motivational", palette: mood.palette)
@@ -104,11 +108,11 @@ struct WallpaperPreviewView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            
+
             // Subtle border around the wallpaper
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(.white.opacity(0.2), lineWidth: 1)
-            
+
             if showOverlay && !appModel.settingsViewModel.settings.keepCurrentWallpaper, appModel.moodViewModel.currentMood != nil {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Current Atmosphere")
@@ -116,7 +120,7 @@ struct WallpaperPreviewView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .kerning(1)
                         .textCase(.uppercase)
-                    
+
                     Text(appModel.moodViewModel.currentMood?.name ?? "Default")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
@@ -134,11 +138,11 @@ struct WallpaperPreviewView: View {
         guard let url = MediaUtils.resolveResourceURL(resource) else {
             return NSImage(named: resource)
         }
-        
+
         if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
             return await MediaUtils.videoPosterImage(from: url)
         }
-        
+
         return await Task.detached(priority: .userInitiated) {
             if let image = NSImage(contentsOf: url) {
                 return image

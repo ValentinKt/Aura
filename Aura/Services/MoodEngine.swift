@@ -19,7 +19,7 @@ final class MoodEngine {
     var currentMood: Mood?
     var state: MoodState = .idle
     var lastError: String?
-    
+
     private var transitionTask: Task<Void, Never>?
 
     init(soundEngine: SoundEngine, wallpaperEngine: WallpaperEngine, themeManager: ThemeManager, settingsEngine: SettingsEngine) {
@@ -34,20 +34,20 @@ final class MoodEngine {
         self.customMoods = settingsEngine.loadCustomMoods()
         var baseMoods = MoodEngine.builtInMoods()
         let savedMixes = settingsEngine.loadMoodMixes()
-        
+
         // Apply saved mixes to both built-in and custom moods
         for i in 0..<baseMoods.count {
             if let savedMix = savedMixes[baseMoods[i].id] {
                 baseMoods[i].layerMix = savedMix
             }
         }
-        
+
         for i in 0..<customMoods.count {
             if let savedMix = savedMixes[customMoods[i].id] {
                 customMoods[i].layerMix = savedMix
             }
         }
-        
+
         self.moods = baseMoods + customMoods
     }
 
@@ -55,12 +55,12 @@ final class MoodEngine {
         guard var current = currentMood else { return }
         current.layerMix = mix
         currentMood = current
-        
+
         // Update in the moods list as well
         if let index = moods.firstIndex(where: { $0.id == current.id }) {
             moods[index].layerMix = mix
         }
-        
+
         // Persist
         settingsEngine.saveMoodMix(moodID: current.id, layerMix: mix)
     }
@@ -77,7 +77,7 @@ final class MoodEngine {
         customMoods.removeAll { $0.id == id }
         settingsEngine.saveCustomMoods(customMoods)
         self.moods = MoodEngine.builtInMoods() + customMoods
-        
+
         if currentMood?.id == id {
             if let first = moods.first {
                 Task { await applyMood(first) }
@@ -108,71 +108,71 @@ final class MoodEngine {
         print("🟢 [MoodEngine] Applying mood: \(mood.name) (ID: \(mood.id))")
         // Update state and currentMood immediately for UI responsiveness
         currentMood = mood
-        
+
         // Cancel any existing transition to allow rapid switching
         transitionTask?.cancel()
-        
+
         transitionTask = Task {
             state = .transitioning
-            
+
             // Ensure wallpaper is downloaded before applying
             if let primaryResource = mood.wallpaper.resources.first, mood.wallpaper.type == .animated {
                 let name = URL(fileURLWithPath: primaryResource).deletingPathExtension().lastPathComponent
-                let isFirst = name.hasSuffix("_1") || 
-                             name == "Donkey_Kong" || 
-                             name == "Mario_Pixel_Room" || 
-                             name == "Pixel_Cosmic" ||
-                             name == "Mindfulness_1" ||
-                             name == "Waterfall_1" ||
-                             name == "Wild_1" ||
-                             name == "Storm_1" ||
-                             name == "Rest_1" ||
-                             name == "Forest_1" ||
-                             name == "Flow_1" ||
-                             name == "Desert_1" ||
-                             name == "DeepFocus_1" ||
-                             name == "Concentration_1" ||
-                             name == "Aurora_1" ||
-                             name == "Autumn_1" ||
-                             name == "CoffeeShop_1" ||
-                             name == "Color_1" ||
-                             name == "Fractal_1"
-                
+                let isFirst = name.hasSuffix("_1") ||
+                    name == "Donkey_Kong" ||
+                    name == "Mario_Pixel_Room" ||
+                    name == "Pixel_Cosmic" ||
+                    name == "Mindfulness_1" ||
+                    name == "Waterfall_1" ||
+                    name == "Wild_1" ||
+                    name == "Storm_1" ||
+                    name == "Rest_1" ||
+                    name == "Forest_1" ||
+                    name == "Flow_1" ||
+                    name == "Desert_1" ||
+                    name == "DeepFocus_1" ||
+                    name == "Concentration_1" ||
+                    name == "Aurora_1" ||
+                    name == "Autumn_1" ||
+                    name == "CoffeeShop_1" ||
+                    name == "Color_1" ||
+                    name == "Fractal_1"
+
                 if isFirst {
                     _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
                 }
             }
-            
+
             let settings = settingsEngine.loadSettings()
             let duration = settings.transitionDuration
-            
+
             // UI palette update is quick, do it on the main actor immediately
             themeManager.updatePalette(mood.palette)
-            
+
             // Run audio crossfade and wallpaper application concurrently
             async let audioTransition: () = soundEngine.crossfade(to: mood.layerMix, duration: duration)
-            
+
             let wallpaperDescriptor = settings.keepCurrentWallpaper ? WallpaperDescriptor(type: .current) : mood.wallpaper
             async let wallpaperTransition = wallpaperEngine.applyWallpaper(wallpaperDescriptor)
-            
+
             // Wait for both to finish, but check for cancellation
             _ = await (audioTransition, wallpaperTransition)
-            
+
             if !Task.isCancelled {
                 settingsEngine.updateLastUsedMood(mood.id)
                 state = .idle
             }
         }
-        
+
         await transitionTask?.value
     }
 
     func playCustomAudio(url: URL) async {
         print("🟢 [MoodEngine] Requesting custom audio at \(url.path)")
-        
+
         // Cancel any existing mood transition
         transitionTask?.cancel()
-        
+
         transitionTask = Task {
             state = .transitioning
             do {
@@ -188,7 +188,7 @@ final class MoodEngine {
                 }
             }
         }
-        
+
         await transitionTask?.value
     }
 
@@ -725,11 +725,11 @@ final class MoodEngine {
                 name: "Flower Flow",
                 theme: "Nature",
                 subtheme: "Wild",
-                layerMix: ["forest": 0.6,  "wind": 0.3, "crickets": 0.2],
+                layerMix: ["forest": 0.6, "wind": 0.3, "crickets": 0.2],
                 wallpaper: WallpaperDescriptor(type: .animated, resources: ["Wild_7.mov"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.2, green: 0.35, blue: 0.2), secondary: ColorComponents(red: 0.3, green: 0.45, blue: 0.3), accent: ColorComponents(red: 0.6, green: 0.8, blue: 0.4))
             ),
-             Mood(
+            Mood(
                 id: "yellow_flower",
                 name: "Yellow Flower",
                 theme: "Nature",
