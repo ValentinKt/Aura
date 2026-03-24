@@ -115,6 +115,7 @@ struct QuotesManagerView: View {
     @Bindable var appModel: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     @State private var quotes: [CustomQuoteModel] = []
     @State private var newQuoteText: String = ""
@@ -126,114 +127,211 @@ struct QuotesManagerView: View {
     let availableStyles = ["motivational", "philosophical", "minimal", "bold"]
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Manage Custom Quotes")
-                .font(.title2.weight(.bold))
-                .padding(.top, 20)
-
-            HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Add New Quote")
-                        .font(.headline)
-
-                    TextField("Quote text...", text: $newQuoteText)
-                        .textFieldStyle(.roundedBorder)
-
-                    Picker("Style", selection: $selectedStyle) {
-                        ForEach(availableStyles, id: \.self) { style in
-                            Text(style.capitalized).tag(style)
-                        }
+        GlassEffectContainer(shape: RoundedRectangle(cornerRadius: 24, style: .continuous)) {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("Manage Custom Quotes")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                    Spacer()
+                    Button {
+                        appModel.moodViewModel.refreshQuoteMoods()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.secondary)
                     }
-                    .pickerStyle(.menu)
-
-                    ColorPicker("Text Color", selection: $selectedTextColor, supportsOpacity: true)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Font Size")
-                            Spacer()
-                            Text("\(Int(selectedFontSize)) pt")
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Slider(value: $selectedFontSize, in: 28...96, step: 1)
-                    }
-
-                    Picker("Font", selection: $selectedFontStyle) {
-                        ForEach(QuoteFontStyle.allCases, id: \.self) { fontStyle in
-                            Text(fontStyle.displayName).tag(fontStyle)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    quotePreview
-                        .padding(.top, 4)
-
-                    Button("Add Quote") {
-                        addQuote()
-                    }
-                    .disabled(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.plain)
+                    .liquidGlass(Circle(), interactive: true)
                 }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlBackgroundColor)))
+                .padding(.horizontal, 32)
+                .padding(.top, 32)
+                .padding(.bottom, 24)
 
-                VStack(alignment: .leading) {
-                    Text("Your Quotes")
-                        .font(.headline)
+                HStack(alignment: .top, spacing: 32) {
+                    // Left Column: Editor
+                    VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Quote Text")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            TextField("Enter your quote...", text: $newQuoteText)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 15))
+                                .padding(14)
+                                .liquidGlass(RoundedRectangle(cornerRadius: 12), opacity: 0.1, interactive: true)
+                        }
 
-                    List {
-                        ForEach(quotes, id: \.id) { quote in
+                        VStack(alignment: .leading, spacing: 20) {
                             HStack {
-                                VStack(alignment: .leading) {
-                                    Text(quote.text)
-                                        .font(.system(size: 14, weight: .medium))
-                                    Text(quote.style.capitalized)
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.secondary)
-                                    HStack(spacing: 8) {
-                                        Circle()
-                                            .fill(Color(
-                                                red: quote.textColor.red,
-                                                green: quote.textColor.green,
-                                                blue: quote.textColor.blue,
-                                                opacity: quote.textColor.alpha
-                                            ))
-                                            .frame(width: 10, height: 10)
-                                        Text("\(quote.fontStyle.displayName) • \(Int(quote.fontSize)) pt")
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.secondary)
+                                Text("Style")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Picker("", selection: $selectedStyle) {
+                                    ForEach(availableStyles, id: \.self) { style in
+                                        Text(style.capitalized).tag(style)
                                     }
                                 }
-                                Spacer()
-                                Button {
-                                    deleteQuote(quote)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundStyle(.red)
-                                }
-                                .buttonStyle(.plain)
+                                .pickerStyle(.menu)
+                                .frame(width: 150)
                             }
-                            .padding(.vertical, 4)
+
+                            HStack {
+                                Text("Font")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Picker("", selection: $selectedFontStyle) {
+                                    ForEach(QuoteFontStyle.allCases, id: \.self) { fontStyle in
+                                        Text(fontStyle.displayName).tag(fontStyle)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 150)
+                            }
+
+                            HStack {
+                                Text("Text Color")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                ColorPicker("", selection: $selectedTextColor, supportsOpacity: true)
+                                    .labelsHidden()
+                            }
+
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Font Size")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(Int(selectedFontSize)) pt")
+                                        .font(.system(size: 13).monospacedDigit())
+                                        .foregroundStyle(.secondary)
+                                }
+                                Slider(value: $selectedFontSize, in: 28...96, step: 1)
+                                    .controlSize(.regular)
+                            }
+                        }
+                        .padding(20)
+                        .liquidGlass(RoundedRectangle(cornerRadius: 16), opacity: 0.15, interactive: false)
+
+                        Button(action: addQuote) {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "plus")
+                                Text("Add Quote")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                            .font(.system(size: 15))
+                            .padding(.vertical, 14)
+                            .foregroundStyle(.white)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.white.opacity(0.1) : Color.accentColor)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    .frame(width: 300)
+
+                    // Right Column: Preview and List
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Preview
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Preview")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            
+                            quotePreview
+                                .liquidGlass(RoundedRectangle(cornerRadius: 16), opacity: 0.1, interactive: false)
+                        }
+
+                        // List
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Saved Quotes")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            
+                            if quotes.isEmpty {
+                                VStack {
+                                    Spacer()
+                                    Text("No quotes yet.")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .liquidGlass(RoundedRectangle(cornerRadius: 16), opacity: 0.1, interactive: false)
+                            } else {
+                                ScrollView {
+                                    LazyVStack(spacing: 12) {
+                                        ForEach(quotes, id: \.id) { quote in
+                                            HStack(spacing: 16) {
+                                                VStack(alignment: .leading, spacing: 6) {
+                                                    Text(quote.text)
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .lineLimit(1)
+                                                    
+                                                    HStack(spacing: 8) {
+                                                        Text(quote.style.capitalized)
+                                                        Text("•")
+                                                        Text("\(quote.fontStyle.displayName)")
+                                                        Text("•")
+                                                        Text("\(Int(quote.fontSize))pt")
+                                                    }
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(.secondary)
+                                                }
+                                                
+                                                Spacer()
+                                                
+                                                Circle()
+                                                    .fill(Color(
+                                                        red: quote.textColor.red,
+                                                        green: quote.textColor.green,
+                                                        blue: quote.textColor.blue,
+                                                        opacity: quote.textColor.alpha
+                                                    ))
+                                                    .frame(width: 16, height: 16)
+                                                    .overlay(Circle().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
+                                                
+                                                Button {
+                                                    withAnimation(.spring(response: 0.3)) {
+                                                        deleteQuote(quote)
+                                                    }
+                                                } label: {
+                                                    Image(systemName: "trash")
+                                                        .font(.system(size: 13))
+                                                        .foregroundStyle(.red.opacity(0.9))
+                                                        .padding(8)
+                                                }
+                                                .buttonStyle(.plain)
+                                                .liquidGlass(Circle(), opacity: 0.1, interactive: true)
+                                            }
+                                            .padding(16)
+                                            .liquidGlass(RoundedRectangle(cornerRadius: 12), opacity: 0.15, interactive: true)
+                                        }
+                                    }
+                                    .padding(4)
+                                }
+                                .frame(maxHeight: .infinity)
+                                .liquidGlass(RoundedRectangle(cornerRadius: 16), opacity: 0.05, interactive: false)
+                            }
                         }
                     }
-                    .listStyle(.bordered)
-                    .cornerRadius(8)
                 }
-            }
-            .padding(.horizontal, 20)
-
-            HStack {
-                Spacer()
-                Button("Done") {
-                    appModel.moodViewModel.refreshQuoteMoods()
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .padding()
+                .padding(.horizontal, 32)
+                .padding(.bottom, 32)
             }
         }
-        .frame(width: 600, height: 400)
+        .frame(width: 800, height: 600)
+        .presentationBackground(.clear)
+        .shadow(color: .black.opacity(0.3), radius: 50, y: 25)
         .onAppear {
             loadQuotes()
         }
@@ -248,7 +346,7 @@ struct QuotesManagerView: View {
 
     private var quotePreview: some View {
         ZStack {
-            (colorScheme == .dark ? Color.black : Color.white)
+            Color.clear
 
             Text(newQuoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Your quote preview" : newQuoteText)
                 .font(previewFont)
@@ -256,13 +354,10 @@ struct QuotesManagerView: View {
                 .multilineTextAlignment(.center)
                 .padding(24)
                 .minimumScaleFactor(0.5)
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
         }
         .frame(maxWidth: .infinity, minHeight: 170)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
-        )
+        .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), opacity: 0.1, interactive: false)
     }
 
     private var previewFont: Font {
