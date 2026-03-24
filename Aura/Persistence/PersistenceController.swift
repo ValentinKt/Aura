@@ -141,6 +141,12 @@ final class PersistenceController {
             attribute("id", .UUIDAttributeType, optional: false),
             attribute("text", .stringAttributeType, optional: false),
             attribute("style", .stringAttributeType, optional: false),
+            attribute("textColorRed", .doubleAttributeType, optional: false),
+            attribute("textColorGreen", .doubleAttributeType, optional: false),
+            attribute("textColorBlue", .doubleAttributeType, optional: false),
+            attribute("textColorAlpha", .doubleAttributeType, optional: false),
+            attribute("fontSize", .doubleAttributeType, optional: false),
+            attribute("fontStyle", .stringAttributeType, optional: false),
             attribute("createdAt", .dateAttributeType, optional: false)
         ]
 

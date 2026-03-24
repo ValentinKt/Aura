@@ -444,19 +444,42 @@ final class WallpaperWindowController: NSObject {
 
     private var currentURL: URL?
     private var isSecurityScoped: Bool = false
+    private var hostingContainerView: NSView?
     private var hostingView: NSHostingView<AnyView>?
 
     func showSwiftUIView<V: View>(_ view: V) {
         stopVideo()
 
-        let host = NSHostingView(rootView: AnyView(view))
-        host.autoresizingMask = [.width, .height]
-        host.frame = window?.contentView?.bounds ?? .zero
+        // Ensure we have a dedicated hosting container and make it the window's contentView
+        if hostingContainerView == nil {
+            let frame = window?.contentView?.bounds ?? (NSScreen.main?.frame ?? .zero)
+            let container = NSView(frame: frame)
+            container.wantsLayer = false
+            container.autoresizingMask = [.width, .height]
+            hostingContainerView = container
+        }
+
+        if let container = hostingContainerView {
+            window?.contentView = container
+        }
 
         // Remove existing hosting view if any
         hostingView?.removeFromSuperview()
 
-        window?.contentView?.addSubview(host)
+        // Create and pin the SwiftUI hosting view
+        let host = NSHostingView(rootView: AnyView(view))
+        host.translatesAutoresizingMaskIntoConstraints = false
+
+        guard let container = hostingContainerView else { return }
+        container.addSubview(host)
+
+        NSLayoutConstraint.activate([
+            host.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            host.topAnchor.constraint(equalTo: container.topAnchor),
+            host.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+
         hostingView = host
         window?.orderFront(nil)
     }
@@ -464,6 +487,10 @@ final class WallpaperWindowController: NSObject {
     func hideSwiftUIView() {
         hostingView?.removeFromSuperview()
         hostingView = nil
+        // Swap back to the video container if available
+        if let videoView = playerView, window?.contentView !== videoView {
+            window?.contentView = videoView
+        }
     }
 
     func playVideo(url: URL) {
@@ -474,6 +501,11 @@ final class WallpaperWindowController: NSObject {
 
         // Nettoyage complet
         stopVideo()
+        // Ensure the window is using the video container
+        hideSwiftUIView()
+        if let pv = self.playerView, window?.contentView !== pv {
+            window?.contentView = pv
+        }
         // Accès sécurisé
         let finalURL = url
         let isScoped = finalURL.startAccessingSecurityScopedResource()
