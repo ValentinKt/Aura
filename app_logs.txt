@@ -1,0 +1,480 @@
+2026-03-24 01:43:02.014 Aura[57173:390120] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/tmp/com.valentinkt..Aura.savedState
+🟢 [AuraApp] Initialization started
+🟢 [AuraApp] State restoration disabled
+🟢 [AppDelegate] applicationWillFinishLaunching
+🟢 [AppDelegate] applicationDidFinishLaunching
+🟢 [AppModel] Starting engines...
+🟢 [MediaUtils] Resolving resource: Wild_1.mov
+🟢 [AssetManager] Loading audio buffer for rain from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/rain.m4a
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Wild_1.mov
+🟢 [MediaUtils] Resolving resource: Wild_2.mov
+🟢 [MediaUtils] Resolving resource: Wild_3.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_3.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_1.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_2.mov
+🟢 [MediaUtils] Resolving resource: minimal
+🟥 [MediaUtils] Warning - Could not resolve resource: minimal
+🟢 [MediaUtils] Resolving resource: analog
+🟥 [MediaUtils] Warning - Could not resolve resource: analog
+🟢 [MediaUtils] Resolving resource: typographic
+🟥 [MediaUtils] Warning - Could not resolve resource: typographic
+🟢 [MediaUtils] Resolving resource: Storm_3.mov
+🟢 [MediaUtils] Resolving resource: Storm_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_2.mov
+🟢 [MediaUtils] Resolving resource: Storm_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_1.mov
+🟢 [MediaUtils] Resolving resource: Donkey_Kong.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Donkey_Kong.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Cosmic.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Pixel_Cosmic.mov
+🟢 [MediaUtils] Resolving resource: Mario_Pixel_Room.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Mario_Pixel_Room.mov
+🟢 [MediaUtils] Resolving resource: Rest_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Rest_1.mov
+🟢 [MediaUtils] Resolving resource: Rest_3.mov
+🟢 [MediaUtils] Resolving resource: Rest_2.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness2.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness3.mov
+🟢 [MediaUtils] Resolving resource: Fractal_2.mov
+🟢 [MediaUtils] Resolving resource: Fractal_3.mov
+🟢 [MediaUtils] Resolving resource: Fractal_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Fractal_1.mov
+🟢 [MediaUtils] Resolving resource: Forest_2.mov
+🟢 [MediaUtils] Resolving resource: Forest_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Forest_1.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Mindfulness_1.mov
+🟢 [MediaUtils] Resolving resource: Forest_3.mov
+🟢 [MediaUtils] Resolving resource: Flow_2.mov
+🟢 [MediaUtils] Resolving resource: Flow_3.mov
+🟢 [MediaUtils] Resolving resource: Flow_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Flow_1.mov
+🟢 [MediaUtils] Resolving resource: Desert_2.mov
+🟢 [MediaUtils] Resolving resource: Desert_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Desert_1.mov
+🟢 [MediaUtils] Resolving resource: Desert_3.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/DeepFocus_1.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_2.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_3.mov
+🟢 [MediaUtils] Resolving resource: Concentration_3.mov
+🟢 [MediaUtils] Resolving resource: Concentration_2.mov
+🟢 [MediaUtils] Resolving resource: Concentration_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Concentration_1.mov
+🟢 [MediaUtils] Resolving resource: Color_3.mov
+🟢 [MediaUtils] Resolving resource: Color_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Color_1.mov
+🟢 [MediaUtils] Resolving resource: Color_2.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_2.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/CoffeeShop_1.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_3.mov
+🟢 [MediaUtils] Resolving resource: Autumn_3.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_3.mov
+🟢 [MediaUtils] Resolving resource: Autumn_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_1.mov
+🟢 [MediaUtils] Resolving resource: Autumn_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_2.mov
+🟢 [MediaUtils] Resolving resource: Aurora_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Aurora_1.mov
+🟢 [MediaUtils] Resolving resource: Aurora_3.mov
+🟢 [MediaUtils] Resolving resource: Aurora_2.mov
+🟢 [MediaUtils] Resolving resource: Wild_6.mov
+🟢 [MediaUtils] Resolving resource: Wild_5.mov
+🟢 [MediaUtils] Resolving resource: Wild_4.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_6.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_4.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [MediaUtils] Resolving resource: solar
+🟥 [MediaUtils] Warning - Could not resolve resource: solar
+🟢 [MediaUtils] Resolving resource: glass_blocks
+🟥 [MediaUtils] Warning - Could not resolve resource: glass_blocks
+🟢 [MediaUtils] Resolving resource: binary
+🟥 [MediaUtils] Warning - Could not resolve resource: binary
+🟢 [MediaUtils] Resolving resource: Storm_5.mov
+🟢 [MediaUtils] Resolving resource: Storm_4.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_4.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Cyberpunk_City.mov
+🟢 [MediaUtils] Resolving resource: Sailor_Moon.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Gaming_Room.mov
+🟢 [MediaUtils] Resolving resource: Rest_5.mov
+🟢 [MediaUtils] Resolving resource: Rest_4.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_4.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_5.mov
+🟢 [MediaUtils] Resolving resource: Fractal_5.mov
+🟢 [MediaUtils] Resolving resource: Pink_Colorfull.mov
+🟢 [MediaUtils] Resolving resource: Forest_5.mov
+🟢 [MediaUtils] Resolving resource: Forest_4.mov
+🟢 [MediaUtils] Resolving resource: Fractal_4.mov
+🟢 [MediaUtils] Resolving resource: Flow_4.mov
+🟢 [MediaUtils] Resolving resource: Desert_5.mov
+🟢 [MediaUtils] Resolving resource: Desert_4.mov
+🟢 [MediaUtils] Resolving resource: Flow_5.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_4.mov
+🟢 [MediaUtils] Resolving resource: Concentration_4.mov
+🟢 [MediaUtils] Resolving resource: Concentration_5.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_5.mov
+🟢 [MediaUtils] Resolving resource: Color_4.mov
+🟢 [MediaUtils] Resolving resource: Color_5.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_4.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_5.mov
+🟢 [MediaUtils] Resolving resource: Autumn_4.mov
+🟢 [MediaUtils] Resolving resource: Autumn_5.mov
+🟢 [MediaUtils] Resolving resource: Aurora_5.mov
+🟢 [MediaUtils] Resolving resource: Aurora_4.mov
+🟢 [MediaUtils] Resolving resource: Wild_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Wild_1.mov
+🟢 [MediaUtils] Resolving resource: Wild_2.mov
+🟢 [MediaUtils] Resolving resource: Wild_3.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_3.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_1.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_2.mov
+🟢 [MediaUtils] Resolving resource: Storm_3.mov
+🟢 [MediaUtils] Resolving resource: Storm_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_2.mov
+🟢 [MediaUtils] Resolving resource: Storm_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_1.mov
+🟢 [MediaUtils] Resolving resource: Donkey_Kong.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Donkey_Kong.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Cosmic.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Pixel_Cosmic.mov
+🟢 [MediaUtils] Resolving resource: Mario_Pixel_Room.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Mario_Pixel_Room.mov
+🟢 [MediaUtils] Resolving resource: Rest_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Rest_1.mov
+🟢 [MediaUtils] Resolving resource: Rest_3.mov
+🟢 [MediaUtils] Resolving resource: Rest_2.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness2.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness3.mov
+🟢 [MediaUtils] Resolving resource: Fractal_2.mov
+🟢 [MediaUtils] Resolving resource: Fractal_3.mov
+🟢 [MediaUtils] Resolving resource: Fractal_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Fractal_1.mov
+🟢 [MediaUtils] Resolving resource: Forest_2.mov
+🟢 [MediaUtils] Resolving resource: Forest_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Forest_1.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Mindfulness_1.mov
+🟢 [MediaUtils] Resolving resource: Forest_3.mov
+🟢 [MediaUtils] Resolving resource: Flow_2.mov
+🟢 [MediaUtils] Resolving resource: Flow_3.mov
+🟢 [MediaUtils] Resolving resource: Flow_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Flow_1.mov
+🟢 [MediaUtils] Resolving resource: Desert_2.mov
+🟢 [MediaUtils] Resolving resource: Desert_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Desert_1.mov
+🟢 [MediaUtils] Resolving resource: Desert_3.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/DeepFocus_1.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_2.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_3.mov
+🟢 [MediaUtils] Resolving resource: Concentration_3.mov
+🟢 [MediaUtils] Resolving resource: Concentration_2.mov
+🟢 [MediaUtils] Resolving resource: Concentration_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Concentration_1.mov
+🟢 [MediaUtils] Resolving resource: Color_3.mov
+🟢 [MediaUtils] Resolving resource: Color_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Color_1.mov
+🟢 [MediaUtils] Resolving resource: Color_2.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_2.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/CoffeeShop_1.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_3.mov
+🟢 [MediaUtils] Resolving resource: Autumn_3.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_3.mov
+🟢 [MediaUtils] Resolving resource: Autumn_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_1.mov
+🟢 [MediaUtils] Resolving resource: Autumn_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_2.mov
+🟢 [MediaUtils] Resolving resource: Aurora_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Aurora_1.mov
+🟢 [MediaUtils] Resolving resource: Aurora_3.mov
+🟢 [MediaUtils] Resolving resource: Aurora_2.mov
+🟢 [MediaUtils] Resolving resource: Wild_6.mov
+🟢 [MediaUtils] Resolving resource: Wild_5.mov
+🟢 [MediaUtils] Resolving resource: Wild_4.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_6.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_4.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [MediaUtils] Resolving resource: Storm_5.mov
+🟢 [MediaUtils] Resolving resource: Storm_4.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_4.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Cyberpunk_City.mov
+🟢 [MediaUtils] Resolving resource: Sailor_Moon.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Gaming_Room.mov
+🟢 [MediaUtils] Resolving resource: Rest_5.mov
+🟢 [MediaUtils] Resolving resource: Rest_4.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_4.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_5.mov
+🟢 [MediaUtils] Resolving resource: Fractal_5.mov
+🟢 [MediaUtils] Resolving resource: Pink_Colorfull.mov
+🟢 [MediaUtils] Resolving resource: Forest_5.mov
+🟢 [MediaUtils] Resolving resource: Forest_4.mov
+🟢 [MediaUtils] Resolving resource: Fractal_4.mov
+🟢 [MediaUtils] Resolving resource: Flow_4.mov
+🟢 [MediaUtils] Resolving resource: Desert_5.mov
+🟢 [MediaUtils] Resolving resource: Desert_4.mov
+🟢 [MediaUtils] Resolving resource: Flow_5.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_4.mov
+🟢 [AssetManager] Loading audio buffer for forest from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/forest.m4a
+🟢 [MediaUtils] Resolving resource: Concentration_4.mov
+🟢 [MediaUtils] Resolving resource: Concentration_5.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_5.mov
+🟢 [MediaUtils] Resolving resource: Color_4.mov
+🟢 [MediaUtils] Resolving resource: Color_5.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_4.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_5.mov
+🟢 [MediaUtils] Resolving resource: Autumn_4.mov
+🟢 [MediaUtils] Resolving resource: Autumn_5.mov
+🟢 [MediaUtils] Resolving resource: Aurora_5.mov
+🟢 [MediaUtils] Resolving resource: Aurora_4.mov
+🟥 [MoodCard] loadedImage is nil for Wild_2.mov
+🟥 [MoodCard] loadedImage is nil for Wild_3.mov
+🟥 [MoodCard] loadedImage is nil for Waterfall_3.mov
+🟥 [MoodCard] loadedImage is nil for Storm_3.mov
+🟥 [MoodCard] loadedImage is nil for Rest_3.mov
+🟥 [MoodCard] loadedImage is nil for Rest_2.mov
+🟥 [MoodCard] loadedImage is nil for Mindfulness2.mov
+🟥 [MoodCard] loadedImage is nil for Mindfulness3.mov
+🟥 [MoodCard] loadedImage is nil for Fractal_2.mov
+🟥 [MoodCard] loadedImage is nil for Fractal_3.mov
+🟥 [MoodCard] loadedImage is nil for Forest_2.mov
+🟥 [MoodCard] loadedImage is nil for Forest_3.mov
+🟥 [MoodCard] loadedImage is nil for Flow_2.mov
+🟥 [MoodCard] loadedImage is nil for Flow_3.mov
+🟥 [MoodCard] loadedImage is nil for Desert_2.mov
+🟥 [MoodCard] loadedImage is nil for Desert_3.mov
+🟥 [MoodCard] loadedImage is nil for DeepFocus_2.mov
+🟥 [MoodCard] loadedImage is nil for DeepFocus_3.mov
+🟥 [MoodCard] loadedImage is nil for Concentration_3.mov
+🟥 [MoodCard] loadedImage is nil for Concentration_2.mov
+🟥 [MoodCard] loadedImage is nil for Color_3.mov
+🟥 [MoodCard] loadedImage is nil for Color_2.mov
+🟥 [MoodCard] loadedImage is nil for CoffeeShop_2.mov
+🟥 [MoodCard] loadedImage is nil for CoffeeShop_3.mov
+🟥 [MoodCard] loadedImage is nil for Aurora_3.mov
+🟥 [MoodCard] loadedImage is nil for Aurora_2.mov
+🟥 [MoodCard] loadedImage is nil for Wild_6.mov
+🟥 [MoodCard] loadedImage is nil for Wild_5.mov
+🟥 [MoodCard] loadedImage is nil for Wild_4.mov
+🟥 [MoodCard] loadedImage is nil for Waterfall_6.mov
+🟥 [MoodCard] loadedImage is nil for Waterfall_4.mov
+🟥 [MoodCard] loadedImage is nil for Storm_5.mov
+🟥 [MoodCard] loadedImage is nil for Pixel_Cyberpunk_City.mov
+🟥 [MoodCard] loadedImage is nil for Sailor_Moon.mov
+🟥 [MoodCard] loadedImage is nil for Pixel_Gaming_Room.mov
+🟥 [MoodCard] loadedImage is nil for Rest_5.mov
+🟥 [MoodCard] loadedImage is nil for Rest_4.mov
+🟥 [MoodCard] loadedImage is nil for Mindfulness_4.mov
+🟥 [MoodCard] loadedImage is nil for Mindfulness_5.mov
+🟥 [MoodCard] loadedImage is nil for Fractal_5.mov
+🟥 [MoodCard] loadedImage is nil for Pink_Colorfull.mov
+🟥 [MoodCard] loadedImage is nil for Forest_5.mov
+🟥 [MoodCard] loadedImage is nil for Forest_4.mov
+🟥 [MoodCard] loadedImage is nil for Fractal_4.mov
+🟥 [MoodCard] loadedImage is nil for Flow_4.mov
+🟥 [MoodCard] loadedImage is nil for Desert_5.mov
+🟥 [MoodCard] loadedImage is nil for Desert_4.mov
+🟥 [MoodCard] loadedImage is nil for Flow_5.mov
+🟥 [MoodCard] loadedImage is nil for DeepFocus_4.mov
+🟥 [MoodCard] loadedImage is nil for Concentration_4.mov
+🟥 [MoodCard] loadedImage is nil for Concentration_5.mov
+🟥 [MoodCard] loadedImage is nil for DeepFocus_5.mov
+🟥 [MoodCard] loadedImage is nil for Color_4.mov
+🟥 [MoodCard] loadedImage is nil for Color_5.mov
+🟥 [MoodCard] loadedImage is nil for CoffeeShop_4.mov
+🟥 [MoodCard] loadedImage is nil for CoffeeShop_5.mov
+🟥 [MoodCard] loadedImage is nil for Autumn_4.mov
+🟥 [MoodCard] loadedImage is nil for Autumn_5.mov
+🟥 [MoodCard] loadedImage is nil for Aurora_5.mov
+🟥 [MoodCard] loadedImage is nil for Aurora_4.mov
+🟢 [MediaUtils] Resolving resource: Wild_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Wild_1.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_2.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_1.mov
+🟢 [MediaUtils] Resolving resource: Storm_4.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_4.mov
+🟢 [MediaUtils] Resolving resource: Storm_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_2.mov
+🟢 [MediaUtils] Resolving resource: Storm_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Storm_1.mov
+🟢 [MediaUtils] Resolving resource: Pixel_Cosmic.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Pixel_Cosmic.mov
+🟢 [MediaUtils] Resolving resource: Mario_Pixel_Room.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Mario_Pixel_Room.mov
+🟢 [MediaUtils] Resolving resource: Donkey_Kong.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Donkey_Kong.mov
+🟢 [MediaUtils] Resolving resource: Rest_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Rest_1.mov
+🟢 [MediaUtils] Resolving resource: Mindfulness_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Mindfulness_1.mov
+🟢 [MediaUtils] Resolving resource: Fractal_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Fractal_1.mov
+🟢 [MediaUtils] Resolving resource: Forest_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Forest_1.mov
+🟢 [MediaUtils] Resolving resource: Flow_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Flow_1.mov
+🟢 [MediaUtils] Resolving resource: Desert_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Desert_1.mov
+🟢 [MediaUtils] Resolving resource: DeepFocus_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/DeepFocus_1.mov
+🟢 [MediaUtils] Resolving resource: Concentration_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Concentration_1.mov
+🟢 [MediaUtils] Resolving resource: Color_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Color_1.mov
+🟢 [MediaUtils] Resolving resource: CoffeeShop_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/CoffeeShop_1.mov
+🟢 [MediaUtils] Resolving resource: Autumn_3.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_3.mov
+🟢 [MediaUtils] Resolving resource: Autumn_2.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_2.mov
+🟢 [MediaUtils] Resolving resource: Autumn_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Autumn_1.mov
+🟢 [MediaUtils] Resolving resource: Aurora_1.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Aurora_1.mov
+🟢 [AssetManager] Loading audio buffer for ocean from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/ocean.m4a
+🟢 [MediaUtils] Generated thumbnail for Waterfall_1.mov
+🟢 [AssetManager] Loading audio buffer for wind from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/wind.m4a
+🟢 [MediaUtils] Generated thumbnail for Autumn_2.mov
+🟢 [MediaUtils] Generated thumbnail for Waterfall_1.mov
+🟢 [MediaUtils] Generated thumbnail for Concentration_1.mov
+🟢 [MediaUtils] Generated thumbnail for Storm_2.mov
+🟢 [MediaUtils] Generated thumbnail for Donkey_Kong.mov
+🟢 [MediaUtils] Generated thumbnail for Pixel_Cosmic.mov
+🟢 [MediaUtils] Generated thumbnail for Color_1.mov
+🟢 [MediaUtils] Generated thumbnail for Fractal_1.mov
+🟢 [MediaUtils] Generated thumbnail for Autumn_1.mov
+🟢 [MediaUtils] Generated thumbnail for Flow_1.mov
+🟢 [MediaUtils] Generated thumbnail for Flow_1.mov
+🟢 [MediaUtils] Generated thumbnail for Mario_Pixel_Room.mov
+🟢 [MediaUtils] Generated thumbnail for Mindfulness_1.mov
+🟢 [MediaUtils] Generated thumbnail for Storm_1.mov
+🟢 [MediaUtils] Generated thumbnail for Desert_1.mov
+🟢 [MediaUtils] Generated thumbnail for Fractal_1.mov
+🟢 [MediaUtils] Generated thumbnail for Waterfall_5.mov
+🟢 [MediaUtils] Generated thumbnail for Storm_4.mov
+🟢 [MediaUtils] Generated thumbnail for DeepFocus_1.mov
+🟢 [MediaUtils] Generated thumbnail for Autumn_3.mov
+🟢 [MediaUtils] Generated thumbnail for Waterfall_5.mov
+🟢 [MediaUtils] Generated thumbnail for Concentration_1.mov
+🟢 [MediaUtils] Generated thumbnail for Autumn_1.mov
+🟢 [MediaUtils] Generated thumbnail for Storm_4.mov
+🟢 [MediaUtils] Generated thumbnail for Rest_1.mov
+🟢 [MediaUtils] Generated thumbnail for CoffeeShop_1.mov
+🟢 [MediaUtils] Generated thumbnail for Mario_Pixel_Room.mov
+🟢 [MediaUtils] Generated thumbnail for Storm_2.mov
+🟢 [MediaUtils] Generated thumbnail for Forest_1.mov
+🟢 [MediaUtils] Generated thumbnail for Aurora_1.mov
+🟢 [MediaUtils] Generated thumbnail for Forest_1.mov
+🟢 [MediaUtils] Generated thumbnail for Pixel_Cosmic.mov
+🟢 [MediaUtils] Generated thumbnail for Wild_1.mov
+🟢 [MediaUtils] Generated thumbnail for Wild_1.mov
+🟢 [MediaUtils] Generated thumbnail for Waterfall_2.mov
+🟢 [MediaUtils] Generated thumbnail for Mindfulness_1.mov
+🟢 [MediaUtils] Generated thumbnail for Desert_1.mov
+🟢 [MediaUtils] Generated thumbnail for Autumn_3.mov
+🟢 [MediaUtils] Generated thumbnail for Autumn_2.mov
+🟢 [MediaUtils] Generated thumbnail for DeepFocus_1.mov
+🟢 [MediaUtils] Generated thumbnail for Donkey_Kong.mov
+🟢 [MediaUtils] Generated thumbnail for Color_1.mov
+🟢 [MediaUtils] Generated thumbnail for CoffeeShop_1.mov
+🟢 [MoodCard] Setting image for Waterfall_1.mov
+🟢 [MoodCard] Setting image for Autumn_2.mov
+🟢 [MoodCard] Setting image for Waterfall_1.mov
+🟢 [MoodCard] Setting image for Concentration_1.mov
+🟢 [MoodCard] Setting image for Storm_2.mov
+🟢 [MoodCard] Setting image for Donkey_Kong.mov
+🟢 [MoodCard] Setting image for Pixel_Cosmic.mov
+🟢 [MoodCard] Setting image for Color_1.mov
+🟢 [MediaUtils] Generated thumbnail for Waterfall_2.mov
+🟢 [MediaUtils] Generated thumbnail for Rest_1.mov
+🟢 [MediaUtils] Generated thumbnail for Storm_1.mov
+🟢 [MoodCard] Setting image for Fractal_1.mov
+🟢 [MoodCard] Setting image for Autumn_1.mov
+🟢 [MoodCard] Setting image for Flow_1.mov
+🟢 [MoodCard] Setting image for Flow_1.mov
+🟢 [MoodCard] Setting image for Mario_Pixel_Room.mov
+🟢 [MoodCard] Setting image for Mindfulness_1.mov
+🟢 [MoodCard] Setting image for Storm_1.mov
+🟢 [MoodCard] Setting image for Desert_1.mov
+🟢 [MoodCard] Setting image for Fractal_1.mov
+🟢 [MoodCard] Setting image for Waterfall_5.mov
+🟢 [MoodCard] Setting image for Storm_4.mov
+🟢 [MoodCard] Setting image for DeepFocus_1.mov
+🟢 [MoodCard] Setting image for Autumn_3.mov
+🟢 [MoodCard] Setting image for Waterfall_5.mov
+🟢 [MoodCard] Setting image for Concentration_1.mov
+🟢 [MoodCard] Setting image for Autumn_1.mov
+🟢 [MoodCard] Setting image for Storm_4.mov
+🟢 [MoodCard] Setting image for Rest_1.mov
+🟢 [MediaUtils] Generated thumbnail for Aurora_1.mov
+🟢 [MoodCard] Setting image for CoffeeShop_1.mov
+🟢 [MoodCard] Setting image for Mario_Pixel_Room.mov
+🟢 [MoodCard] Setting image for Storm_2.mov
+🟢 [MoodCard] Setting image for Forest_1.mov
+🟢 [MoodCard] Setting image for Aurora_1.mov
+🟢 [MoodCard] Setting image for Forest_1.mov
+🟢 [MoodCard] Setting image for Pixel_Cosmic.mov
+🟢 [MoodCard] Setting image for Wild_1.mov
+🟢 [MoodCard] Setting image for Wild_1.mov
+🟢 [MoodCard] Setting image for Waterfall_2.mov
+🟢 [MoodCard] Setting image for Mindfulness_1.mov
+🟢 [MoodCard] Setting image for Desert_1.mov
+🟢 [MoodCard] Setting image for Autumn_3.mov
+🟢 [MoodCard] Setting image for Autumn_2.mov
+🟢 [MoodCard] Setting image for DeepFocus_1.mov
+🟢 [MoodCard] Setting image for Donkey_Kong.mov
+🟢 [MoodCard] Setting image for Color_1.mov
+🟢 [MoodCard] Setting image for CoffeeShop_1.mov
+🟢 [MoodCard] Setting image for Waterfall_2.mov
+🟢 [MoodCard] Setting image for Rest_1.mov
+🟢 [MoodCard] Setting image for Storm_1.mov
+🟢 [MoodCard] Setting image for Aurora_1.mov
+🟢 [AssetManager] Loading audio buffer for cafe from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/cafe.m4a
+🟢 [AssetManager] Loading audio buffer for brownnoise from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/brownnoise.m4a
+🟢 [AssetManager] Loading audio buffer for stream from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/stream.m4a
+🟢 [AssetManager] Loading audio buffer for night from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/night.m4a
+🟢 [AssetManager] Loading audio buffer for crickets from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/crickets.m4a
+🟢 [AssetManager] Loading audio buffer for fan from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/fan.m4a
+🟢 [AssetManager] Loading audio buffer for hum from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/hum.m4a
+🟢 [AssetManager] Loading audio buffer for piano from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/piano.m4a
+🟢 [AssetManager] Loading audio buffer for fire from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/fire.m4a
+🟢 [AssetManager] Loading audio buffer for thunder from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/thunder.m4a
+🟢 [AssetManager] Loading audio buffer for birds from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/birds.m4a
+🟢 [AssetManager] Loading audio buffer for seaside from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/seaside.m4a
+🟢 [AssetManager] Loading audio buffer for mountainstream from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/mountainstream.m4a
+🟢 [AssetManager] Loading audio buffer for tropicalbeach from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/tropicalbeach.m4a
+🟢 [AssetManager] Loading audio buffer for heavyrain from /Users/valentin/Library/Developer/Xcode/DerivedData/Aura-ebwxtaakcjfbtygjwdzyhezlsuct/Build/Products/Debug/Aura.app/Contents/Resources/heavyrain.m4a
+🟢 [MoodEngine] Applying mood: Eternal Spring (ID: eternal_spring)
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [VideoBackgroundView] Loading: Waterfall_5.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [SoundEngine] Crossfade started over 0.5s
+🟢 [WallpaperEngine] Applying wallpaper of type: animated
+🟢 [WallpaperEngine] Hardware Decoder Released
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [WallpaperEngine] Hardware Decoder Released
+🟢 [MediaUtils] Generated thumbnail for Waterfall_5.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_7.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_7.mov
+🟥 [MoodCard] loadedImage is nil for Waterfall_7.mov
+🟢 [AppModel] Mood engine started.
+🟢 [AppModel] Start complete.
+🟢 [MediaUtils] Resolving resource: Waterfall_5.mov
+🟢 [MediaUtils] Found downloaded resource at /Users/valentin/Library/Containers/com.valentinkt..Aura/Data/Library/Application Support/Aura/Videos/Waterfall_5.mov
+🟢 [VideoBackgroundView] Loading: Waterfall_5.mov
+🟢 [MediaUtils] Resolving resource: Waterfall_3.mov
+🟥 [Popover MoodCard] loadedImage is nil for Waterfall_3.mov

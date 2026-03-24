@@ -2,6 +2,26 @@ import AVFoundation
 import SwiftUI
 
 enum MediaUtils {
+    nonisolated static func resolveImageFallback(for name: String) -> URL? {
+        // Try the local absolute path first
+        let absolutePath = "/Users/valentin/XCode/Aura/Aura/Resources/Image/\(name).jpg"
+        if FileManager.default.fileExists(atPath: absolutePath) {
+            return URL(fileURLWithPath: absolutePath)
+        }
+        
+        // Then try bundle
+        if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "Resources/Image") {
+            return url
+        }
+        if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "Image") {
+            return url
+        }
+        if let url = Bundle.main.url(forResource: name, withExtension: "jpg") {
+            return url
+        }
+        return nil
+    }
+    
     nonisolated static func resolveResourceURL(_ resource: String) -> URL? {
         print("🟢 [MediaUtils] Resolving resource: \(resource)")
         // 1. Check if it's already an absolute path and exists
@@ -34,6 +54,11 @@ enum MediaUtils {
         let isVideo = ext?.lowercased() == "mov" || ext?.lowercased() == "mp4"
         if isVideo && !name.hasSuffix("_1") {
             // No warning here, this is expected for non-first items
+            // If the video is not downloaded, we should still try to return a placeholder image
+            if let imageFallbackURL = resolveImageFallback(for: name) {
+                print("🟢 [MediaUtils] Returning image fallback for \(name)")
+                return imageFallbackURL
+            }
             return nil
         }
         
@@ -132,7 +157,12 @@ enum MediaUtils {
             }
         }
         
-        if !isVideo {
+        if isVideo {
+            if let imageFallbackURL = resolveImageFallback(for: name) {
+                print("🟢 [MediaUtils] Returning image fallback for missing video \(name)")
+                return imageFallbackURL
+            }
+        } else {
             print("🟥 [MediaUtils] Warning - Could not resolve resource: \(resource)")
         }
         return nil

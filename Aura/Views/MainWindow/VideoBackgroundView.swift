@@ -19,6 +19,7 @@ struct VideoBackgroundView: NSViewRepresentable {
 
 private class VideoLoopView: NSView {
     private var playerLayer: AVPlayerLayer?
+    private var imageLayer: CALayer?
     private var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
     private var currentURL: URL?
@@ -42,7 +43,7 @@ private class VideoLoopView: NSView {
     func play(url: URL) {
         // Avoid restarting if the same URL is already playing
         if currentURL == url {
-            if player != nil {
+            if player != nil || imageLayer != nil {
                 return
             }
         }
@@ -61,7 +62,24 @@ private class VideoLoopView: NSView {
             return
         }
 
-        // --- STEP 2: CONFIGURE ASSET ---
+        let ext = url.pathExtension.lowercased()
+        if ["jpg", "jpeg", "png", "heic"].contains(ext) {
+            // --- IMAGE FALLBACK ---
+            guard let image = NSImage(contentsOf: url) else {
+                print("🟥 [VideoBackgroundView] Failed to load image at: \(url.path)")
+                return
+            }
+            
+            let layer = CALayer()
+            layer.contents = image
+            layer.contentsGravity = .resizeAspectFill
+            layer.frame = self.bounds
+            self.layer?.addSublayer(layer)
+            self.imageLayer = layer
+            return
+        }
+
+        // --- STEP 2: CONFIGURE ASSET (VIDEO) ---
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         
@@ -112,6 +130,9 @@ private class VideoLoopView: NSView {
         playerLayer?.removeFromSuperlayer()
         playerLayer = nil
         
+        imageLayer?.removeFromSuperlayer()
+        imageLayer = nil
+        
         player = nil
         
         if let url = currentURL, isSecurityScoped {
@@ -128,5 +149,6 @@ private class VideoLoopView: NSView {
     override func layout() {
         super.layout()
         playerLayer?.frame = bounds
+        imageLayer?.frame = bounds
     }
 }

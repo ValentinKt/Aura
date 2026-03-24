@@ -85,10 +85,17 @@ final class WallpaperEngine {
     private func startAnimated(_ descriptor: WallpaperDescriptor) {
         let fps = min(5, max(0.1, descriptor.fps)) // Limit FPS to reasonable background range
         if let resource = descriptor.resources.first,
-           let resolvedURL = resolveResourceURL(resource),
-           ["mp4", "mov"].contains(resolvedURL.pathExtension.lowercased()) {
-            startVideoAnimated(resourceURL: resolvedURL, fps: fps)
-            return
+           let resolvedURL = resolveResourceURL(resource) {
+            
+            let ext = resolvedURL.pathExtension.lowercased()
+            if ["mp4", "mov"].contains(ext) {
+                startVideoAnimated(resourceURL: resolvedURL, fps: fps)
+                return
+            } else if ["jpg", "jpeg", "png", "heic"].contains(ext) {
+                // If it resolved to an image (e.g., fallback), apply it statically
+                _ = applyImageURLs([resolvedURL])
+                return
+            }
         }
         
         let stops = descriptor.gradientStops
