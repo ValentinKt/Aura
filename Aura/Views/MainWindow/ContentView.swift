@@ -146,7 +146,9 @@ struct ContentView: View {
         case "wild": return "pawprint.fill"
         case "zen": return "circle.hexagongrid.fill"
         case "quotes": return "quote.bubble.fill"
-        default: return "circle.fill"
+         case "website": return "globe"
+         case "websites": return "globe"
+         default: return "circle.fill"
         }
     }
 
