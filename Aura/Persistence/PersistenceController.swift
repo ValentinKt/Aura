@@ -110,6 +110,7 @@ final class PersistenceController {
             attribute("randomAmbienceInterval", .doubleAttributeType, optional: false),
             attribute("lastUsedMoodID", .stringAttributeType, optional: true),
             attribute("keepCurrentWallpaper", .booleanAttributeType, optional: false),
+            attribute("websiteWallpaperInteractive", .booleanAttributeType, optional: false),
             attribute("masterVolume", .floatAttributeType, optional: false)
         ]
 

@@ -122,21 +122,10 @@ final class MoodEngine {
                     name == "Donkey_Kong" ||
                     name == "Mario_Pixel_Room" ||
                     name == "Pixel_Cosmic" ||
-                    name == "Mindfulness_1" ||
-                    name == "Waterfall_1" ||
-                    name == "Wild_1" ||
-                    name == "Storm_1" ||
-                    name == "Rest_1" ||
-                    name == "Forest_1" ||
-                    name == "Flow_1" ||
-                    name == "Desert_1" ||
-                    name == "DeepFocus_1" ||
-                    name == "Concentration_1" ||
-                    name == "Aurora_1" ||
-                    name == "Autumn_1" ||
-                    name == "CoffeeShop_1" ||
-                    name == "Color_1" ||
-                    name == "Fractal_1"
+                    name == "Pixel_Cyberpunk_City" ||
+                    name == "Pixel_Gaming_Room" ||
+                    name == "Sailor_Moon" ||
+                    name == "Zelda_Pixel_Art"
 
                 if isFirst {
                     _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
@@ -259,6 +248,33 @@ final class MoodEngine {
                 subtheme: "Waterfall",
                 layerMix: ["rain": 0.3, "forest": 0.4],
                 wallpaper: WallpaperDescriptor(type: .animated, resources: ["Waterfall_7.mov"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.3, green: 0.36, blue: 0.55), secondary: ColorComponents(red: 0.45, green: 0.4, blue: 0.6), accent: ColorComponents(red: 0.7, green: 0.65, blue: 0.85))
+            ),
+            Mood(
+                id: "silver_veil",
+                name: "Silver Veil",
+                theme: "Nature",
+                subtheme: "Waterfall",
+                layerMix: ["rain": 0.3, "forest": 0.4],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Waterfall_8.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.3, green: 0.36, blue: 0.55), secondary: ColorComponents(red: 0.45, green: 0.4, blue: 0.6), accent: ColorComponents(red: 0.7, green: 0.65, blue: 0.85))
+            ),
+            Mood(
+                id: "azure_descent",
+                name: "Azure Descent",
+                theme: "Nature",
+                subtheme: "Waterfall",
+                layerMix: ["rain": 0.3, "forest": 0.4],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Waterfall_9.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.3, green: 0.36, blue: 0.55), secondary: ColorComponents(red: 0.45, green: 0.4, blue: 0.6), accent: ColorComponents(red: 0.7, green: 0.65, blue: 0.85))
+            ),
+            Mood(
+                id: "moonlit_current",
+                name: "Moonlit Current",
+                theme: "Nature",
+                subtheme: "Waterfall",
+                layerMix: ["rain": 0.3, "forest": 0.4],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Waterfall_10.mp4"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.3, green: 0.36, blue: 0.55), secondary: ColorComponents(red: 0.45, green: 0.4, blue: 0.6), accent: ColorComponents(red: 0.7, green: 0.65, blue: 0.85))
             ),
             Mood(
@@ -440,6 +456,51 @@ final class MoodEngine {
                 layerMix: ["brownnoise": 0.5, "piano": 0.5],
                 wallpaper: WallpaperDescriptor(type: .animated, resources: ["Flow_5.mov"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.8, green: 0.4, blue: 0.2), secondary: ColorComponents(red: 0.9, green: 0.6, blue: 0.3), accent: ColorComponents(red: 1.0, green: 0.9, blue: 0.5))
+            ),
+            Mood(
+                id: "energy_ignition",
+                name: "Ignition",
+                theme: "Wellness",
+                subtheme: "Energy",
+                layerMix: ["hum": 0.45, "brownnoise": 0.3, "fire": 0.15],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Energy_1.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.08, blue: 0.1), secondary: ColorComponents(red: 0.28, green: 0.12, blue: 0.08), accent: ColorComponents(red: 0.98, green: 0.62, blue: 0.18))
+            ),
+            Mood(
+                id: "energy_spark_surge",
+                name: "Spark Surge",
+                theme: "Wellness",
+                subtheme: "Energy",
+                layerMix: ["hum": 0.4, "brownnoise": 0.25, "wind": 0.2],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Energy_2.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.06, green: 0.07, blue: 0.1), secondary: ColorComponents(red: 0.22, green: 0.14, blue: 0.1), accent: ColorComponents(red: 0.94, green: 0.5, blue: 0.14))
+            ),
+            Mood(
+                id: "energy_core_pulse",
+                name: "Core Pulse",
+                theme: "Wellness",
+                subtheme: "Energy",
+                layerMix: ["hum": 0.35, "brownnoise": 0.35, "piano": 0.15],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Energy_3.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.09, blue: 0.12), secondary: ColorComponents(red: 0.26, green: 0.16, blue: 0.1), accent: ColorComponents(red: 1.0, green: 0.72, blue: 0.22))
+            ),
+            Mood(
+                id: "energy_voltage_bloom",
+                name: "Voltage Bloom",
+                theme: "Wellness",
+                subtheme: "Energy",
+                layerMix: ["hum": 0.4, "fire": 0.2, "wind": 0.15],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Energy_4.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.07, green: 0.07, blue: 0.09), secondary: ColorComponents(red: 0.24, green: 0.1, blue: 0.08), accent: ColorComponents(red: 1.0, green: 0.56, blue: 0.1))
+            ),
+            Mood(
+                id: "energy_solar_charge",
+                name: "Solar Charge",
+                theme: "Wellness",
+                subtheme: "Energy",
+                layerMix: ["hum": 0.45, "brownnoise": 0.2, "fire": 0.2],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Energy_5.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.08, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.12, blue: 0.08), accent: ColorComponents(red: 1.0, green: 0.66, blue: 0.16))
             ),
             Mood(
                 id: "quiet_mind",
@@ -784,6 +845,51 @@ final class MoodEngine {
                 palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.15, blue: 0.2), secondary: ColorComponents(red: 0.2, green: 0.25, blue: 0.35), accent: ColorComponents(red: 0.5, green: 0.6, blue: 0.8))
             ),
             Mood(
+                id: "rain_monsoon_village",
+                name: "Monsoon Village",
+                theme: "Nature",
+                subtheme: "Rain",
+                layerMix: ["rain": 0.65, "wind": 0.2, "stream": 0.15],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Rain_1.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.18, green: 0.2, blue: 0.18), secondary: ColorComponents(red: 0.3, green: 0.34, blue: 0.28), accent: ColorComponents(red: 0.64, green: 0.72, blue: 0.58))
+            ),
+            Mood(
+                id: "rain_rainforest_shelter",
+                name: "Rainforest Shelter",
+                theme: "Nature",
+                subtheme: "Rain",
+                layerMix: ["rain": 0.7, "forest": 0.25, "wind": 0.1],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Rain_2.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.16, green: 0.18, blue: 0.12), secondary: ColorComponents(red: 0.28, green: 0.32, blue: 0.18), accent: ColorComponents(red: 0.76, green: 0.62, blue: 0.26))
+            ),
+            Mood(
+                id: "rain_lakeside_ember",
+                name: "Lakeside Ember",
+                theme: "Nature",
+                subtheme: "Rain",
+                layerMix: ["rain": 0.55, "fire": 0.25, "wind": 0.15],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Rain_3.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.14, blue: 0.16), secondary: ColorComponents(red: 0.2, green: 0.24, blue: 0.26), accent: ColorComponents(red: 0.95, green: 0.58, blue: 0.28))
+            ),
+            Mood(
+                id: "rain_emerald_downpour",
+                name: "Emerald Downpour",
+                theme: "Nature",
+                subtheme: "Rain",
+                layerMix: ["rain": 0.68, "forest": 0.22, "stream": 0.12],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Rain_4.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.16, blue: 0.12), secondary: ColorComponents(red: 0.18, green: 0.28, blue: 0.22), accent: ColorComponents(red: 0.5, green: 0.74, blue: 0.58))
+            ),
+            Mood(
+                id: "rain_quiet_drizzle",
+                name: "Quiet Drizzle",
+                theme: "Nature",
+                subtheme: "Rain",
+                layerMix: ["rain": 0.58, "wind": 0.18, "forest": 0.12],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Rain_5.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.18, blue: 0.14), secondary: ColorComponents(red: 0.18, green: 0.3, blue: 0.24), accent: ColorComponents(red: 0.62, green: 0.82, blue: 0.72))
+            ),
+            Mood(
                 id: "amber_forest",
                 name: "Amber Forest",
                 theme: "Nature",
@@ -929,11 +1035,29 @@ final class MoodEngine {
                 wallpaper: WallpaperDescriptor(type: .animated, resources: ["Color_5.mov"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.2, green: 0.1, blue: 0.2), secondary: ColorComponents(red: 0.4, green: 0.2, blue: 0.4), accent: ColorComponents(red: 0.7, green: 0.4, blue: 0.7))
             ),
+            Mood(
+                id: "prismatic_dawn",
+                name: "Prismatic Dawn",
+                theme: "Art",
+                subtheme: "Color",
+                layerMix: ["piano": 0.4, "rain": 0.2],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Color_6.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.28, green: 0.12, blue: 0.22), secondary: ColorComponents(red: 0.48, green: 0.24, blue: 0.42), accent: ColorComponents(red: 0.86, green: 0.46, blue: 0.74))
+            ),
+            Mood(
+                id: "violet_spectrum",
+                name: "Violet Spectrum",
+                theme: "Art",
+                subtheme: "Color",
+                layerMix: ["piano": 0.4, "rain": 0.2],
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Color_7.mp4"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.16, green: 0.12, blue: 0.3), secondary: ColorComponents(red: 0.28, green: 0.22, blue: 0.5), accent: ColorComponents(red: 0.56, green: 0.46, blue: 0.88))
+            ),
             // Time Subthemes
             Mood(
                 id: "time_minimal",
                 name: "Minimalist Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["hum": 0.2, "wind": 0.1],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["minimal"]),
@@ -942,7 +1066,7 @@ final class MoodEngine {
             Mood(
                 id: "time_analog",
                 name: "Analog Clock",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["hum": 0.1, "night": 0.2],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["analog"]),
@@ -951,7 +1075,7 @@ final class MoodEngine {
             Mood(
                 id: "time_typographic",
                 name: "Typographic Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["piano": 0.3, "rain": 0.2],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["typographic"]),
@@ -960,7 +1084,7 @@ final class MoodEngine {
             Mood(
                 id: "time_binary",
                 name: "Binary Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["hum": 0.4, "piano": 0.1],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["binary"]),
@@ -969,7 +1093,7 @@ final class MoodEngine {
             Mood(
                 id: "time_solar",
                 name: "Solar Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["wind": 0.3, "forest": 0.2],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["solar"]),
@@ -978,7 +1102,7 @@ final class MoodEngine {
             Mood(
                 id: "time_glass_blocks",
                 name: "Glass Blocks",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["hum": 0.2, "wind": 0.1],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["glass_blocks"]),
@@ -987,7 +1111,7 @@ final class MoodEngine {
             Mood(
                 id: "time_words",
                 name: "Prose Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["piano": 0.2, "rain": 0.2],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["words"]),
@@ -996,7 +1120,7 @@ final class MoodEngine {
             Mood(
                 id: "time_orbit",
                 name: "Orbit Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["hum": 0.4, "night": 0.3],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["orbit"]),
@@ -1005,7 +1129,7 @@ final class MoodEngine {
             Mood(
                 id: "time_neon",
                 name: "Neon Glow",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["wind": 0.2, "piano": 0.3],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["neon"]),
@@ -1014,7 +1138,7 @@ final class MoodEngine {
             Mood(
                 id: "time_fluid",
                 name: "Fluid Time",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Time",
                 layerMix: ["stream": 0.4, "rain": 0.2],
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["fluid"]),
@@ -1024,7 +1148,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_breathing",
                 name: "Breathing",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["wind": 0.2, "hum": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["breathing"]),
@@ -1033,7 +1157,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_mandala",
                 name: "Mandala",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["piano": 0.2, "wind": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["mandala"]),
@@ -1042,7 +1166,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_ripple",
                 name: "Ripple",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["stream": 0.3, "rain": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["ripple"]),
@@ -1051,7 +1175,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_orb",
                 name: "Energy Orb",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["hum": 0.3, "wind": 0.2],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["orb"]),
@@ -1060,7 +1184,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_lotus",
                 name: "Lotus Flower",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["stream": 0.2, "piano": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["lotus"]),
@@ -1069,7 +1193,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_waves",
                 name: "Ocean Waves",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["rain": 0.3, "wind": 0.2],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["waves"]),
@@ -1078,7 +1202,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_eclipse",
                 name: "Solar Eclipse",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["night": 0.4, "hum": 0.2],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["eclipse"]),
@@ -1087,7 +1211,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_particles",
                 name: "Stardust",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["wind": 0.3, "piano": 0.2],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["particles"]),
@@ -1096,7 +1220,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_galaxy",
                 name: "Galaxy",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["brownnoise": 0.4, "wind": 0.2],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["galaxy"]),
@@ -1105,7 +1229,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_pendulum",
                 name: "Pendulum",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["hum": 0.3, "stream": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["pendulum"]),
@@ -1114,7 +1238,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_infinity",
                 name: "Infinity",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["ocean": 0.4, "wind": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["infinity"]),
@@ -1123,7 +1247,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_prism",
                 name: "Prism",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["brownnoise": 0.2, "fire": 0.1],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["prism"]),
@@ -1132,7 +1256,7 @@ final class MoodEngine {
             Mood(
                 id: "zen_stardust",
                 name: "Stardust",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Zen",
                 layerMix: ["wind": 0.5, "hum": 0.2],
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["stardust"]),
@@ -1142,7 +1266,7 @@ final class MoodEngine {
             Mood(
                 id: "quote_motivational",
                 name: "Motivational Quote",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Quotes",
                 layerMix: ["hum": 0.1, "wind": 0.2],
                 wallpaper: WallpaperDescriptor(type: .quote, resources: ["motivational"]),
@@ -1151,7 +1275,7 @@ final class MoodEngine {
             Mood(
                 id: "quote_philosophical",
                 name: "Philosophical Quote",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Quotes",
                 layerMix: ["piano": 0.3, "rain": 0.2],
                 wallpaper: WallpaperDescriptor(type: .quote, resources: ["philosophical"]),
@@ -1160,7 +1284,7 @@ final class MoodEngine {
             Mood(
                 id: "quote_minimal",
                 name: "Minimal Quote",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Quotes",
                 layerMix: ["hum": 0.2, "night": 0.1],
                 wallpaper: WallpaperDescriptor(type: .quote, resources: ["minimal"]),
@@ -1169,7 +1293,7 @@ final class MoodEngine {
             Mood(
                 id: "quote_bold",
                 name: "Bold Quote",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Quotes",
                 layerMix: ["wind": 0.4, "piano": 0.1],
                 wallpaper: WallpaperDescriptor(type: .quote, resources: ["bold"]),
@@ -1179,7 +1303,7 @@ final class MoodEngine {
             Mood(
                 id: "website_custom",
                 name: "Custom Website",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Website",
                 layerMix: ["hum": 0.1],
                 wallpaper: WallpaperDescriptor(type: .website, resources: ["https://example.com"]),
@@ -1253,7 +1377,7 @@ final class MoodEngine {
             Mood(
                 id: "website_apple",
                 name: "Apple",
-                theme: "Utility",
+                theme: "Dynamic",
                 subtheme: "Website",
                 layerMix: ["hum": 0.1, "wind": 0.1],
                 wallpaper: WallpaperDescriptor(type: .website, resources: ["https://www.apple.com"]),

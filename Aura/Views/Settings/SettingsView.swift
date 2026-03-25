@@ -42,6 +42,22 @@ struct SettingsView: View {
                             }
                         }
                         .toggleStyle(.switch)
+
+                        Divider()
+
+                        Toggle(isOn: Binding(
+                            get: { appModel.settingsViewModel.settings.websiteWallpaperInteractive },
+                            set: { appModel.setWebsiteWallpaperInteractive($0) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Website Interaction Mode")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("Brings website wallpapers just above desktop icons so clicks and scrolling work. Turn it off to restore full desktop click-through.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .toggleStyle(.switch)
                     }
                 }
 

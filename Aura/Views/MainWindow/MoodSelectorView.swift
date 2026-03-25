@@ -6,10 +6,23 @@ struct MoodSelectorView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading, spacing: 24) {
-                ForEach(appModel.moodViewModel.subthemes, id: \.self) { subtheme in
-                    SubthemeRow(subtheme: subtheme, appModel: appModel)
-                        .id(subtheme)
+            let subthemeSections = appModel.moodViewModel.subthemeSections
+            VStack(alignment: .leading, spacing: 28) {
+                ForEach(subthemeSections) { section in
+                    VStack(alignment: .leading, spacing: 24) {
+                        if subthemeSections.count > 1 {
+                            Text(section.title.uppercased())
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.55))
+                                .kerning(1.2)
+                                .padding(.horizontal, 40)
+                        }
+
+                        ForEach(section.subthemes, id: \.self) { subtheme in
+                            SubthemeRow(subtheme: subtheme, appModel: appModel)
+                                .id(subtheme)
+                        }
+                    }
                 }
             }
             .padding(.vertical, 24)
@@ -118,8 +131,8 @@ struct SubthemeRow: View {
                     showingQuotesManager = true
                 }
             }
-            
-            if subtheme.caseInsensitiveCompare("Website") == .orderedSame {
+
+            if ["Website", "Websites"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
                 CreateWebsiteCard {
                     showingWebsiteManager = true
                 }
@@ -160,7 +173,7 @@ struct CreateQuoteCard: View {
             }
             .padding(16)
             .frame(width: 120, height: 160)
-            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: true, variant: .regular)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
@@ -207,7 +220,7 @@ struct CreateWebsiteCard: View {
             }
             .padding(16)
             .frame(width: 120, height: 160)
-            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: true, variant: .regular)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
@@ -337,6 +350,8 @@ struct MoodCard: View {
                 QuoteWallpaperPreview(mood: mood, isPressed: isPressed)
             } else if mood.wallpaper.type == .zen {
                 ZenWallpaperPreview(mood: mood, isPressed: isPressed)
+            } else if mood.wallpaper.type == .website {
+                WebsiteWallpaperPreview(mood: mood, isPressed: isPressed)
             } else if let image = image {
                 Image(nsImage: image)
                     .resizable()
@@ -398,7 +413,7 @@ struct MoodCard: View {
             }
 
             // Download Status Overlay
-            if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, !primaryResource.isEmpty {
+            if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, mood.wallpaper.type != .website, !primaryResource.isEmpty {
                 let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
                 if downloadState == .notDownloaded {
                     VStack {
@@ -443,7 +458,7 @@ struct MoodCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || mood.wallpaper.type == .website || primaryResource.isEmpty {
             action()
             return
         }
@@ -607,6 +622,32 @@ struct ZenWallpaperPreview: View {
                 let scale = max(scaleX, scaleY)
 
                 ZenWallpaperView(style: style, palette: mood.palette)
+                    .frame(width: baseSize.width, height: baseSize.height)
+                    .scaleEffect(scale)
+                    .frame(width: targetSize.width, height: targetSize.height)
+                    .clipped()
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: targetSize.width, height: targetSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+struct WebsiteWallpaperPreview: View {
+    let mood: Mood
+    let isPressed: Bool
+    var targetSize: CGSize = CGSize(width: 240, height: 160)
+
+    var body: some View {
+        ZStack {
+            if let urlString = mood.wallpaper.resources.first {
+                let baseSize = CGSize(width: 1920, height: 1080)
+                let scaleX = targetSize.width / baseSize.width
+                let scaleY = targetSize.height / baseSize.height
+                let scale = max(scaleX, scaleY)
+
+                WebsiteWallpaperView(urlString: urlString)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)

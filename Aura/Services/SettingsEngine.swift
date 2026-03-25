@@ -8,21 +8,24 @@ struct UserSettings: Codable, Hashable {
     var randomAmbienceInterval: Double
     var lastUsedMoodID: String?
     var keepCurrentWallpaper: Bool
+    var websiteWallpaperInteractive: Bool
     var masterVolume: Float
 
-    init(weatherSyncEnabled: Bool = false, defaultMoodID: String = "mountain_stream", transitionDuration: Double = 2.5, randomAmbienceInterval: Double = 300, lastUsedMoodID: String? = nil, keepCurrentWallpaper: Bool = false, masterVolume: Float = 0.6) {
+    init(weatherSyncEnabled: Bool = false, defaultMoodID: String = "mountain_stream", transitionDuration: Double = 2.5, randomAmbienceInterval: Double = 300, lastUsedMoodID: String? = nil, keepCurrentWallpaper: Bool = false, websiteWallpaperInteractive: Bool = true, masterVolume: Float = 0.6) {
         self.weatherSyncEnabled = weatherSyncEnabled
         self.defaultMoodID = defaultMoodID
         self.transitionDuration = transitionDuration
         self.randomAmbienceInterval = randomAmbienceInterval
         self.lastUsedMoodID = lastUsedMoodID
         self.keepCurrentWallpaper = keepCurrentWallpaper
+        self.websiteWallpaperInteractive = websiteWallpaperInteractive
         self.masterVolume = masterVolume
     }
 }
 
 final class SettingsEngine {
     private let persistence: PersistenceController
+    private let websiteInteractionMigrationKey = "didMigrateWebsiteWallpaperInteractionDefault"
 
     init(persistence: PersistenceController) {
         self.persistence = persistence
@@ -33,18 +36,28 @@ final class SettingsEngine {
         let request = NSFetchRequest<NSManagedObject>(entityName: "UserSettings")
         request.fetchLimit = 1
         if let entity = try? context.fetch(request).first {
-            return UserSettings(
+            var settings = UserSettings(
                 weatherSyncEnabled: entity.value(forKey: "weatherSyncEnabled") as? Bool ?? false,
                 defaultMoodID: entity.value(forKey: "defaultMoodID") as? String ?? "mountain_stream",
                 transitionDuration: entity.value(forKey: "transitionDuration") as? Double ?? 2.5,
                 randomAmbienceInterval: entity.value(forKey: "randomAmbienceInterval") as? Double ?? 300,
                 lastUsedMoodID: entity.value(forKey: "lastUsedMoodID") as? String,
                 keepCurrentWallpaper: entity.value(forKey: "keepCurrentWallpaper") as? Bool ?? false,
+                websiteWallpaperInteractive: entity.value(forKey: "websiteWallpaperInteractive") as? Bool ?? true,
                 masterVolume: entity.value(forKey: "masterVolume") as? Float ?? 0.6
             )
+
+            if UserDefaults.standard.bool(forKey: websiteInteractionMigrationKey) == false {
+                settings.websiteWallpaperInteractive = true
+                saveSettings(settings)
+                UserDefaults.standard.set(true, forKey: websiteInteractionMigrationKey)
+            }
+
+            return settings
         }
         let defaults = UserSettings()
         saveSettings(defaults)
+        UserDefaults.standard.set(true, forKey: websiteInteractionMigrationKey)
         return defaults
     }
 
@@ -59,6 +72,7 @@ final class SettingsEngine {
         entity.setValue(settings.randomAmbienceInterval, forKey: "randomAmbienceInterval")
         entity.setValue(settings.lastUsedMoodID, forKey: "lastUsedMoodID")
         entity.setValue(settings.keepCurrentWallpaper, forKey: "keepCurrentWallpaper")
+        entity.setValue(settings.websiteWallpaperInteractive, forKey: "websiteWallpaperInteractive")
         entity.setValue(settings.masterVolume, forKey: "masterVolume")
         persistence.saveContext()
     }
@@ -96,6 +110,12 @@ final class SettingsEngine {
     func updateKeepCurrentWallpaper(_ enabled: Bool) {
         var settings = loadSettings()
         settings.keepCurrentWallpaper = enabled
+        saveSettings(settings)
+    }
+
+    func updateWebsiteWallpaperInteractive(_ enabled: Bool) {
+        var settings = loadSettings()
+        settings.websiteWallpaperInteractive = enabled
         saveSettings(settings)
     }
 

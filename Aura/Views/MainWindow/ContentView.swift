@@ -134,10 +134,12 @@ struct ContentView: View {
         case "concentration": return "brain.head.profile"
         case "deepfocus": return "target"
         case "desert": return "sun.dust.fill"
+        case "energy": return "bolt.fill"
         case "flow": return "water.waves"
         case "forest": return "tree.fill"
         case "fractal": return "hurricane"
         case "mindfulness": return "figure.mind.and.body"
+        case "rain": return "cloud.rain.fill"
         case "rest": return "moon.zzz.fill"
         case "retro": return "gamecontroller.fill"
         case "storm": return "cloud.bolt.rain.fill"
@@ -203,19 +205,32 @@ struct ContentView: View {
                         .contentShape(Rectangle())
 
                         if isMoodsExpanded {
-                            LazyVStack(spacing: 2) {
-                                ForEach(appModel.moodViewModel.subthemes, id: \.self) { subtheme in
-                                    SidebarItem(
-                                        title: subtheme,
-                                        isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
-                                        systemImage: iconForSubtheme(subtheme),
-                                        action: {
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                selectedTab = .moods
-                                            }
-                                            appModel.moodViewModel.selectedSubtheme = subtheme
+                            let subthemeSections = appModel.moodViewModel.subthemeSections
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(subthemeSections) { section in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        if subthemeSections.count > 1 {
+                                            Text(section.title.uppercased())
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundStyle(.white.opacity(0.45))
+                                                .padding(.horizontal, 16)
+                                                .padding(.top, 4)
                                         }
-                                    )
+
+                                        ForEach(section.subthemes, id: \.self) { subtheme in
+                                            SidebarItem(
+                                                title: subtheme,
+                                                isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
+                                                systemImage: iconForSubtheme(subtheme),
+                                                action: {
+                                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                        selectedTab = .moods
+                                                    }
+                                                    appModel.moodViewModel.selectedSubtheme = subtheme
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             .padding(.leading, 8)

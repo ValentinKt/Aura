@@ -108,7 +108,7 @@ struct WebsiteManagerView: View {
         // Add to MoodViewModel
         appModel.moodViewModel.addCustomMood(
             name: trimmedName,
-            theme: "Utility",
+            theme: "Dynamic",
             subtheme: "Website",
             wallpaperPath: trimmedURL,
             layerMix: ["hum": 0.1], // Default ambient sound

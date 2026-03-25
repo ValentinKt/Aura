@@ -98,6 +98,19 @@ struct WallpaperPreviewView: View {
                         ZenWallpaperView(style: "breathing", palette: mood.palette)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .website {
+                    if let urlString = mood.wallpaper.resources.first {
+                        WebsiteWallpaperView(urlString: urlString)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .allowsHitTesting(false)
+                    } else {
+                        // Fallback to gradient
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(LinearGradient(colors: [
+                                appModel.themeManager.color(from: appModel.themeManager.palette.primary),
+                                appModel.themeManager.color(from: appModel.themeManager.palette.secondary)
+                            ], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    }
                 } else {
                     // Fallback to gradient
                     RoundedRectangle(cornerRadius: 8)

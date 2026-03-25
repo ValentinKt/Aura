@@ -24,7 +24,6 @@ enum MediaUtils {
 
     nonisolated static func resolveResourceURL(_ resource: String) -> URL? {
         print("🟢 [MediaUtils] Resolving resource: \(resource)")
-        // 1. Check if it's already an absolute path and exists
         if resource.hasPrefix("/") {
             let url = URL(fileURLWithPath: resource)
             if FileManager.default.fileExists(atPath: url.path) {
@@ -33,28 +32,27 @@ enum MediaUtils {
         }
 
         let fileManager = FileManager.default
+        let resourceURL = URL(fileURLWithPath: resource)
+        let name = resourceURL.deletingPathExtension().lastPathComponent
+        let ext = resourceURL.pathExtension.isEmpty ? nil : resourceURL.pathExtension
+        let isVideo = ext?.lowercased() == "mov" || ext?.lowercased() == "mp4"
 
-        // 1.5 Check if it's already downloaded in Application Support
         if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let videoURL = appSupport.appendingPathComponent("Aura/Videos").appendingPathComponent(resource)
-            if fileManager.fileExists(atPath: videoURL.path) {
-                print("🟢 [MediaUtils] Found downloaded resource at \(videoURL.path)")
-                return videoURL
+            let videosDirectory = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
+
+            if let localResourceURL = resolveDownloadedResourceURL(
+                resource: resource,
+                name: name,
+                ext: ext,
+                in: videosDirectory
+            ) {
+                print("🟢 [MediaUtils] Found downloaded resource at \(localResourceURL.path)")
+                return localResourceURL
             }
         }
 
         let bundle = Bundle.main
-
-        // Split name and extension if needed
-        let resourceURL = URL(fileURLWithPath: resource)
-        let name = resourceURL.deletingPathExtension().lastPathComponent
-        let ext = resourceURL.pathExtension.isEmpty ? nil : resourceURL.pathExtension
-
-        // Force download for non-first wallpapers (videos)
-        let isVideo = ext?.lowercased() == "mov" || ext?.lowercased() == "mp4"
         if isVideo && !name.hasSuffix("_1") {
-            // No warning here, this is expected for non-first items
-            // If the video is not downloaded, we should still try to return a placeholder image
             if let imageFallbackURL = resolveImageFallback(for: name) {
                 print("🟢 [MediaUtils] Returning image fallback for \(name)")
                 return imageFallbackURL
@@ -62,7 +60,6 @@ enum MediaUtils {
             return nil
         }
 
-        // 2. Check in various potential subdirectories
         let subdirs = [
             "Assets/Submoods",
             "Submoods",
@@ -74,7 +71,6 @@ enum MediaUtils {
                 return url
             }
 
-            // Try sub-theme structure: Submoods/Waterfall/Waterfall_1.mp4
             let components = name.components(separatedBy: "_")
             if components.count > 1 {
                 let potentialSubtheme = components[0]
@@ -84,12 +80,10 @@ enum MediaUtils {
             }
         }
 
-        // 3. Check in bundle root
         if let url = bundle.url(forResource: name, withExtension: ext) {
             return url
         }
 
-        // 3.5 Check if there is a zipped version
         let targetName = ext == nil ? name : "\(name).\(ext!)"
         let zipSubdirs = subdirs + [""]
         for subdir in zipSubdirs {
@@ -125,7 +119,6 @@ enum MediaUtils {
             }
         }
 
-        // 4. Fallback: try with full resource name as forResource (sometimes works for full filenames)
         if let url = bundle.url(forResource: resource, withExtension: nil) {
             return url
         }
@@ -181,14 +174,10 @@ enum MediaUtils {
             try? fileManager.createDirectory(at: targetDir, withIntermediateDirectories: true)
         }
 
-        let destinationURL = targetDir.appendingPathComponent(originalResource)
-
-        // If already extracted, just return it
-        if fileManager.fileExists(atPath: destinationURL.path) {
-            return destinationURL
+        if let existingURL = extractedResourceURL(for: originalResource, in: targetDir) {
+            return existingURL
         }
 
-        // Use Process to unzip
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         process.arguments = ["-o", zipURL.path, "-d", targetDir.path]
@@ -197,17 +186,101 @@ enum MediaUtils {
             try process.run()
             process.waitUntilExit()
 
-            if process.terminationStatus == 0 && fileManager.fileExists(atPath: destinationURL.path) {
+            if process.terminationStatus == 0,
+               let extractedURL = extractedResourceURL(for: originalResource, in: targetDir) {
                 print("🟢 [MediaUtils] Successfully extracted \(originalResource)")
-                return destinationURL
-            } else {
-                print("🟥 [MediaUtils] Failed to extract \(originalResource). Status: \(process.terminationStatus)")
+                return extractedURL
             }
+
+            print("🟥 [MediaUtils] Failed to extract \(originalResource). Status: \(process.terminationStatus)")
         } catch {
             print("🟥 [MediaUtils] Error running unzip: \(error)")
         }
 
         return nil
+    }
+
+    nonisolated private static func resolveDownloadedResourceURL(
+        resource: String,
+        name: String,
+        ext: String?,
+        in directory: URL
+    ) -> URL? {
+        let fileManager = FileManager.default
+        let directURL = directory.appendingPathComponent(resource)
+        if fileManager.fileExists(atPath: directURL.path) {
+            return directURL
+        }
+
+        if let extractedURL = extractedResourceURL(for: resource, in: directory) {
+            return extractedURL
+        }
+
+        if let alternateExtension = alternateVideoExtension(for: ext) {
+            let alternateResource = "\(name).\(alternateExtension)"
+            let alternateURL = directory.appendingPathComponent(alternateResource)
+            if fileManager.fileExists(atPath: alternateURL.path) {
+                return alternateURL
+            }
+
+            if let extractedURL = extractedResourceURL(for: alternateResource, in: directory) {
+                return extractedURL
+            }
+        }
+
+        return nil
+    }
+
+    nonisolated private static func extractedResourceURL(for resource: String, in directory: URL) -> URL? {
+        let fileManager = FileManager.default
+        let directURL = directory.appendingPathComponent(resource)
+        if fileManager.fileExists(atPath: directURL.path) {
+            return directURL
+        }
+
+        let expectedName = URL(fileURLWithPath: resource).lastPathComponent.lowercased()
+        if let enumerator = fileManager.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            for case let candidateURL as URL in enumerator
+                where candidateURL.lastPathComponent.lowercased() == expectedName {
+                return candidateURL
+            }
+        }
+
+        let originalURL = URL(fileURLWithPath: resource)
+        let name = originalURL.deletingPathExtension().lastPathComponent
+        let ext = originalURL.pathExtension.isEmpty ? nil : originalURL.pathExtension
+
+        if let alternateExtension = alternateVideoExtension(for: ext) {
+            let alternateName = "\(name).\(alternateExtension)".lowercased()
+
+            if let enumerator = fileManager.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) {
+                for case let candidateURL as URL in enumerator
+                    where candidateURL.lastPathComponent.lowercased() == alternateName {
+                    return candidateURL
+                }
+            }
+        }
+
+        return nil
+    }
+
+    nonisolated private static func alternateVideoExtension(for ext: String?) -> String? {
+        switch ext?.lowercased() {
+        case "mov":
+            return "mp4"
+        case "mp4":
+            return "mov"
+        default:
+            return nil
+        }
     }
 
     nonisolated static func videoPosterImage(from url: URL) async -> NSImage? {

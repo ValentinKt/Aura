@@ -1,6 +1,13 @@
 import Foundation
 import Observation
 
+struct MoodSubthemeSection: Identifiable, Hashable {
+    let title: String
+    let subthemes: [String]
+
+    var id: String { title }
+}
+
 @MainActor
 @Observable
 final class MoodViewModel {
@@ -8,6 +15,7 @@ final class MoodViewModel {
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
     private var quoteRefreshToken = 0
+    private static let dynamicSubthemes: Set<String> = ["Quotes", "Time", "Website", "Websites", "Zen"]
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
         uniqueKeysWithValues: MoodEngine.builtInMoods()
@@ -87,7 +95,24 @@ final class MoodViewModel {
     }
 
     var subthemes: [String] {
-        moodsBySubtheme.keys.sorted()
+        subthemeSections.flatMap(\.subthemes)
+    }
+
+    var subthemeSections: [MoodSubthemeSection] {
+        let allSubthemes = moodsBySubtheme.keys.sorted()
+        let atmosphereSubthemes = allSubthemes.filter { !Self.dynamicSubthemes.contains($0) }
+        let dynamicSubthemes = allSubthemes.filter { Self.dynamicSubthemes.contains($0) }
+        var sections: [MoodSubthemeSection] = []
+
+        if !atmosphereSubthemes.isEmpty {
+            sections.append(MoodSubthemeSection(title: "Atmospheres", subthemes: atmosphereSubthemes))
+        }
+
+        if !dynamicSubthemes.isEmpty {
+            sections.append(MoodSubthemeSection(title: "Dynamic", subthemes: dynamicSubthemes))
+        }
+
+        return sections
     }
 
     var selectedSubtheme: String?
@@ -177,7 +202,7 @@ final class MoodViewModel {
             return Mood(
                 id: "custom_quote_\(quote.id.uuidString)",
                 name: quote.text,
-                theme: template?.theme ?? "Utility",
+                theme: template?.theme ?? "Dynamic",
                 subtheme: "Quotes",
                 layerMix: template?.layerMix ?? [:],
                 wallpaper: WallpaperDescriptor(type: .quote, resources: [quote.style, quote.id.uuidString]),

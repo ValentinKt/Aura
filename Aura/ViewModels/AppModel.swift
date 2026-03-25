@@ -51,6 +51,7 @@ final class AppModel {
         self.moodViewModel = moodViewModel
         self.playlistViewModel = PlaylistViewModel(playlistEngine: playlistEngine)
         self.settingsViewModel = SettingsViewModel(settingsEngine: settingsEngine)
+        self.wallpaperEngine.setWebsiteWallpaperInteractive(self.settingsViewModel.settings.websiteWallpaperInteractive)
     }
 
     @MainActor
@@ -81,6 +82,11 @@ final class AppModel {
             weatherEngine.stop()
         }
     }
+
+    func setWebsiteWallpaperInteractive(_ enabled: Bool) {
+        settingsViewModel.updateWebsiteWallpaperInteractive(enabled)
+        wallpaperEngine.setWebsiteWallpaperInteractive(enabled)
+    }
 }
 
 enum DownloadState: Equatable {
@@ -97,7 +103,7 @@ final class DownloadManager {
 
     var downloadStates: [String: DownloadState] = [:]
 
-    private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.0/"
+    private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.1/"
 
     private init() {}
 
@@ -140,7 +146,11 @@ final class DownloadManager {
         return name.hasSuffix("_1") ||
             name == "Donkey_Kong" ||
             name == "Mario_Pixel_Room" ||
-            name == "Pixel_Cosmic"
+            name == "Pixel_Cosmic" ||
+            name == "Pixel_Cyberpunk_City" ||
+            name == "Pixel_Gaming_Room" ||
+            name == "Sailor_Moon" ||
+            name == "Zelda_Pixel_Art"
     }
 
     func downloadIfNeeded(_ resource: String) async -> Bool {
@@ -160,58 +170,116 @@ final class DownloadManager {
     }
 
     func download(_ resource: String) async {
-        guard let url = URL(string: "\(baseURL)\(resource).zip") else {
-            downloadStates[resource] = .failed(error: "Invalid URL")
+        downloadStates[resource] = .downloading(progress: 0.0)
+
+        let fileManager = FileManager.default
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            downloadStates[resource] = .failed(error: "Application Support directory not found")
             return
         }
 
-        print("⬇️ [DownloadManager] Starting download for wallpaper from: \(url.absoluteString)")
-
-        downloadStates[resource] = .downloading(progress: 0.0)
+        let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
 
         do {
-            let wrapper = DownloadTaskWrapper()
-            let tempURL = try await wrapper.download(url: url) { progress in
-                Task { @MainActor in
-                    if case .downloading = self.downloadStates[resource] {
-                        self.downloadStates[resource] = .downloading(progress: progress)
+            try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            downloadStates[resource] = .failed(error: error.localizedDescription)
+            return
+        }
+
+        var lastError: Error?
+
+        for candidate in remoteCandidates(for: resource) {
+            guard let url = URL(string: "\(baseURL)\(candidate.remoteName)") else {
+                continue
+            }
+
+            print("⬇️ [DownloadManager] Starting download for wallpaper from: \(url.absoluteString)")
+
+            do {
+                let wrapper = DownloadTaskWrapper()
+                let tempURL = try await wrapper.download(url: url) { progress in
+                    Task { @MainActor in
+                        if case .downloading = self.downloadStates[resource] {
+                            self.downloadStates[resource] = .downloading(progress: progress)
+                        }
                     }
                 }
-            }
 
-            let fileManager = FileManager.default
-            guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-                throw NSError(domain: "DownloadManager", code: -3, userInfo: [NSLocalizedDescriptionKey: "Application Support directory not found"])
-            }
+                let targetURL = videosDir.appendingPathComponent(candidate.localName)
 
-            let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
-            try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true, attributes: nil)
+                if fileManager.fileExists(atPath: targetURL.path) {
+                    try fileManager.removeItem(at: targetURL)
+                }
+                try fileManager.moveItem(at: tempURL, to: targetURL)
 
-            let targetURL = videosDir.appendingPathComponent("\(resource).zip")
+                if candidate.shouldExtract {
+                    if MediaUtils.extractZip(targetURL, originalResource: resource, destinationDir: videosDir) != nil {
+                        print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
+                        try? fileManager.removeItem(at: targetURL)
+                        downloadStates[resource] = .downloaded
+                        return
+                    }
 
-            if fileManager.fileExists(atPath: targetURL.path) {
-                try fileManager.removeItem(at: targetURL)
-            }
-            try fileManager.moveItem(at: tempURL, to: targetURL)
+                    print("❌ [DownloadManager] Extraction failed for archive: \(candidate.remoteName)")
+                    try? fileManager.removeItem(at: targetURL)
+                    lastError = NSError(
+                        domain: "DownloadManager",
+                        code: -4,
+                        userInfo: [NSLocalizedDescriptionKey: "Extraction failed for \(candidate.remoteName)"]
+                    )
+                    continue
+                }
 
-            // Extract it
-            if MediaUtils.extractZip(targetURL, originalResource: resource, destinationDir: videosDir) != nil {
-                print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
-
-                // Clean up the zip file after successful extraction
-                try? fileManager.removeItem(at: targetURL)
-
+                print("✅ [DownloadManager] Successfully downloaded wallpaper from: \(url.absoluteString)")
                 downloadStates[resource] = .downloaded
-            } else {
-                print("❌ [DownloadManager] Extraction failed for: \(resource)")
-                downloadStates[resource] = .failed(error: "Extraction failed")
+                return
+            } catch {
+                print("❌ [DownloadManager] Download attempt failed for \(candidate.remoteName): \(error.localizedDescription)")
+                lastError = error
             }
-
-        } catch {
-            print("❌ [DownloadManager] Download failed with error: \(error.localizedDescription)")
-            downloadStates[resource] = .failed(error: error.localizedDescription)
         }
+
+        let message = lastError?.localizedDescription ?? "Download failed"
+        print("❌ [DownloadManager] Download failed with error: \(message)")
+        downloadStates[resource] = .failed(error: message)
     }
+
+    private func remoteCandidates(for resource: String) -> [RemoteDownloadCandidate] {
+        let resourceURL = URL(fileURLWithPath: resource)
+        let name = resourceURL.deletingPathExtension().lastPathComponent
+        let ext = resourceURL.pathExtension.lowercased()
+
+        var candidates: [RemoteDownloadCandidate] = []
+
+        if !ext.isEmpty {
+            candidates.append(RemoteDownloadCandidate(remoteName: resource, localName: resource, shouldExtract: false))
+        }
+
+        if ext == "mov" {
+            candidates.append(RemoteDownloadCandidate(remoteName: "\(name).mp4", localName: "\(name).mp4", shouldExtract: false))
+        } else if ext == "mp4" {
+            candidates.append(RemoteDownloadCandidate(remoteName: "\(name).mov", localName: "\(name).mov", shouldExtract: false))
+        }
+
+        candidates.append(RemoteDownloadCandidate(remoteName: "\(name).zip", localName: "\(name).zip", shouldExtract: true))
+        candidates.append(RemoteDownloadCandidate(remoteName: "\(resource).zip", localName: "\(resource).zip", shouldExtract: true))
+
+        if ext == "mov" {
+            candidates.append(RemoteDownloadCandidate(remoteName: "\(name).mp4.zip", localName: "\(name).mp4.zip", shouldExtract: true))
+        } else if ext == "mp4" {
+            candidates.append(RemoteDownloadCandidate(remoteName: "\(name).mov.zip", localName: "\(name).mov.zip", shouldExtract: true))
+        }
+
+        var seen = Set<String>()
+        return candidates.filter { seen.insert($0.remoteName).inserted }
+    }
+}
+
+private struct RemoteDownloadCandidate {
+    let remoteName: String
+    let localName: String
+    let shouldExtract: Bool
 }
 
 class DownloadTaskWrapper: NSObject {

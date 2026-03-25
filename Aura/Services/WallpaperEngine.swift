@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import SwiftUI
+import WebKit
 
 struct WallpaperApplyResult: Hashable {
     var success: Bool
@@ -21,6 +22,10 @@ final class WallpaperEngine {
         self.themeManager = themeManager
         self.wallpaperDirectory = fileManager.temporaryDirectory.appendingPathComponent("AuraWallpapers", isDirectory: true)
         setupDirectory()
+    }
+
+    func setWebsiteWallpaperInteractive(_ interactive: Bool) {
+        wallpaperWindowController.setWebsiteInteractive(interactive)
     }
 
     private func setupDirectory() {
@@ -205,9 +210,9 @@ final class WallpaperEngine {
     }
 
     private func startWebsite(_ descriptor: WallpaperDescriptor) {
-        guard let urlString = descriptor.resources.first else { return }
-        let websiteView = WebsiteWallpaperView(urlString: urlString)
-        wallpaperWindowController.showSwiftUIView(websiteView)
+        guard let urlString = descriptor.resources.first,
+              let url = WebsiteWallpaperView.resolvedURL(from: urlString) else { return }
+        wallpaperWindowController.showWebsite(url: url)
     }
 
     private func applyImageURLs(_ urls: [URL]) -> WallpaperApplyResult {
@@ -394,6 +399,15 @@ final class WallpaperWindowController: NSObject {
     private var playerQueue: AVQueuePlayer?
     private var playerLooper: AVPlayerLooper?
     private var endObserver: NSObjectProtocol?
+    private var websiteContainerView: NSView?
+    private var websiteSnapshotView: NSImageView?
+    private var websiteWebView: WKWebView?
+    private var currentWebsiteURL: URL?
+    private var isWebsiteInteractive = false
+    private var isWebsiteSuspended = false
+    private var websiteHoverProbeTimer: Timer?
+    private var websiteHoverProbeSequence: Int = 0
+    private var websiteShouldReceiveMouseEvents = true
 
     override init() {
         super.init()
@@ -405,29 +419,22 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func setupWindow() {
-        // Create a borderless window that covers the entire screen
         let screenFrame = NSScreen.main?.frame ?? .zero
-        let window = NSWindow(
+        let window = DesktopWallpaperWindow(
             contentRect: screenFrame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
 
-        // Configure window level to be behind desktop icons but above the system wallpaper
-        // Note: kCGDesktopWindowLevel is usually -2147483603
-        // We use a slightly higher level to ensure visibility over system wallpaper
-        // but lower than icons (kCGDesktopIconWindowLevel)
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
-
-        // Ensure window behavior is appropriate for a wallpaper
+        window.level = Self.passiveWallpaperLevel
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         window.ignoresMouseEvents = true
+        window.acceptsMouseMovedEvents = true
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = false
 
-        // Create the video player view
         let playerView = NSView(frame: screenFrame)
         playerView.wantsLayer = true
         playerView.layer?.backgroundColor = NSColor.clear.cgColor
@@ -437,11 +444,34 @@ final class WallpaperWindowController: NSObject {
         self.window = window
         self.playerView = playerView
 
-        // Handle screen changes
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenChanged),
             name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowVisibilityChanged),
+            name: NSWindow.didChangeOcclusionStateNotification,
+            object: window
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceStateChanged),
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceStateChanged),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceStateChanged),
+            name: NSWorkspace.didDeactivateApplicationNotification,
             object: nil
         )
     }
@@ -449,7 +479,8 @@ final class WallpaperWindowController: NSObject {
     @objc private func screenChanged() {
         guard let screen = NSScreen.main else { return }
         window?.setFrame(screen.frame, display: true)
-        playerLayer?.frame = screen.frame
+        playerLayer?.frame = window?.contentView?.bounds ?? screen.frame
+        updateWebsitePerformanceState()
     }
 
     private var currentURL: URL?
@@ -459,6 +490,7 @@ final class WallpaperWindowController: NSObject {
 
     func showSwiftUIView<V: View>(_ view: V) {
         stopVideo()
+        stopWebsite()
 
         // Ensure we have a dedicated hosting container and make it the window's contentView
         if hostingContainerView == nil {
@@ -511,6 +543,7 @@ final class WallpaperWindowController: NSObject {
 
         // Nettoyage complet
         stopVideo()
+        stopWebsite()
         // Ensure the window is using the video container
         hideSwiftUIView()
         if let pv = self.playerView, window?.contentView !== pv {
@@ -551,6 +584,41 @@ final class WallpaperWindowController: NSObject {
         window?.orderFront(nil)
     }
 
+    func setWebsiteInteractive(_ interactive: Bool) {
+        isWebsiteInteractive = interactive
+        if currentWebsiteURL != nil {
+            applyWebsiteInteractionMode()
+        }
+    }
+
+    func showWebsite(url: URL) {
+        stopVideo()
+        hideSwiftUIView()
+        ensureWebsiteContainerView()
+
+        guard let container = websiteContainerView,
+              let webView = websiteWebView else { return }
+
+        window?.contentView = container
+
+        if currentWebsiteURL != url || webView.url?.absoluteString != url.absoluteString {
+            currentWebsiteURL = url
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 30
+            webView.load(request)
+        } else {
+            currentWebsiteURL = url
+        }
+
+        applyWebsiteInteractionMode()
+        setWebsiteSuspended(false)
+        window?.orderFront(nil)
+        if isWebsiteInteractive {
+            window?.makeFirstResponder(webView)
+        }
+        updateWebsitePerformanceState()
+    }
+
     @objc private func videoPlayerItemFailedToPlayToEndTime(_ notification: Notification) {
         if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
             print("🟥 [WallpaperWindowController] Video playback failed: \(error.localizedDescription)")
@@ -581,6 +649,245 @@ final class WallpaperWindowController: NSObject {
         print("🟢 [WallpaperEngine] Hardware Decoder Released")
     }
 
+    private func ensureWebsiteContainerView() {
+        if websiteContainerView != nil, websiteWebView != nil {
+            return
+        }
+
+        let frame = window?.contentView?.bounds ?? (NSScreen.main?.frame ?? .zero)
+        let container = NSView(frame: frame)
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.clear.cgColor
+        container.autoresizingMask = [.width, .height]
+
+        let snapshotView = NSImageView(frame: frame)
+        snapshotView.translatesAutoresizingMaskIntoConstraints = false
+        snapshotView.imageScaling = .scaleAxesIndependently
+        snapshotView.isHidden = true
+
+        let configuration = WKWebViewConfiguration()
+        configuration.applicationNameForUserAgent = "AuraWallpaper"
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+
+        let webView = InteractiveWallpaperWebView(frame: .zero, configuration: configuration)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.setValue(false, forKey: "drawsBackground")
+        webView.underPageBackgroundColor = .clear
+        webView.allowsMagnification = false
+
+        container.addSubview(snapshotView)
+        container.addSubview(webView)
+
+        NSLayoutConstraint.activate([
+            snapshotView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            snapshotView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            snapshotView.topAnchor.constraint(equalTo: container.topAnchor),
+            snapshotView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            webView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            webView.topAnchor.constraint(equalTo: container.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+
+        websiteContainerView = container
+        websiteSnapshotView = snapshotView
+        websiteWebView = webView
+    }
+
+    private func applyWebsiteInteractionMode() {
+        updateWebsiteWindowLevel()
+
+        if isWebsiteInteractive {
+            websiteShouldReceiveMouseEvents = true
+            window?.ignoresMouseEvents = false
+            startWebsiteHoverProbing()
+            if let websiteWebView {
+                window?.makeFirstResponder(websiteWebView)
+            }
+        } else {
+            stopWebsiteHoverProbing()
+            websiteShouldReceiveMouseEvents = false
+            window?.ignoresMouseEvents = true
+        }
+
+        window?.orderFront(nil)
+    }
+
+    @objc private func workspaceStateChanged(_ notification: Notification) {
+        updateWebsitePerformanceState()
+    }
+
+    @objc private func windowVisibilityChanged(_ notification: Notification) {
+        updateWebsitePerformanceState()
+    }
+
+    private func updateWebsitePerformanceState() {
+        guard currentWebsiteURL != nil else { return }
+        let shouldSuspend = window?.isVisible != true || isFullscreenApplicationActive()
+        setWebsiteSuspended(shouldSuspend)
+    }
+
+    private func setWebsiteSuspended(_ suspended: Bool) {
+        guard let webView = websiteWebView else { return }
+        guard suspended != isWebsiteSuspended else { return }
+
+        isWebsiteSuspended = suspended
+
+        if suspended {
+            captureWebsiteSnapshot()
+            evaluateWebsiteJavaScript(Self.pauseWebsiteScript)
+            webView.isHidden = true
+        } else {
+            websiteSnapshotView?.isHidden = true
+            webView.isHidden = false
+            evaluateWebsiteJavaScript(Self.resumeWebsiteScript)
+        }
+    }
+
+    private func captureWebsiteSnapshot() {
+        guard let webView = websiteWebView, !webView.isHidden else { return }
+
+        webView.takeSnapshot(with: nil) { [weak self] image, _ in
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.isWebsiteSuspended,
+                      let image else { return }
+                self.websiteSnapshotView?.image = image
+                self.websiteSnapshotView?.isHidden = false
+            }
+        }
+    }
+
+    private func evaluateWebsiteJavaScript(_ script: String) {
+        websiteWebView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    private func updateWebsiteWindowLevel() {
+        guard let window else { return }
+        window.level = isWebsiteInteractive ? Self.interactiveWallpaperLevel : Self.passiveWallpaperLevel
+    }
+
+    private func startWebsiteHoverProbing() {
+        guard websiteHoverProbeTimer == nil else { return }
+
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in
+            self?.probeWebsiteHoverState()
+        }
+        timer.tolerance = 0.04
+        RunLoop.main.add(timer, forMode: .common)
+        websiteHoverProbeTimer = timer
+        probeWebsiteHoverState()
+    }
+
+    private func stopWebsiteHoverProbing() {
+        websiteHoverProbeTimer?.invalidate()
+        websiteHoverProbeTimer = nil
+        websiteHoverProbeSequence += 1
+    }
+
+    private func probeWebsiteHoverState() {
+        guard isWebsiteInteractive,
+              !isWebsiteSuspended,
+              let window = window,
+              let webView = websiteWebView,
+              let currentWebsiteURL = currentWebsiteURL else {
+            setWebsiteMouseEventInterception(enabled: isWebsiteInteractive)
+            return
+        }
+
+        guard window.isVisible else {
+            setWebsiteMouseEventInterception(enabled: false)
+            return
+        }
+
+        let screenLocation = NSEvent.mouseLocation
+        guard window.frame.contains(screenLocation) else {
+            setWebsiteMouseEventInterception(enabled: true)
+            return
+        }
+
+        let windowPoint = window.convertPoint(fromScreen: screenLocation)
+        let viewPoint = webView.convert(windowPoint, from: nil as NSView?)
+        guard webView.bounds.contains(viewPoint) else {
+            setWebsiteMouseEventInterception(enabled: true)
+            return
+        }
+
+        websiteHoverProbeSequence += 1
+        let sequence = websiteHoverProbeSequence
+        let javaScriptPoint = CGPoint(x: viewPoint.x, y: webView.bounds.height - viewPoint.y)
+        let script = Self.hitTestScript(for: javaScriptPoint)
+
+        webView.evaluateJavaScript(script) { [weak self] (result: Any?, _: Error?) in
+            guard let self,
+                  self.isWebsiteInteractive,
+                  self.currentWebsiteURL == currentWebsiteURL,
+                  self.websiteHoverProbeSequence == sequence else { return }
+
+            let shouldIntercept = (result as? Bool) ?? true
+            self.setWebsiteMouseEventInterception(enabled: shouldIntercept)
+        }
+    }
+
+    private func setWebsiteMouseEventInterception(enabled: Bool) {
+        websiteShouldReceiveMouseEvents = enabled
+        window?.ignoresMouseEvents = !enabled
+    }
+
+    private func isFullscreenApplicationActive() -> Bool {
+        guard let activeApplication = NSWorkspace.shared.frontmostApplication else {
+            return false
+        }
+
+        let activePID = activeApplication.processIdentifier
+        guard activePID != ProcessInfo.processInfo.processIdentifier,
+              let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return false
+        }
+
+        let screens = NSScreen.screens.map(\.frame)
+
+        for windowInfo in windowList {
+            guard let ownerPID = windowInfo[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == activePID,
+                  let layer = windowInfo[kCGWindowLayer as String] as? Int,
+                  layer == 0,
+                  let alpha = windowInfo[kCGWindowAlpha as String] as? Double,
+                  alpha > 0.01,
+                  let boundsDictionary = windowInfo[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary),
+                  !bounds.isEmpty else {
+                continue
+            }
+
+            if screens.contains(where: { screen in
+                bounds.width >= screen.width * 0.95 &&
+                bounds.height >= screen.height * 0.95 &&
+                abs(bounds.minX - screen.minX) < 24 &&
+                abs(bounds.minY - screen.minY) < 24
+            }) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private func stopWebsite() {
+        stopWebsiteHoverProbing()
+        currentWebsiteURL = nil
+        isWebsiteSuspended = false
+        websiteSnapshotView?.image = nil
+        websiteSnapshotView?.isHidden = true
+        websiteWebView?.stopLoading()
+        websiteWebView?.loadHTMLString("", baseURL: nil)
+        websiteWebView?.isHidden = false
+        websiteShouldReceiveMouseEvents = false
+        updateWebsiteWindowLevel()
+        window?.ignoresMouseEvents = true
+    }
+
     func stopVideo() {
         stopAndCleanup()
 
@@ -600,11 +907,98 @@ final class WallpaperWindowController: NSObject {
 
     func stopAll() {
         stopVideo()
+        stopWebsite()
         hideSwiftUIView()
         window?.orderOut(nil)
     }
 
     func isPlaying() -> Bool {
         return playerQueue != nil && playerQueue?.rate != 0 && window?.isVisible == true
+    }
+
+    private static let pauseWebsiteScript = """
+    (() => {
+      const styleId = "aura-wallpaper-pause-style";
+      let style = document.getElementById(styleId);
+      if (!style) {
+        style = document.createElement("style");
+        style.id = styleId;
+        document.head.appendChild(style);
+      }
+      style.textContent = "*, *::before, *::after { animation-play-state: paused !important; transition-property: none !important; }";
+      document.querySelectorAll("video, audio").forEach((element) => {
+        if (!element.hasAttribute("data-aura-was-paused")) {
+          element.setAttribute("data-aura-was-paused", element.paused ? "true" : "false");
+        }
+        try { element.pause(); } catch (_) {}
+      });
+      return true;
+    })();
+    """
+
+    private static let resumeWebsiteScript = """
+    (() => {
+      const style = document.getElementById("aura-wallpaper-pause-style");
+      if (style) {
+        style.remove();
+      }
+      document.querySelectorAll("video, audio").forEach((element) => {
+        const wasPaused = element.getAttribute("data-aura-was-paused");
+        element.removeAttribute("data-aura-was-paused");
+        if (wasPaused === "false") {
+          const playPromise = element.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {});
+          }
+        }
+      });
+      return true;
+    })();
+    """
+
+    private static func hitTestScript(for point: CGPoint) -> String {
+        """
+        (() => {
+          const x = \(point.x);
+          const y = \(point.y);
+          const element = document.elementFromPoint(x, y);
+          if (!element) { return false; }
+          const style = window.getComputedStyle(element);
+          if (style.pointerEvents === "none" || style.visibility === "hidden" || style.display === "none") {
+            return false;
+          }
+          const background = style.backgroundColor || "";
+          const hasBackground = !background.includes("rgba(0, 0, 0, 0)") && background !== "transparent";
+          const hasBackgroundImage = style.backgroundImage && style.backgroundImage !== "none";
+          const hasText = (element.innerText || element.textContent || "").trim().length > 0;
+          const mediaTags = new Set(["A", "BUTTON", "CANVAS", "IFRAME", "IMG", "INPUT", "SELECT", "TEXTAREA", "VIDEO"]);
+          const isInteractiveTag = mediaTags.has(element.tagName);
+          const hasPointerCursor = style.cursor === "pointer";
+          return hasBackground || hasBackgroundImage || hasText || isInteractiveTag || hasPointerCursor;
+        })();
+        """
+    }
+
+    private static let passiveWallpaperLevel = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
+    private static let interactiveWallpaperLevel = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
+}
+
+final class DesktopWallpaperWindow: NSWindow {
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override var canBecomeMain: Bool {
+        true
+    }
+}
+
+final class InteractiveWallpaperWebView: WKWebView {
+    override var acceptsFirstResponder: Bool {
+        true
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
     }
 }

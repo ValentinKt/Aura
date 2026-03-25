@@ -31,4 +31,9 @@ final class SettingsViewModel {
         settings.keepCurrentWallpaper = enabled
         settingsEngine.updateKeepCurrentWallpaper(enabled)
     }
+
+    func updateWebsiteWallpaperInteractive(_ enabled: Bool) {
+        settings.websiteWallpaperInteractive = enabled
+        settingsEngine.updateWebsiteWallpaperInteractive(enabled)
+    }
 }
