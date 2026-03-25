@@ -54,4 +54,5 @@ enum WallpaperType: String, Codable, Hashable {
     case time // Programmatic time wallpaper
     case quote // Programmatic quote wallpaper
     case zen // Programmatic zen wallpaper
+    case website // Programmatic website wallpaper
 }

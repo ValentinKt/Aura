@@ -48,6 +48,16 @@ struct ZenWallpaperView: View {
                 EclipseZenView(primaryColor: primaryColor, accentColor: accentColor)
             case "particles":
                 ParticlesZenView(primaryColor: primaryColor, accentColor: accentColor)
+            case "galaxy":
+                GalaxyZenView(primaryColor: primaryColor, accentColor: accentColor)
+            case "pendulum":
+                PendulumZenView(primaryColor: primaryColor, accentColor: accentColor)
+            case "infinity":
+                InfinityZenView(primaryColor: primaryColor, accentColor: accentColor)
+            case "prism":
+                PrismZenView(primaryColor: primaryColor, accentColor: accentColor)
+            case "stardust":
+                StardustZenView(primaryColor: primaryColor, accentColor: accentColor)
             default:
                 BreathingZenView(primaryColor: primaryColor, accentColor: accentColor)
             }
@@ -62,6 +72,182 @@ struct ZenWallpaperView: View {
            let url = NSWorkspace.shared.desktopImageURL(for: screen),
            let image = NSImage(contentsOf: url) {
             desktopImage = image
+        }
+    }
+}
+
+// 9. Galaxy Style
+struct GalaxyZenView: View {
+    let primaryColor: Color
+    let accentColor: Color
+    @State private var rotation: Double = 0
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.85).ignoresSafeArea()
+            
+            ZStack {
+                ForEach(0..<4, id: \.self) { i in
+                    Ellipse()
+                        .stroke(
+                            LinearGradient(colors: [primaryColor.opacity(0.4), accentColor.opacity(0.1)], startPoint: .top, endPoint: .bottom),
+                            lineWidth: 2
+                        )
+                        .frame(width: 600 - CGFloat(i * 100), height: 200 - CGFloat(i * 30))
+                        .rotationEffect(.degrees(Double(i) * 45 + rotation))
+                }
+                
+                Circle()
+                    .fill(accentColor)
+                    .frame(width: 40, height: 40)
+                    .blur(radius: 20)
+            }
+            .rotationEffect(.degrees(rotation))
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 60).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+        }
+    }
+}
+
+// 10. Pendulum Style
+struct PendulumZenView: View {
+    let primaryColor: Color
+    let accentColor: Color
+    @State private var swing: Double = -30
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.7).ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(LinearGradient(colors: [primaryColor.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 2, height: 300)
+                
+                Circle()
+                    .fill(accentColor)
+                    .frame(width: 60, height: 60)
+                    .shadow(color: accentColor.opacity(0.6), radius: 20, x: 0, y: 10)
+            }
+            .rotationEffect(.degrees(swing), anchor: .top)
+            .offset(y: -100)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                swing = 30
+            }
+        }
+    }
+}
+
+// 11. Infinity Style
+struct InfinityZenView: View {
+    let primaryColor: Color
+    let accentColor: Color
+    @State private var phase: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.8).ignoresSafeArea()
+            
+            HStack(spacing: -60) {
+                Circle()
+                    .stroke(
+                        AngularGradient(colors: [primaryColor, accentColor, primaryColor], center: .center, angle: .degrees(phase * 360)),
+                        lineWidth: 10
+                    )
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 2)
+                
+                Circle()
+                    .stroke(
+                        AngularGradient(colors: [accentColor, primaryColor, accentColor], center: .center, angle: .degrees(-phase * 360)),
+                        lineWidth: 10
+                    )
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 2)
+            }
+            .scaleEffect(1.2)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
+                phase = 1.0
+            }
+        }
+    }
+}
+
+// 12. Prism Style
+struct PrismZenView: View {
+    let primaryColor: Color
+    let accentColor: Color
+    @State private var isAnimating = false
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.75).ignoresSafeArea()
+            
+            ZStack {
+                Path { path in
+                    path.move(to: CGPoint(x: 200, y: 50))
+                    path.addLine(to: CGPoint(x: 50, y: 350))
+                    path.addLine(to: CGPoint(x: 350, y: 350))
+                    path.closeSubpath()
+                }
+                .stroke(
+                    LinearGradient(colors: [primaryColor, accentColor], startPoint: isAnimating ? .top : .bottom, endPoint: isAnimating ? .bottom : .top),
+                    lineWidth: 4
+                )
+                .frame(width: 400, height: 400)
+                .blur(radius: isAnimating ? 4 : 1)
+                .scaleEffect(isAnimating ? 1.05 : 0.95)
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
+    }
+}
+
+// 13. Stardust Style
+struct StardustZenView: View {
+    let primaryColor: Color
+    let accentColor: Color
+    @State private var isAnimating = false
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.9).ignoresSafeArea()
+            
+            GeometryReader { geometry in
+                ZStack {
+                    ForEach(0..<50, id: \.self) { index in
+                        Circle()
+                            .fill(index % 3 == 0 ? accentColor : primaryColor)
+                            .frame(width: CGFloat.random(in: 2...6))
+                            .position(
+                                x: CGFloat.random(in: 0...geometry.size.width),
+                                y: CGFloat.random(in: 0...geometry.size.height)
+                            )
+                            .opacity(isAnimating ? CGFloat.random(in: 0.3...1.0) : 0.1)
+                            .scaleEffect(isAnimating ? CGFloat.random(in: 0.8...1.2) : 1.0)
+                            .animation(
+                                .easeInOut(duration: Double.random(in: 2...5))
+                                    .repeatForever(autoreverses: true)
+                                    .delay(Double.random(in: 0...2)),
+                                value: isAnimating
+                            )
+                    }
+                }
+            }
+        }
+        .onAppear {
+            isAnimating = true
         }
     }
 }

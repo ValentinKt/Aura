@@ -42,6 +42,7 @@ struct SubthemeRow: View {
     let subtheme: String
     @Bindable var appModel: AppModel
     @State private var showingQuotesManager = false
+    @State private var showingWebsiteManager = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -89,6 +90,9 @@ struct SubthemeRow: View {
         .sheet(isPresented: $showingQuotesManager) {
             QuotesManagerView(appModel: appModel)
         }
+        .sheet(isPresented: $showingWebsiteManager) {
+            WebsiteManagerView(appModel: appModel)
+        }
     }
 
     @ViewBuilder
@@ -112,6 +116,12 @@ struct SubthemeRow: View {
             if subtheme.caseInsensitiveCompare("Quotes") == .orderedSame {
                 CreateQuoteCard {
                     showingQuotesManager = true
+                }
+            }
+            
+            if subtheme.caseInsensitiveCompare("Website") == .orderedSame {
+                CreateWebsiteCard {
+                    showingWebsiteManager = true
                 }
             }
         }
@@ -150,15 +160,7 @@ struct CreateQuoteCard: View {
             }
             .padding(16)
             .frame(width: 120, height: 160)
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    Color.clear
-                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
-            }
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: true, variant: .regular)
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
@@ -179,6 +181,53 @@ struct CreateQuoteCard: View {
                 .onEnded { _ in isPressed = false }
         )
         .accessibilityLabel("Create a new quote")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+struct CreateWebsiteCard: View {
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var isPressed = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
+
+                Text("Create new\nWebsite")
+                    .font(.system(size: 14, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+            }
+            .padding(16)
+            .frame(width: 120, height: 160)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: true, variant: .regular)
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
+            }
+            .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .onHover { isHovered = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+        .accessibilityLabel("Create a new website")
         .accessibilityAddTraits(.isButton)
     }
 }

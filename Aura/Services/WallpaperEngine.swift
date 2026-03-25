@@ -62,6 +62,10 @@ final class WallpaperEngine {
         case .zen:
             startZen(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
+        case .website:
+            // Handle website wallpaper
+            startWebsite(descriptor)
+            result = WallpaperApplyResult(success: true, permissionDenied: false)
         }
 
         return result
@@ -198,6 +202,12 @@ final class WallpaperEngine {
         let palette = themeManager.palette
         let zenView = ZenWallpaperView(style: style, palette: palette)
         wallpaperWindowController.showSwiftUIView(zenView)
+    }
+
+    private func startWebsite(_ descriptor: WallpaperDescriptor) {
+        guard let urlString = descriptor.resources.first else { return }
+        let websiteView = WebsiteWallpaperView(urlString: urlString)
+        wallpaperWindowController.showSwiftUIView(websiteView)
     }
 
     private func applyImageURLs(_ urls: [URL]) -> WallpaperApplyResult {

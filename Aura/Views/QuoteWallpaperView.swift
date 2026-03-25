@@ -37,46 +37,75 @@ struct QuoteWallpaperView: View {
             // Dynamic animated gradient background
             LinearGradient(
                 colors: [
-                    Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue).opacity(colorScheme == .dark ? 0.3 : 0.8),
-                    Color(red: palette.secondary.red, green: palette.secondary.green, blue: palette.secondary.blue).opacity(colorScheme == .dark ? 0.5 : 0.6),
-                    Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue).opacity(colorScheme == .dark ? 0.4 : 0.7)
+                    Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue).opacity(colorScheme == .dark ? 0.4 : 0.9),
+                    Color(red: palette.secondary.red, green: palette.secondary.green, blue: palette.secondary.blue).opacity(colorScheme == .dark ? 0.6 : 0.7),
+                    Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue).opacity(colorScheme == .dark ? 0.5 : 0.8)
                 ],
                 startPoint: isAnimating ? .topLeading : .bottomTrailing,
                 endPoint: isAnimating ? .bottomTrailing : .topLeading
             )
-            .animation(.easeInOut(duration: 10).repeatForever(autoreverses: true), value: isAnimating)
+            .animation(.easeInOut(duration: 15).repeatForever(autoreverses: true), value: isAnimating)
             .ignoresSafeArea()
 
-            // Subtle glowing orb behind text
-            Circle()
-                .fill(accentColor.opacity(0.15))
-                .blur(radius: 120)
-                .scaleEffect(isAnimating ? 1.2 : 0.8)
-                .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: isAnimating)
-            
-            VStack {
+            // Ambient floating orbs
+            ZStack {
+                Circle()
+                    .fill(accentColor.opacity(0.2))
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 100)
+                    .offset(x: isAnimating ? 200 : -200, y: isAnimating ? -150 : 150)
+                
+                Circle()
+                    .fill(secondaryColor.opacity(0.2))
+                    .frame(width: 300, height: 300)
+                    .blur(radius: 80)
+                    .offset(x: isAnimating ? -250 : 250, y: isAnimating ? 200 : -200)
+            }
+            .animation(.easeInOut(duration: 20).repeatForever(autoreverses: true), value: isAnimating)
+
+            VStack(spacing: 24) {
+                Image(systemName: "quote.opening")
+                    .font(.system(size: quoteFontSize * 0.5, weight: .black, design: .serif))
+                    .foregroundStyle(quoteTextColor.opacity(0.15))
+                    .offset(x: -20, y: 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 60)
+                
                 Text(quoteTextValue.isEmpty ? quoteText(for: style) : quoteTextValue)
                     .font(quoteFont)
+                    .lineSpacing(8)
+                    .kerning(quoteFontStyle == .monospaced ? 2 : 0)
                     .foregroundStyle(
                         LinearGradient(
                             colors: [
                                 quoteTextColor,
-                                quoteTextColor.opacity(0.7)
+                                quoteTextColor.opacity(0.6)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .multilineTextAlignment(.center)
-                    .shadow(color: quoteTextColor.opacity(0.2), radius: 15, x: 0, y: 5)
-                    .shadow(color: accentColor.opacity(0.4), radius: 30, x: 0, y: 15)
-                    .padding(40)
+                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+                    .shadow(color: accentColor.opacity(0.3), radius: 40, x: 0, y: 20)
+                    .padding(.horizontal, 80)
                     .minimumScaleFactor(0.3)
                     .opacity(textOpacity)
                     .offset(y: textOffset)
-                    .scaleEffect(isAnimating ? 1.03 : 0.97)
-                    .animation(.easeInOut(duration: 6).repeatForever(autoreverses: true), value: isAnimating)
+                    .scaleEffect(isAnimating ? 1.02 : 0.98)
+                    .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: isAnimating)
+                
+                Image(systemName: "quote.closing")
+                    .font(.system(size: quoteFontSize * 0.5, weight: .black, design: .serif))
+                    .foregroundStyle(quoteTextColor.opacity(0.15))
+                    .offset(x: 20, y: -10)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 60)
             }
+            .frame(maxWidth: 900)
+            .padding(60)
+            .liquidGlass(RoundedRectangle(cornerRadius: 40, style: .continuous), opacity: 0.1, interactive: false, variant: .regular)
+            .shadow(color: .black.opacity(0.2), radius: 50, x: 0, y: 20)
         }
         .onAppear {
             isAnimating = true

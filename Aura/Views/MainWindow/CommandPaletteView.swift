@@ -143,7 +143,7 @@ struct CommandPaletteView: View {
 
         // Moods
         items.append(contentsOf: appModel.moodViewModel.moods.map { mood in
-            CommandItem(id: "mood-\(mood.id)", title: "Mood: \(mood.name)", category: "Moods", icon: "square.grid.2x2.fill") {
+            CommandItem(id: "mood-\(mood.id)", title: "Mood: \(mood.name)", category: "Moods", icon: "swatchpalette.fill") {
                 appModel.moodViewModel.selectMood(mood)
             }
         })

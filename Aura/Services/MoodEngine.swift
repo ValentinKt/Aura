@@ -1093,6 +1093,51 @@ final class MoodEngine {
                 wallpaper: WallpaperDescriptor(type: .zen, resources: ["particles"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.2, green: 0.1, blue: 0.4), secondary: ColorComponents(red: 0.3, green: 0.2, blue: 0.5), accent: ColorComponents(red: 0.8, green: 0.6, blue: 0.9))
             ),
+            Mood(
+                id: "zen_galaxy",
+                name: "Galaxy",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["brownnoise": 0.4, "wind": 0.2],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["galaxy"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.05, green: 0.0, blue: 0.2), secondary: ColorComponents(red: 0.3, green: 0.0, blue: 0.5), accent: ColorComponents(red: 0.6, green: 0.2, blue: 0.8))
+            ),
+            Mood(
+                id: "zen_pendulum",
+                name: "Pendulum",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["hum": 0.3, "stream": 0.1],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["pendulum"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.4, green: 0.4, blue: 0.4), secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.2), accent: ColorComponents(red: 0.8, green: 0.7, blue: 0.3))
+            ),
+            Mood(
+                id: "zen_infinity",
+                name: "Infinity",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["ocean": 0.4, "wind": 0.1],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["infinity"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.5, blue: 0.4), secondary: ColorComponents(red: 0.0, green: 0.3, blue: 0.2), accent: ColorComponents(red: 0.4, green: 0.9, blue: 0.6))
+            ),
+            Mood(
+                id: "zen_prism",
+                name: "Prism",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["brownnoise": 0.2, "fire": 0.1],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["prism"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.7, green: 0.1, blue: 0.2), secondary: ColorComponents(red: 0.9, green: 0.4, blue: 0.1), accent: ColorComponents(red: 1.0, green: 0.8, blue: 0.2))
+            ),
+            Mood(
+                id: "zen_stardust",
+                name: "Stardust",
+                theme: "Utility",
+                subtheme: "Zen",
+                layerMix: ["wind": 0.5, "hum": 0.2],
+                wallpaper: WallpaperDescriptor(type: .zen, resources: ["stardust"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.3), secondary: ColorComponents(red: 0.3, green: 0.4, blue: 0.6), accent: ColorComponents(red: 0.9, green: 0.9, blue: 1.0))
+            ),
             // Quote Subthemes
             Mood(
                 id: "quote_motivational",
@@ -1129,6 +1174,16 @@ final class MoodEngine {
                 layerMix: ["wind": 0.4, "piano": 0.1],
                 wallpaper: WallpaperDescriptor(type: .quote, resources: ["bold"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.0, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.0, blue: 0.2), accent: ColorComponents(red: 1.0, green: 0.2, blue: 0.8))
+            ),
+            // MARK: - Website
+            Mood(
+                id: "website_custom",
+                name: "Custom Website",
+                theme: "Utility",
+                subtheme: "Website",
+                layerMix: ["hum": 0.1],
+                wallpaper: WallpaperDescriptor(type: .website, resources: ["https://example.com"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.15), secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.25), accent: ColorComponents(red: 0.4, green: 0.6, blue: 0.9))
             ),
             // MARK: - Retro
             Mood(
@@ -1193,6 +1248,16 @@ final class MoodEngine {
                 layerMix: ["forest": 0.4, "stream": 0.3],
                 wallpaper: WallpaperDescriptor(type: .animated, resources: ["Zelda_Pixel_Art.mov"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.2, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.3, blue: 0.2), accent: ColorComponents(red: 0.4, green: 0.6, blue: 0.4))
+            ),
+            // MARK: - Website
+            Mood(
+                id: "website_apple",
+                name: "Apple",
+                theme: "Utility",
+                subtheme: "Website",
+                layerMix: ["hum": 0.1, "wind": 0.1],
+                wallpaper: WallpaperDescriptor(type: .website, resources: ["https://www.apple.com"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.2), accent: ColorComponents(red: 0.8, green: 0.8, blue: 0.8))
             )
         ]
     }

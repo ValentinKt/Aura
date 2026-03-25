@@ -121,15 +121,7 @@ struct ContentView: View {
             .padding(.top, 16)
             .padding(.bottom, 36)
             .padding(.horizontal, 24)
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    Color.clear
-                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-            }
+            .liquidGlass(RoundedRectangle(cornerRadius: 8, style: .continuous), interactive: false, variant: .clear)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
@@ -182,15 +174,7 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             // Liquid Glass pill behind the brand mark
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    Color.clear
-                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-            }
+            .liquidGlass(RoundedRectangle(cornerRadius: 8, style: .continuous), interactive: false, variant: .clear)
             .padding(.bottom, 24)
 
             ScrollView {
@@ -201,7 +185,7 @@ struct ContentView: View {
                             withAnimation { isMoodsExpanded.toggle() }
                         } label: {
                             HStack {
-                                Label("Moods", systemImage: "square.grid.2x2.fill")
+                                Label("Moods", systemImage: "swatchpalette.fill")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.8))
                                 Spacer()
@@ -350,15 +334,7 @@ struct ContentView: View {
                     .padding(.horizontal, 24)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 200)
-                    .background {
-                        if reduceTransparency {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(.regularMaterial)
-                        } else {
-                            Color.clear
-                                .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                    }
+                    .liquidGlass(RoundedRectangle(cornerRadius: 8, style: .continuous), interactive: false, variant: .clear)
                     .padding(.horizontal, 40)
                     .padding(.bottom, 16)
             }
@@ -409,13 +385,7 @@ struct ContentView: View {
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .background {
-                    if reduceTransparency {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial)
-                    } else {
-                        Color.clear.glassEffect(.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                }
+                .liquidGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true, variant: .clear)
                 .help("Search (⌘K)")
 
                 // Settings button
@@ -429,13 +399,7 @@ struct ContentView: View {
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .background {
-                    if reduceTransparency {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial)
-                    } else {
-                        Color.clear.glassEffect(.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                }
+                .liquidGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true, variant: .clear)
                 .help("Settings")
             }
         }
@@ -468,20 +432,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var newMoodButtonLabel: some View {
-        if reduceTransparency {
-            newMoodButtonBase
-                .background {
-                    newMoodButtonShape.fill(.regularMaterial)
-                }
-                .contentShape(newMoodButtonShape)
-        } else {
-            newMoodButtonBase
-                .background {
-                    Color.clear
-                        .glassEffect(.clear, in: newMoodButtonShape)
-                }
-                .contentShape(newMoodButtonShape)
-        }
+        newMoodButtonBase
+            .liquidGlass(newMoodButtonShape, interactive: true, variant: .clear)
+            .contentShape(newMoodButtonShape)
     }
 
     private var newMoodButtonBase: some View {
