@@ -15,7 +15,7 @@ final class MoodViewModel {
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
     private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Solstice", "Time", "Website", "Websites", "Zen"]
+    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Website", "Websites", "Zen"]
     private static let pinnedDynamicSubthemes: Set<String> = ["Image Playground"]
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(

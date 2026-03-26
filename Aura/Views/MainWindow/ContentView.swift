@@ -148,7 +148,6 @@ struct ContentView: View {
         case "rain": return "cloud.rain.fill"
         case "rest": return "moon.zzz.fill"
         case "retro": return "gamecontroller.fill"
-        case "solstice": return "sun.max.fill"
         case "storm": return "cloud.bolt.rain.fill"
         case "time": return "clock.fill"
         case "waterfall": return "drop.fill"
