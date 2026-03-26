@@ -93,6 +93,10 @@ final class MoodViewModel {
         moods.first { $0.id == id }
     }
 
+    func firstMood(inSubtheme subtheme: String) -> Mood? {
+        moods.first { $0.subtheme.caseInsensitiveCompare(subtheme) == .orderedSame }
+    }
+
     func refreshQuoteMoods() {
         quoteRefreshToken += 1
     }

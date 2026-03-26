@@ -4,6 +4,14 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    enum ShortcutRoutine: Sendable {
+        case deepFocusJourney
+        case windDown
+        case zenBreathMode
+    }
+
+    static let shared = AppModel(persistence: PersistenceController.shared)
+
     let persistence: PersistenceController
     let themeManager: ThemeManager
     let settingsEngine: SettingsEngine
@@ -22,6 +30,7 @@ final class AppModel {
     var showImmersive: Bool = false
     var showCommandPalette: Bool = false
     var isReady: Bool = false
+    private var isStarting = false
 
     init(persistence: PersistenceController) {
         let themeManager = ThemeManager()
@@ -60,6 +69,8 @@ final class AppModel {
     }
 
     func start() async {
+        guard !isReady, !isStarting else { return }
+        isStarting = true
         print("🟢 [AppModel] Starting engines...")
         await moodEngine.start()
         print("🟢 [AppModel] Mood engine started.")
@@ -72,6 +83,42 @@ final class AppModel {
         }
         print("🟢 [AppModel] Start complete.")
         isReady = true
+        isStarting = false
+    }
+
+    func startIfNeeded() async {
+        guard !isReady else { return }
+
+        if isStarting {
+            while isStarting && !isReady {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            return
+        }
+
+        await start()
+    }
+
+    func performShortcut(_ routine: ShortcutRoutine) async throws {
+        await startIfNeeded()
+
+        let mood: Mood?
+        switch routine {
+        case .deepFocusJourney:
+            mood = moodViewModel.firstMood(inSubtheme: "DeepFocus")
+        case .windDown:
+            mood = moodViewModel.firstMood(inSubtheme: "Rest")
+        case .zenBreathMode:
+            mood = moodViewModel.mood(for: "zen_breathing") ?? moodViewModel.firstMood(inSubtheme: "Zen")
+        }
+
+        guard let mood else {
+            throw ShortcutExecutionError.moodUnavailable
+        }
+
+        showImmersive = true
+        moodViewModel.selectedSubtheme = mood.subtheme
+        moodViewModel.selectMood(mood)
     }
 
     func toggleWeatherSync(_ enabled: Bool) {
@@ -86,6 +133,17 @@ final class AppModel {
     func setWebsiteWallpaperInteractive(_ enabled: Bool) {
         settingsViewModel.updateWebsiteWallpaperInteractive(enabled)
         wallpaperEngine.setWebsiteWallpaperInteractive(enabled)
+    }
+}
+
+enum ShortcutExecutionError: LocalizedError {
+    case moodUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .moodUnavailable:
+            return "Aura couldn't find the requested automation mood."
+        }
     }
 }
 

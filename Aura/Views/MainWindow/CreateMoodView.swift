@@ -3,13 +3,6 @@ import ImagePlayground
 import UniformTypeIdentifiers
 
 struct CreateMoodView: View {
-    enum WallpaperSource: String, CaseIterable, Identifiable {
-        case importedMedia = "Imported Media"
-        case imagePlayground = "Image Playground"
-
-        var id: String { rawValue }
-    }
-
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
@@ -21,20 +14,17 @@ struct CreateMoodView: View {
     @State private var selectedFileURL: URL?
     @State private var isShowingFilePicker = false
     @State private var isShowingImagePlayground = false
-    @State private var wallpaperSource: WallpaperSource
-    @State private var imagePlaygroundPrompt: String = ""
     @State private var errorMessage: String?
 
     init(
         appModel: AppModel,
         defaultTheme: String = "Custom",
         defaultSubtheme: String = "Personal",
-        initialWallpaperSource: WallpaperSource = .importedMedia
+        initialWallpaperSource: InitialWallpaperSource = .importedMedia
     ) {
         self.appModel = appModel
         self.defaultTheme = defaultTheme
         self.defaultSubtheme = defaultSubtheme
-        _wallpaperSource = State(initialValue: initialWallpaperSource)
     }
 
     var body: some View {
@@ -68,13 +58,13 @@ struct CreateMoodView: View {
         .shadow(color: .black.opacity(0.3), radius: 50, y: 25)
         .imagePlaygroundSheet(
             isPresented: $isShowingImagePlayground,
-            concept: trimmedImagePlaygroundPrompt,
+            concept: "",
             onCompletion: { url in
                 selectedFileURL = url
                 errorMessage = nil
 
                 if trimmedMoodName.isEmpty {
-                    moodName = suggestedMoodName(from: trimmedImagePlaygroundPrompt)
+                    moodName = "Image Playground Mood"
                 }
             },
             onCancellation: nil
@@ -128,11 +118,7 @@ struct CreateMoodView: View {
 
     private var mediaPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if supportsImagePlayground {
-                wallpaperSourcePicker
-            }
-
-            if wallpaperSource == .imagePlayground {
+            if defaultSubtheme == "Image Playground" {
                 imagePlaygroundSection
             } else {
                 importedMediaSection
@@ -151,42 +137,6 @@ struct CreateMoodView: View {
                 }
             case .failure(let error):
                 errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private var wallpaperSourcePicker: some View {
-        HStack(spacing: 12) {
-            ForEach(WallpaperSource.allCases) { source in
-                Button {
-                    guard source != wallpaperSource else { return }
-                    wallpaperSource = source
-                    selectedFileURL = nil
-                    errorMessage = nil
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: source == .imagePlayground ? "wand.and.stars" : "photo.on.rectangle.angled")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text(source.rawValue)
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.black.opacity(0.001))
-                    .background {
-                        if source == wallpaperSource {
-                            Color.accentColor.opacity(0.8)
-                        } else if reduceTransparency {
-                            buttonShape.fill(.regularMaterial)
-                        } else {
-                            Color.clear
-                                .glassEffect(.regular.interactive(), in: buttonShape)
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .contentShape(buttonShape)
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -227,19 +177,6 @@ struct CreateMoodView: View {
     private var imagePlaygroundSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             if supportsImagePlayground {
-                TextField("Describe the wallpaper you want to generate", text: $imagePlaygroundPrompt, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(3...5)
-                    .padding(14)
-                    .background {
-                        if reduceTransparency {
-                            nameFieldShape.fill(.regularMaterial)
-                        } else {
-                            Color.clear
-                                .glassEffect(.regular.interactive(), in: nameFieldShape)
-                        }
-                    }
-
                 Button {
                     isShowingImagePlayground = true
                 } label: {
@@ -251,28 +188,13 @@ struct CreateMoodView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.black.opacity(0.001))
                     .background {
-                        if trimmedImagePlaygroundPrompt.isEmpty {
-                            if reduceTransparency {
-                                buttonShape.fill(.regularMaterial)
-                            } else {
-                                Color.clear
-                                    .glassEffect(.regular, in: buttonShape)
-                            }
-                        } else {
-                            Color.accentColor.opacity(0.8)
-                        }
+                        buttonShape.fill(Color.blue)
                     }
                     .foregroundStyle(.white)
                     .contentShape(buttonShape)
                 }
                 .buttonStyle(.plain)
-                .disabled(trimmedImagePlaygroundPrompt.isEmpty)
-
-                Text("Use a short concept like “sunlit Japanese garden, watercolor, calm atmosphere”.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
 
                 if let url = selectedFileURL {
                     selectedWallpaperPreview(for: url)
@@ -281,7 +203,7 @@ struct CreateMoodView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Image Playground isn’t available on this Mac.")
                         .font(.system(size: 13, weight: .medium))
-                    Text("Aura still lets you import your own wallpapers from the Imported Media tab.")
+                    Text("Aura still lets you create custom moods with your own imported wallpapers.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -428,10 +350,6 @@ struct CreateMoodView: View {
         moodName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var trimmedImagePlaygroundPrompt: String {
-        imagePlaygroundPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     private func createMood() {
         do {
             guard let url = selectedFileURL else { return }
@@ -452,12 +370,11 @@ struct CreateMoodView: View {
         }
     }
 
-    private func suggestedMoodName(from prompt: String) -> String {
-        let sanitizedPrompt = prompt
-            .split(separator: ",")
-            .first?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? prompt
-        return sanitizedPrompt.prefix(48).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+extension CreateMoodView {
+    enum InitialWallpaperSource {
+        case importedMedia
+        case imagePlayground
     }
 }

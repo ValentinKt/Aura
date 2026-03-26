@@ -7,10 +7,11 @@
 
 import SwiftUI
 import AppKit
+import AppIntents
 
 @main
 struct AuraApp: App {
-    @State private var appModel = AppModel()
+    @State private var appModel = AppModel.shared
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
@@ -63,14 +64,12 @@ struct AuraApp: App {
             .environment(appModel)
             .onAppear {
                 appDelegate.appModel = appModel
-
-                // Ensure any existing windows are not restorable
                 for window in NSApp.windows {
                     window.isRestorable = false
                 }
             }
             .task {
-                await appModel.start()
+                await appModel.startIfNeeded()
             }
         }
         .windowStyle(.hiddenTitleBar)
@@ -125,5 +124,75 @@ struct AuraApp: App {
                 .font(.system(size: 24))
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+struct AuraShortcuts: AppShortcutsProvider {
+    static var shortcutTileColor: ShortcutTileColor = .blue
+
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: StartDeepFocusJourneyIntent(),
+            phrases: [
+                "Start Deep Focus Journey in \(.applicationName)",
+                "Begin Deep Focus in \(.applicationName)"
+            ],
+            shortTitle: "Deep Focus Journey",
+            systemImageName: "brain.head.profile"
+        )
+        AppShortcut(
+            intent: SwitchToWindDownIntent(),
+            phrases: [
+                "Switch to Wind Down in \(.applicationName)",
+                "Wind down with \(.applicationName)"
+            ],
+            shortTitle: "Switch to Wind Down",
+            systemImageName: "moon.zzz.fill"
+        )
+        AppShortcut(
+            intent: SetZenBreathModeIntent(),
+            phrases: [
+                "Set Zen Breath Mode in \(.applicationName)",
+                "Start Zen Breath Mode in \(.applicationName)"
+            ],
+            shortTitle: "Zen Breath Mode",
+            systemImageName: "wind"
+        )
+    }
+}
+
+struct StartDeepFocusJourneyIntent: AppIntent {
+    static let title: LocalizedStringResource = "Start Deep Focus Journey"
+    static let description = IntentDescription("Starts Aura with the first Deep Focus mood and opens immersive mode.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        try await AppModel.shared.performShortcut(.deepFocusJourney)
+        return .result(dialog: "Aura started your Deep Focus Journey.")
+    }
+}
+
+struct SwitchToWindDownIntent: AppIntent {
+    static let title: LocalizedStringResource = "Switch to Wind Down"
+    static let description = IntentDescription("Switches Aura to the first Rest mood for a wind-down session.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        try await AppModel.shared.performShortcut(.windDown)
+        return .result(dialog: "Aura switched to Wind Down.")
+    }
+}
+
+struct SetZenBreathModeIntent: AppIntent {
+    static let title: LocalizedStringResource = "Set Zen Breath Mode"
+    static let description = IntentDescription("Sets Aura to the breathing-based Zen mode and opens immersive mode.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        try await AppModel.shared.performShortcut(.zenBreathMode)
+        return .result(dialog: "Aura is now in Zen Breath Mode.")
     }
 }
