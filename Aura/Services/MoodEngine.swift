@@ -1053,6 +1053,96 @@ final class MoodEngine {
                 wallpaper: WallpaperDescriptor(type: .animated, resources: ["Color_7.mp4"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.16, green: 0.12, blue: 0.3), secondary: ColorComponents(red: 0.28, green: 0.22, blue: 0.5), accent: ColorComponents(red: 0.56, green: 0.46, blue: 0.88))
             ),
+            Mood(
+                id: "solstice_ember_horizon",
+                name: "Ember Horizon",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["hum": 0.24, "wind": 0.18],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_1.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.07, green: 0.13, blue: 0.27), secondary: ColorComponents(red: 0.36, green: 0.14, blue: 0.36), accent: ColorComponents(red: 0.98, green: 0.75, blue: 0.48))
+            ),
+            Mood(
+                id: "solstice_vermilion_tide",
+                name: "Vermilion Tide",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["piano": 0.2, "rain": 0.16],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_2.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.06, green: 0.17, blue: 0.23), secondary: ColorComponents(red: 0.11, green: 0.34, blue: 0.44), accent: ColorComponents(red: 0.97, green: 0.83, blue: 0.5))
+            ),
+            Mood(
+                id: "solstice_rose_current",
+                name: "Rose Current",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["night": 0.26, "hum": 0.16],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_3.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.13, green: 0.06, blue: 0.24), secondary: ColorComponents(red: 0.44, green: 0.14, blue: 0.34), accent: ColorComponents(red: 0.99, green: 0.62, blue: 0.71))
+            ),
+            Mood(
+                id: "solstice_jade_afterglow",
+                name: "Jade Afterglow",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["forest": 0.24, "stream": 0.18],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_4.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.04, green: 0.14, blue: 0.15), secondary: ColorComponents(red: 0.17, green: 0.34, blue: 0.25), accent: ColorComponents(red: 0.76, green: 0.93, blue: 0.57))
+            ),
+            Mood(
+                id: "solstice_saffron_sky",
+                name: "Saffron Sky",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["wind": 0.22, "piano": 0.18],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_5.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.09, green: 0.09, blue: 0.22), secondary: ColorComponents(red: 0.19, green: 0.2, blue: 0.43), accent: ColorComponents(red: 1.0, green: 0.86, blue: 0.44))
+            ),
+            Mood(
+                id: "solstice_copper_bloom",
+                name: "Copper Bloom",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["fire": 0.18, "hum": 0.22],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_6.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.08, blue: 0.09), secondary: ColorComponents(red: 0.34, green: 0.14, blue: 0.14), accent: ColorComponents(red: 0.98, green: 0.67, blue: 0.46))
+            ),
+            Mood(
+                id: "solstice_azure_drift",
+                name: "Azure Drift",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["stream": 0.24, "rain": 0.14],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_7.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.05, green: 0.1, blue: 0.2), secondary: ColorComponents(red: 0.12, green: 0.24, blue: 0.38), accent: ColorComponents(red: 0.52, green: 0.8, blue: 0.98))
+            ),
+            Mood(
+                id: "solstice_velvet_radiance",
+                name: "Velvet Radiance",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["night": 0.24, "piano": 0.18],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_8.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.04, blue: 0.13), secondary: ColorComponents(red: 0.29, green: 0.1, blue: 0.24), accent: ColorComponents(red: 0.99, green: 0.57, blue: 0.76))
+            ),
+            Mood(
+                id: "solstice_mint_halo",
+                name: "Mint Halo",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["wind": 0.24, "forest": 0.16],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_9.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.03, green: 0.1, blue: 0.16), secondary: ColorComponents(red: 0.13, green: 0.28, blue: 0.31), accent: ColorComponents(red: 0.67, green: 0.93, blue: 0.89))
+            ),
+            Mood(
+                id: "solstice_lilac_nocturne",
+                name: "Lilac Nocturne",
+                theme: "Dynamic",
+                subtheme: "Solstice",
+                layerMix: ["brownnoise": 0.24, "hum": 0.18],
+                wallpaper: WallpaperDescriptor(type: .dynamic, resources: ["Solstice_10.heic"]),
+                palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.07, blue: 0.2), secondary: ColorComponents(red: 0.2, green: 0.16, blue: 0.4), accent: ColorComponents(red: 0.82, green: 0.76, blue: 1.0))
+            ),
             // Time Subthemes
             Mood(
                 id: "time_minimal",

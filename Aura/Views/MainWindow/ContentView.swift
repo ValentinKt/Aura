@@ -142,15 +142,16 @@ struct ContentView: View {
         case "rain": return "cloud.rain.fill"
         case "rest": return "moon.zzz.fill"
         case "retro": return "gamecontroller.fill"
+        case "solstice": return "sun.max.fill"
         case "storm": return "cloud.bolt.rain.fill"
         case "time": return "clock.fill"
         case "waterfall": return "drop.fill"
         case "wild": return "pawprint.fill"
         case "zen": return "circle.hexagongrid.fill"
         case "quotes": return "quote.bubble.fill"
-         case "website": return "globe"
-         case "websites": return "globe"
-         default: return "circle.fill"
+        case "website": return "globe"
+        case "websites": return "globe"
+        default: return "circle.fill"
         }
     }
 
