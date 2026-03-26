@@ -71,7 +71,12 @@ struct MenuBarPopoverView: View {
             Task { await loadBackgroundMedia() }
         }
         .sheet(isPresented: $isShowingCreateMood) {
-            CreateMoodView(appModel: appModel)
+            CreateMoodView(
+                appModel: appModel,
+                defaultTheme: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Dynamic" : "Custom",
+                defaultSubtheme: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Personal",
+                initialWallpaperSource: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .importedMedia
+            )
         }
         .environment(\.colorScheme, .dark)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ReopenMainWindow"))) { _ in

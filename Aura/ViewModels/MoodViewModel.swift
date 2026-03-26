@@ -15,7 +15,8 @@ final class MoodViewModel {
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
     private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Quotes", "Solstice", "Time", "Website", "Websites", "Zen"]
+    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Solstice", "Time", "Website", "Websites", "Zen"]
+    private static let pinnedDynamicSubthemes: Set<String> = ["Image Playground"]
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
         uniqueKeysWithValues: MoodEngine.builtInMoods()
@@ -54,8 +55,14 @@ final class MoodViewModel {
         if let type = type {
             finalType = type
         } else {
-            let isHeicOrImage = ["heic", "heif", "jpg", "jpeg", "png"].contains((wallpaperPath as NSString).pathExtension.lowercased())
-            finalType = isHeicOrImage ? .dynamic : .animated
+            let pathExtension = (wallpaperPath as NSString).pathExtension.lowercased()
+            if ["heic", "heif"].contains(pathExtension) {
+                finalType = .dynamic
+            } else if ["jpg", "jpeg", "png"].contains(pathExtension) {
+                finalType = .staticImage
+            } else {
+                finalType = .animated
+            }
         }
 
         let newMood = Mood(
@@ -99,9 +106,12 @@ final class MoodViewModel {
     }
 
     var subthemeSections: [MoodSubthemeSection] {
-        let allSubthemes = moodsBySubtheme.keys.sorted()
-        let atmosphereSubthemes = allSubthemes.filter { !Self.dynamicSubthemes.contains($0) }
-        let dynamicSubthemes = allSubthemes.filter { Self.dynamicSubthemes.contains($0) }
+        let allSubthemes = Set(moodsBySubtheme.keys)
+        let atmosphereSubthemes = allSubthemes.filter { !Self.dynamicSubthemes.contains($0) }.sorted()
+        let dynamicSubthemes = allSubthemes
+            .filter { Self.dynamicSubthemes.contains($0) }
+            .union(Self.pinnedDynamicSubthemes)
+            .sorted()
         var sections: [MoodSubthemeSection] = []
 
         if !atmosphereSubthemes.isEmpty {

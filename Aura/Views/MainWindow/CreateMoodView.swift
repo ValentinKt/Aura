@@ -1,15 +1,41 @@
 import SwiftUI
+import ImagePlayground
 import UniformTypeIdentifiers
 
 struct CreateMoodView: View {
+    enum WallpaperSource: String, CaseIterable, Identifiable {
+        case importedMedia = "Imported Media"
+        case imagePlayground = "Image Playground"
+
+        var id: String { rawValue }
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.supportsImagePlayground) private var supportsImagePlayground
     @Bindable var appModel: AppModel
+    let defaultTheme: String
+    let defaultSubtheme: String
 
     @State private var moodName: String = ""
     @State private var selectedFileURL: URL?
     @State private var isShowingFilePicker = false
+    @State private var isShowingImagePlayground = false
+    @State private var wallpaperSource: WallpaperSource
+    @State private var imagePlaygroundPrompt: String = ""
     @State private var errorMessage: String?
+
+    init(
+        appModel: AppModel,
+        defaultTheme: String = "Custom",
+        defaultSubtheme: String = "Personal",
+        initialWallpaperSource: WallpaperSource = .importedMedia
+    ) {
+        self.appModel = appModel
+        self.defaultTheme = defaultTheme
+        self.defaultSubtheme = defaultSubtheme
+        _wallpaperSource = State(initialValue: initialWallpaperSource)
+    }
 
     var body: some View {
         GlassEffectContainer {
@@ -40,13 +66,26 @@ struct CreateMoodView: View {
         }
         .presentationBackground(.clear)
         .shadow(color: .black.opacity(0.3), radius: 50, y: 25)
+        .imagePlaygroundSheet(
+            isPresented: $isShowingImagePlayground,
+            concept: trimmedImagePlaygroundPrompt,
+            onCompletion: { url in
+                selectedFileURL = url
+                errorMessage = nil
+
+                if trimmedMoodName.isEmpty {
+                    moodName = suggestedMoodName(from: trimmedImagePlaygroundPrompt)
+                }
+            },
+            onCancellation: nil
+        )
     }
 
     private var header: some View {
         VStack(spacing: 4) {
-            Text("Create Custom Mood")
+            Text(defaultSubtheme == "Image Playground" ? "Create Image Playground Mood" : "Create Custom Mood")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text("Combine your favorite wallpaper with a custom audio mix.")
+            Text(defaultSubtheme == "Image Playground" ? "Design a wallpaper in Image Playground and pair it with a custom audio mix." : "Combine your favorite wallpaper with a custom audio mix.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -89,44 +128,73 @@ struct CreateMoodView: View {
 
     private var mediaPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let url = selectedFileURL {
-                ZStack(alignment: .topTrailing) {
-                    VStack(spacing: 12) {
-                        if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-                            VideoBackgroundView(url: url)
-                                .aspectRatio(16/9, contentMode: .fill)
-                                .frame(height: 140)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        } else if let image = NSImage(contentsOf: url) {
-                            Image(nsImage: image)
-                                .resizable()
-                                .aspectRatio(16/9, contentMode: .fill)
-                                .frame(height: 140)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        } else {
-                            Rectangle()
-                                .fill(Color.secondary.opacity(0.2))
-                                .frame(height: 140)
-                                .overlay(Text("Unsupported format").foregroundStyle(.secondary))
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
+            if supportsImagePlayground {
+                wallpaperSourcePicker
+            }
 
-                        Text(url.lastPathComponent)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Button {
-                        selectedFileURL = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.white.opacity(0.6))
-                            .font(.system(size: 24))
-                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.black.opacity(0.3)))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(12)
+            if wallpaperSource == .imagePlayground {
+                imagePlaygroundSection
+            } else {
+                importedMediaSection
+            }
+        }
+        .fileImporter(
+            isPresented: $isShowingFilePicker,
+            allowedContentTypes: [.movie, .quickTimeMovie, .mpeg4Movie, .image, UTType("public.heic")].compactMap { $0 },
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    selectedFileURL = url
+                    errorMessage = nil
                 }
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private var wallpaperSourcePicker: some View {
+        HStack(spacing: 12) {
+            ForEach(WallpaperSource.allCases) { source in
+                Button {
+                    guard source != wallpaperSource else { return }
+                    wallpaperSource = source
+                    selectedFileURL = nil
+                    errorMessage = nil
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: source == .imagePlayground ? "wand.and.stars" : "photo.on.rectangle.angled")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(source.rawValue)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.black.opacity(0.001))
+                    .background {
+                        if source == wallpaperSource {
+                            Color.accentColor.opacity(0.8)
+                        } else if reduceTransparency {
+                            buttonShape.fill(.regularMaterial)
+                        } else {
+                            Color.clear
+                                .glassEffect(.regular.interactive(), in: buttonShape)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .contentShape(buttonShape)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var importedMediaSection: some View {
+        Group {
+            if let url = selectedFileURL {
+                selectedWallpaperPreview(for: url)
             } else {
                 Button {
                     isShowingFilePicker = true
@@ -135,7 +203,7 @@ struct CreateMoodView: View {
                         Image(systemName: "plus.square.dashed")
                             .font(.system(size: 32))
                             .foregroundStyle(Color.accentColor)
-                        Text("Select Media (MP4 / HEIC)")
+                        Text("Select Media (MP4 / HEIC / PNG)")
                             .font(.system(size: 13, weight: .medium))
                     }
                     .frame(maxWidth: .infinity)
@@ -154,19 +222,120 @@ struct CreateMoodView: View {
                 .buttonStyle(.plain)
             }
         }
-        .fileImporter(
-            isPresented: $isShowingFilePicker,
-            allowedContentTypes: [.movie, .quickTimeMovie, .mpeg4Movie, .image, UTType("public.heic")].compactMap { $0 },
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    selectedFileURL = url
+    }
+
+    private var imagePlaygroundSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if supportsImagePlayground {
+                TextField("Describe the wallpaper you want to generate", text: $imagePlaygroundPrompt, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(3...5)
+                    .padding(14)
+                    .background {
+                        if reduceTransparency {
+                            nameFieldShape.fill(.regularMaterial)
+                        } else {
+                            Color.clear
+                                .glassEffect(.regular.interactive(), in: nameFieldShape)
+                        }
+                    }
+
+                Button {
+                    isShowingImagePlayground = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text(selectedFileURL == nil ? "Open Image Playground" : "Regenerate in Image Playground")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.black.opacity(0.001))
+                    .background {
+                        if trimmedImagePlaygroundPrompt.isEmpty {
+                            if reduceTransparency {
+                                buttonShape.fill(.regularMaterial)
+                            } else {
+                                Color.clear
+                                    .glassEffect(.regular, in: buttonShape)
+                            }
+                        } else {
+                            Color.accentColor.opacity(0.8)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .contentShape(buttonShape)
                 }
-            case .failure(let error):
-                errorMessage = error.localizedDescription
+                .buttonStyle(.plain)
+                .disabled(trimmedImagePlaygroundPrompt.isEmpty)
+
+                Text("Use a short concept like “sunlit Japanese garden, watercolor, calm atmosphere”.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                if let url = selectedFileURL {
+                    selectedWallpaperPreview(for: url)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Image Playground isn’t available on this Mac.")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Aura still lets you import your own wallpapers from the Imported Media tab.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background {
+                    if reduceTransparency {
+                        buttonShape.fill(.regularMaterial)
+                    } else {
+                        Color.clear
+                            .glassEffect(.regular, in: buttonShape)
+                    }
+                }
             }
+        }
+    }
+
+    private func selectedWallpaperPreview(for url: URL) -> some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 12) {
+                if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
+                    VideoBackgroundView(url: url)
+                        .aspectRatio(16 / 9, contentMode: .fill)
+                        .frame(height: 140)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                } else if let image = NSImage(contentsOf: url) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(16 / 9, contentMode: .fill)
+                        .frame(height: 140)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                } else {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(height: 140)
+                        .overlay(Text("Unsupported format").foregroundStyle(.secondary))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+
+                Text(url.lastPathComponent)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                selectedFileURL = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.system(size: 24))
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.black.opacity(0.3)))
+            }
+            .buttonStyle(.plain)
+            .padding(12)
         }
     }
 
@@ -213,7 +382,7 @@ struct CreateMoodView: View {
                 }
                 .buttonStyle(.plain)
 
-                let isFormValid = !moodName.isEmpty && selectedFileURL != nil
+                let isFormValid = !trimmedMoodName.isEmpty && selectedFileURL != nil
 
                 Button(action: createMood) {
                     Text("Create Mood")
@@ -255,14 +424,23 @@ struct CreateMoodView: View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
     }
 
+    private var trimmedMoodName: String {
+        moodName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedImagePlaygroundPrompt: String {
+        imagePlaygroundPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func createMood() {
         do {
             guard let url = selectedFileURL else { return }
             let wallpaperPath = try CustomAssetManager.saveCustomWallpaper(from: url)
 
-            // Add the mood to the model
             appModel.moodViewModel.addCustomMood(
-                name: moodName,
+                name: trimmedMoodName,
+                theme: defaultTheme,
+                subtheme: defaultSubtheme,
                 wallpaperPath: wallpaperPath,
                 layerMix: appModel.playerViewModel.layerVolumes
             )
@@ -272,5 +450,14 @@ struct CreateMoodView: View {
             print("🟥 [CreateMoodView] Failed to save wallpaper: \(error.localizedDescription)")
             errorMessage = "Failed to save wallpaper: \(error.localizedDescription)"
         }
+    }
+
+    private func suggestedMoodName(from prompt: String) -> String {
+        let sanitizedPrompt = prompt
+            .split(separator: ",")
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? prompt
+        return sanitizedPrompt.prefix(48).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

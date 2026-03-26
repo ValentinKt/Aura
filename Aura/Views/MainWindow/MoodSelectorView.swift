@@ -56,6 +56,7 @@ struct SubthemeRow: View {
     @Bindable var appModel: AppModel
     @State private var showingQuotesManager = false
     @State private var showingWebsiteManager = false
+    @State private var showingImagePlaygroundDesigner = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -106,6 +107,14 @@ struct SubthemeRow: View {
         .sheet(isPresented: $showingWebsiteManager) {
             WebsiteManagerView(appModel: appModel)
         }
+        .sheet(isPresented: $showingImagePlaygroundDesigner) {
+            CreateMoodView(
+                appModel: appModel,
+                defaultTheme: "Dynamic",
+                defaultSubtheme: "Image Playground",
+                initialWallpaperSource: .imagePlayground
+            )
+        }
     }
 
     @ViewBuilder
@@ -135,6 +144,12 @@ struct SubthemeRow: View {
             if ["Website", "Websites"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
                 CreateWebsiteCard {
                     showingWebsiteManager = true
+                }
+            }
+
+            if subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame {
+                CreateImagePlaygroundCard {
+                    showingImagePlaygroundDesigner = true
                 }
             }
         }
@@ -241,6 +256,52 @@ struct CreateWebsiteCard: View {
                 .onEnded { _ in isPressed = false }
         )
         .accessibilityLabel("Create a new website")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+struct CreateImagePlaygroundCard: View {
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
+
+                Text("Design with\nImage Playground")
+                    .font(.system(size: 14, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+            }
+            .padding(16)
+            .frame(width: 140, height: 160)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
+            }
+            .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .onHover { isHovered = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+        .accessibilityLabel("Design a wallpaper with Image Playground")
         .accessibilityAddTraits(.isButton)
     }
 }

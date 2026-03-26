@@ -94,7 +94,12 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $isShowingCreateMood) {
-            CreateMoodView(appModel: appModel)
+            CreateMoodView(
+                appModel: appModel,
+                defaultTheme: appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Dynamic" : "Custom",
+                defaultSubtheme: appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Personal",
+                initialWallpaperSource: appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .importedMedia
+            )
         }
         .focusable()
         .onKeyPress(.rightArrow) {
@@ -138,6 +143,7 @@ struct ContentView: View {
         case "flow": return "water.waves"
         case "forest": return "tree.fill"
         case "fractal": return "hurricane"
+        case "image playground": return "wand.and.stars"
         case "mindfulness": return "figure.mind.and.body"
         case "rain": return "cloud.rain.fill"
         case "rest": return "moon.zzz.fill"
