@@ -7,10 +7,13 @@ struct QuoteWallpaperView: View {
     let style: String
     let palette: ThemePalette
     let quoteID: UUID?
+    let selectedWallpaperURL: URL?
+    var isPreview: Bool = false
     @State private var quoteTextValue: String = ""
     @State private var quoteTextColor = Color.white
     @State private var quoteFontSize: Double = 48
     @State private var quoteFontStyle: QuoteFontStyle = .serif
+    @State private var backgroundImage: NSImage?
 
     private let quoteEngine = QuoteEngine(persistence: PersistenceController.shared)
 
@@ -22,10 +25,12 @@ struct QuoteWallpaperView: View {
         Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue)
     }
 
-    init(style: String, palette: ThemePalette, quoteID: UUID? = nil) {
+    init(style: String, palette: ThemePalette, quoteID: UUID? = nil, selectedWallpaperURL: URL? = nil, isPreview: Bool = false) {
         self.style = style
         self.palette = palette
         self.quoteID = quoteID
+        self.selectedWallpaperURL = selectedWallpaperURL
+        self.isPreview = isPreview
     }
 
     @State private var isAnimating = false
@@ -34,7 +39,20 @@ struct QuoteWallpaperView: View {
 
     var body: some View {
         ZStack {
-            // Dynamic animated gradient background
+            if let selectedWallpaperURL {
+                if Self.isVideoURL(selectedWallpaperURL) {
+                    VideoBackgroundView(url: selectedWallpaperURL)
+                        .ignoresSafeArea()
+                } else if let backgroundImage {
+                    Image(nsImage: backgroundImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .ignoresSafeArea()
+                } else {
+                    Color.black.ignoresSafeArea()
+                }
+            }
+
             LinearGradient(
                 colors: [
                     Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue).opacity(colorScheme == .dark ? 0.4 : 0.9),
@@ -44,6 +62,7 @@ struct QuoteWallpaperView: View {
                 startPoint: isAnimating ? .topLeading : .bottomTrailing,
                 endPoint: isAnimating ? .bottomTrailing : .topLeading
             )
+            .opacity(backgroundImage == nil && !isShowingVideoBackground ? 1 : 0.45)
             .animation(.easeInOut(duration: 15).repeatForever(autoreverses: true), value: isAnimating)
             .ignoresSafeArea()
 
@@ -54,7 +73,7 @@ struct QuoteWallpaperView: View {
                     .frame(width: 400, height: 400)
                     .blur(radius: 100)
                     .offset(x: isAnimating ? 200 : -200, y: isAnimating ? -150 : 150)
-                
+
                 Circle()
                     .fill(secondaryColor.opacity(0.2))
                     .frame(width: 300, height: 300)
@@ -70,7 +89,7 @@ struct QuoteWallpaperView: View {
                     .offset(x: -20, y: 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 60)
-                
+
                 Text(quoteTextValue.isEmpty ? quoteText(for: style) : quoteTextValue)
                     .font(quoteFont)
                     .lineSpacing(8)
@@ -94,7 +113,7 @@ struct QuoteWallpaperView: View {
                     .offset(y: textOffset)
                     .scaleEffect(isAnimating ? 1.02 : 0.98)
                     .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: isAnimating)
-                
+
                 Image(systemName: "quote.closing")
                     .font(.system(size: quoteFontSize * 0.5, weight: .black, design: .serif))
                     .foregroundStyle(quoteTextColor.opacity(0.15))
@@ -108,9 +127,11 @@ struct QuoteWallpaperView: View {
             .shadow(color: .black.opacity(0.2), radius: 50, x: 0, y: 20)
         }
         .onAppear {
-            isAnimating = true
+            if !isPreview {
+                isAnimating = true
+            }
             loadCustomQuote()
-            
+
             withAnimation(.easeOut(duration: 1.5)) {
                 textOpacity = 1.0
                 textOffset = 0
@@ -126,6 +147,40 @@ struct QuoteWallpaperView: View {
                 loadCustomQuote()
             }
         }
+        .task(id: backgroundTaskKey) {
+            await loadBackgroundImage()
+        }
+    }
+
+    private var isShowingVideoBackground: Bool {
+        if isPreview { return false }
+        guard let selectedWallpaperURL else { return false }
+        return Self.isVideoURL(selectedWallpaperURL)
+    }
+
+    private static func isVideoURL(_ url: URL) -> Bool {
+        ["mp4", "mov"].contains(url.pathExtension.lowercased())
+    }
+
+    private var backgroundTaskKey: String {
+        selectedWallpaperURL?.absoluteString ?? "system-wallpaper"
+    }
+
+    private func loadBackgroundImage() async {
+        guard let url = selectedWallpaperURL else {
+            if let screen = NSScreen.main, let desktopURL = NSWorkspace.shared.desktopImageURL(for: screen) {
+                backgroundImage = await MediaUtils.loadImage(from: desktopURL)
+            } else {
+                backgroundImage = nil
+            }
+            return
+        }
+
+        if Self.isVideoURL(url) {
+            backgroundImage = await MediaUtils.videoPosterImage(from: url)
+        } else {
+            backgroundImage = await MediaUtils.loadImage(from: url)
+        }
     }
 
     private func loadCustomQuote() {
@@ -137,7 +192,7 @@ struct QuoteWallpaperView: View {
         } else {
             quoteTextValue = quoteText(for: style)
             quoteTextColor = colorScheme == .dark ? .white : .black
-            
+
             // Apply dynamic default styles based on the quote theme
             switch style {
             case "motivational":

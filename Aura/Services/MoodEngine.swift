@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 @MainActor
 @Observable
@@ -7,6 +8,11 @@ final class MoodEngine {
         case idle
         case transitioning
         case error
+    }
+
+    private enum ApplyStrategy {
+        case standard
+        case deferredStartup
     }
 
     private let soundEngine: SoundEngine
@@ -21,6 +27,8 @@ final class MoodEngine {
     var lastError: String?
 
     private var transitionTask: Task<Void, Never>?
+    private var deferredStartupMix: [String: Float]?
+    private var deferredStartupMoodID: String?
 
     init(soundEngine: SoundEngine, wallpaperEngine: WallpaperEngine, themeManager: ThemeManager, settingsEngine: SettingsEngine) {
         self.soundEngine = soundEngine
@@ -85,15 +93,14 @@ final class MoodEngine {
         }
     }
 
-    func start() async {
+    func start(deferInitialPresentation: Bool = false) async {
         do {
             try await soundEngine.prepare()
             if let last = settingsEngine.loadSettings().lastUsedMoodID, let mood = moods.first(where: { $0.id == last }) {
-                await applyMood(mood)
+                await applyMood(mood, strategy: deferInitialPresentation ? .deferredStartup : .standard)
             } else if let first = moods.first {
-                await applyMood(first)
+                await applyMood(first, strategy: deferInitialPresentation ? .deferredStartup : .standard)
             }
-            // State is set to .idle inside applyMood, but we ensure it here just in case
             if state != .error {
                 state = .idle
             }
@@ -105,17 +112,33 @@ final class MoodEngine {
     }
 
     func applyMood(_ mood: Mood) async {
+        await applyMood(mood, strategy: .standard)
+    }
+
+    func completeDeferredStartupIfNeeded() async {
+        guard let deferredStartupMix, let deferredStartupMoodID else { return }
+
+        self.deferredStartupMix = nil
+        self.deferredStartupMoodID = nil
+
+        await soundEngine.crossfade(to: deferredStartupMix, duration: 0.15)
+        settingsEngine.updateLastUsedMood(deferredStartupMoodID)
+        state = .idle
+    }
+
+    private func applyMood(_ mood: Mood, strategy: ApplyStrategy) async {
         print("🟢 [MoodEngine] Applying mood: \(mood.name) (ID: \(mood.id))")
-        // Update state and currentMood immediately for UI responsiveness
         currentMood = mood
 
-        // Cancel any existing transition to allow rapid switching
         transitionTask?.cancel()
 
         transitionTask = Task {
             state = .transitioning
+            if strategy == .standard {
+                deferredStartupMix = nil
+                deferredStartupMoodID = nil
+            }
 
-            // Ensure wallpaper is downloaded before applying
             if let primaryResource = mood.wallpaper.resources.first, mood.wallpaper.type == .animated {
                 let name = URL(fileURLWithPath: primaryResource).deletingPathExtension().lastPathComponent
                 let isFirst = name.hasSuffix("_1") ||
@@ -128,28 +151,43 @@ final class MoodEngine {
                     name == "Zelda_Pixel_Art"
 
                 if isFirst {
-                    _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
+                    if strategy == .deferredStartup {
+                        if !DownloadManager.shared.isDownloaded(resource: primaryResource) {
+                            Task {
+                                _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
+                            }
+                        }
+                    } else {
+                        _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
+                    }
                 }
             }
 
             let settings = settingsEngine.loadSettings()
             let duration = settings.transitionDuration
 
-            // UI palette update is quick, do it on the main actor immediately
             themeManager.updatePalette(mood.palette)
 
-            // Run audio crossfade and wallpaper application concurrently
-            async let audioTransition: () = soundEngine.crossfade(to: mood.layerMix, duration: duration)
-
             let wallpaperDescriptor = settings.keepCurrentWallpaper ? WallpaperDescriptor(type: .current) : mood.wallpaper
-            async let wallpaperTransition = wallpaperEngine.applyWallpaper(wallpaperDescriptor)
+            switch strategy {
+            case .standard:
+                async let audioTransition: () = soundEngine.crossfade(to: mood.layerMix, duration: duration)
+                async let wallpaperTransition = wallpaperEngine.applyWallpaper(wallpaperDescriptor)
 
-            // Wait for both to finish, but check for cancellation
-            _ = await (audioTransition, wallpaperTransition)
+                _ = await (audioTransition, wallpaperTransition)
 
-            if !Task.isCancelled {
-                settingsEngine.updateLastUsedMood(mood.id)
-                state = .idle
+                if !Task.isCancelled {
+                    settingsEngine.updateLastUsedMood(mood.id)
+                    state = .idle
+                }
+            case .deferredStartup:
+                deferredStartupMix = mood.layerMix
+                deferredStartupMoodID = mood.id
+                _ = await wallpaperEngine.applyWallpaper(wallpaperDescriptor)
+
+                if !Task.isCancelled {
+                    state = .idle
+                }
             }
         }
 

@@ -5,6 +5,8 @@ struct WallpaperPreviewView: View {
     @Bindable var appModel: AppModel
     var showOverlay: Bool = true
     @State private var previewImage: NSImage?
+    /// Async-loaded placeholder shown while the next image loads — avoids any synchronous disk reads in the body.
+    @State private var cachedPlaceholderImage: NSImage?
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -33,12 +35,25 @@ struct WallpaperPreviewView: View {
                             VideoBackgroundView(url: url)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if let image = previewImage {
-                            Image(nsImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            GeometryReader { geo in
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .clipped()
+                            }
+                            .transition(.opacity)
+                        } else if let placeholder = cachedPlaceholderImage {
+                            // Async-loaded placeholder so we never block the main thread
+                            GeometryReader { geo in
+                                Image(nsImage: placeholder)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .clipped()
+                            }
+                            .opacity(0.6)
                         } else {
-                            // Fallback if image not found or loading
                             Color.black.opacity(0.3)
                         }
 
@@ -65,17 +80,33 @@ struct WallpaperPreviewView: View {
                     }
                     .task(id: mood.id) {
                         if let resource = mood.wallpaper.resources.first {
-                            previewImage = await loadPreviewImageAsync(resource)
+                            let loaded = await loadPreviewImageAsync(resource)
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                previewImage = loaded
+                            }
                         } else {
-                            previewImage = nil
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                previewImage = nil
+                            }
                         }
+                    }
+                    // Async-load the placeholder from backgroundImageURL so the body never blocks
+                    .task(id: appModel.wallpaperEngine.backgroundImageURL) {
+                        guard let bgURL = appModel.wallpaperEngine.backgroundImageURL,
+                              !Self.isVideoURL(bgURL) else {
+                            cachedPlaceholderImage = nil
+                            return
+                        }
+                        cachedPlaceholderImage = await Task.detached(priority: .utility) {
+                            NSImage(contentsOf: bgURL)
+                        }.value
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .time {
                     if let style = mood.wallpaper.resources.first {
-                        TimeWallpaperView(style: style, palette: mood.palette)
+                        TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        TimeWallpaperView(style: "minimal", palette: mood.palette)
+                        TimeWallpaperView(style: "minimal", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .quote {
@@ -83,19 +114,20 @@ struct WallpaperPreviewView: View {
                         QuoteWallpaperView(
                             style: style,
                             palette: mood.palette,
-                            quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
+                            quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil,
+                            selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL
                         )
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        QuoteWallpaperView(style: "motivational", palette: mood.palette)
+                        QuoteWallpaperView(style: "motivational", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .zen {
                     if let style = mood.wallpaper.resources.first {
-                        ZenWallpaperView(style: style, palette: mood.palette)
+                        ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        ZenWallpaperView(style: "breathing", palette: mood.palette)
+                        ZenWallpaperView(style: "breathing", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .website {
@@ -162,5 +194,9 @@ struct WallpaperPreviewView: View {
             }
             return NSImage(named: resource)
         }.value
+    }
+
+    private static func isVideoURL(_ url: URL) -> Bool {
+        ["mp4", "mov"].contains(url.pathExtension.lowercased())
     }
 }

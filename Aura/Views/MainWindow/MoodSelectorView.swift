@@ -125,6 +125,7 @@ struct SubthemeRow: View {
                 MoodCard(
                     mood: mood,
                     isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
+                    appModel: appModel,
                     onDelete: UUID(uuidString: mood.id) != nil ? {
                         withAnimation {
                             appModel.moodViewModel.removeMood(mood)
@@ -161,7 +162,6 @@ struct SubthemeRow: View {
         guard appModel.moodViewModel.currentMood?.id != mood.id else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             appModel.moodViewModel.selectMood(mood)
-            appModel.moodViewModel.selectedSubtheme = nil
         }
     }
 }
@@ -309,6 +309,7 @@ struct CreateImagePlaygroundCard: View {
 struct MoodCard: View {
     let mood: Mood
     let isSelected: Bool
+    var appModel: AppModel
     var onDelete: (() -> Void)?
     let action: () -> Void
 
@@ -406,11 +407,11 @@ struct MoodCard: View {
             // Background Image
             if mood.wallpaper.type == .time {
                 // Time wallpaper specific preview
-                TimeWallpaperPreview(mood: mood, isPressed: isPressed)
+                TimeWallpaperPreview(style: mood.wallpaper.resources.first ?? "", mood: mood, isPressed: isPressed, appModel: appModel)
             } else if mood.wallpaper.type == .quote {
-                QuoteWallpaperPreview(mood: mood, isPressed: isPressed)
+                QuoteWallpaperPreview(mood: mood, isPressed: isPressed, appModel: appModel)
             } else if mood.wallpaper.type == .zen {
-                ZenWallpaperPreview(mood: mood, isPressed: isPressed)
+                ZenWallpaperPreview(mood: mood, isPressed: isPressed, appModel: appModel)
             } else if mood.wallpaper.type == .website {
                 WebsiteWallpaperPreview(mood: mood, isPressed: isPressed)
             } else if let image = image {
@@ -611,28 +612,28 @@ struct MoodCard: View {
 }
 
 struct TimeWallpaperPreview: View {
+    let style: String
     let mood: Mood
     let isPressed: Bool
+    var appModel: AppModel?
     var targetSize: CGSize = CGSize(width: 240, height: 160)
 
     var body: some View {
         ZStack {
-            if let style = mood.wallpaper.resources.first {
-                // Always render at a standard 16:9 landscape resolution
-                let baseSize = CGSize(width: 1920, height: 1080)
+            // Always render at a standard 16:9 landscape resolution
+            let baseSize = CGSize(width: 1920, height: 1080)
 
-                // Calculate scale to aspect-fill the target size
-                let scaleX = targetSize.width / baseSize.width
-                let scaleY = targetSize.height / baseSize.height
-                let scale = max(scaleX, scaleY)
+            // Calculate scale to aspect-fill the target size
+            let scaleX = targetSize.width / baseSize.width
+            let scaleY = targetSize.height / baseSize.height
+            let scale = max(scaleX, scaleY)
 
-                TimeWallpaperView(style: style, palette: mood.palette)
-                    .frame(width: baseSize.width, height: baseSize.height)
-                    .scaleEffect(scale)
-                    .frame(width: targetSize.width, height: targetSize.height)
-                    .clipped()
-                    .allowsHitTesting(false)
-            }
+            TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel?.wallpaperEngine.selectedWallpaperURL, isPreview: true)
+                .frame(width: baseSize.width, height: baseSize.height)
+                .scaleEffect(scale)
+                .frame(width: targetSize.width, height: targetSize.height)
+                .clipped()
+                .allowsHitTesting(false)
         }
         .frame(width: targetSize.width, height: targetSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -642,6 +643,7 @@ struct TimeWallpaperPreview: View {
 struct QuoteWallpaperPreview: View {
     let mood: Mood
     let isPressed: Bool
+    var appModel: AppModel?
     var targetSize: CGSize = CGSize(width: 240, height: 160)
 
     var body: some View {
@@ -655,7 +657,9 @@ struct QuoteWallpaperPreview: View {
                 QuoteWallpaperView(
                     style: style,
                     palette: mood.palette,
-                    quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
+                    quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil,
+                    selectedWallpaperURL: appModel?.wallpaperEngine.selectedWallpaperURL,
+                    isPreview: true
                 )
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
@@ -672,6 +676,7 @@ struct QuoteWallpaperPreview: View {
 struct ZenWallpaperPreview: View {
     let mood: Mood
     let isPressed: Bool
+    var appModel: AppModel?
     var targetSize: CGSize = CGSize(width: 240, height: 160)
 
     var body: some View {
@@ -682,7 +687,7 @@ struct ZenWallpaperPreview: View {
                 let scaleY = targetSize.height / baseSize.height
                 let scale = max(scaleX, scaleY)
 
-                ZenWallpaperView(style: style, palette: mood.palette)
+                ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel?.wallpaperEngine.selectedWallpaperURL, isPreview: true)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)
@@ -708,7 +713,7 @@ struct WebsiteWallpaperPreview: View {
                 let scaleY = targetSize.height / baseSize.height
                 let scale = max(scaleX, scaleY)
 
-                WebsiteWallpaperView(urlString: urlString)
+                WebsiteWallpaperView(urlString: urlString, isPreview: true)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)

@@ -1,5 +1,6 @@
 import AppKit
 import Darwin
+import os
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var appModel: AppModel?
@@ -15,11 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
 
-        print("🟢 [AppDelegate] applicationWillFinishLaunching")
+        Logger.app.info("🟢 [AppDelegate] applicationWillFinishLaunching")
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("🟢 [AppDelegate] applicationDidFinishLaunching")
+        Logger.app.info("🟢 [AppDelegate] applicationDidFinishLaunching")
         // Disable state restoration to prevent "com.apple.appkit.restoration_storage" errors
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")

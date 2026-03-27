@@ -4,7 +4,9 @@ import Combine
 struct ZenWallpaperView: View {
     let style: String
     let palette: ThemePalette
-    @State private var desktopImage: NSImage?
+    let selectedWallpaperURL: URL?
+    var isPreview: Bool = false
+    @State private var backgroundImage: NSImage?
 
     var primaryColor: Color {
         Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue)
@@ -20,8 +22,10 @@ struct ZenWallpaperView: View {
 
     var body: some View {
         ZStack {
-            // Actual System Wallpaper Background
-            if let image = desktopImage {
+            if !isPreview, let selectedWallpaperURL, Self.isVideoURL(selectedWallpaperURL) {
+                VideoBackgroundView(url: selectedWallpaperURL)
+                    .ignoresSafeArea()
+            } else if let image = backgroundImage {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -62,17 +66,34 @@ struct ZenWallpaperView: View {
                 BreathingZenView(primaryColor: primaryColor, accentColor: accentColor)
             }
         }
-        .onAppear {
-            loadDesktopImage()
+        .task(id: backgroundTaskKey) {
+            await loadBackgroundImage()
         }
     }
 
-    private func loadDesktopImage() {
-        if let screen = NSScreen.main,
-           let url = NSWorkspace.shared.desktopImageURL(for: screen),
-           let image = NSImage(contentsOf: url) {
-            desktopImage = image
+    private var backgroundTaskKey: String {
+        selectedWallpaperURL?.absoluteString ?? "system-wallpaper"
+    }
+
+    private func loadBackgroundImage() async {
+        guard let url = selectedWallpaperURL else {
+            if let screen = NSScreen.main, let desktopURL = NSWorkspace.shared.desktopImageURL(for: screen) {
+                backgroundImage = await MediaUtils.loadImage(from: desktopURL)
+            } else {
+                backgroundImage = nil
+            }
+            return
         }
+
+        if Self.isVideoURL(url) {
+            backgroundImage = await MediaUtils.videoPosterImage(from: url)
+        } else {
+            backgroundImage = await MediaUtils.loadImage(from: url)
+        }
+    }
+
+    private static func isVideoURL(_ url: URL) -> Bool {
+        ["mp4", "mov"].contains(url.pathExtension.lowercased())
     }
 }
 
@@ -85,7 +106,7 @@ struct GalaxyZenView: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.85).ignoresSafeArea()
-            
+
             ZStack {
                 ForEach(0..<4, id: \.self) { i in
                     Ellipse()
@@ -96,7 +117,7 @@ struct GalaxyZenView: View {
                         .frame(width: 600 - CGFloat(i * 100), height: 200 - CGFloat(i * 30))
                         .rotationEffect(.degrees(Double(i) * 45 + rotation))
                 }
-                
+
                 Circle()
                     .fill(accentColor)
                     .frame(width: 40, height: 40)
@@ -121,12 +142,12 @@ struct PendulumZenView: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
                 Rectangle()
                     .fill(LinearGradient(colors: [primaryColor.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom))
                     .frame(width: 2, height: 300)
-                
+
                 Circle()
                     .fill(accentColor)
                     .frame(width: 60, height: 60)
@@ -152,7 +173,7 @@ struct InfinityZenView: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
-            
+
             HStack(spacing: -60) {
                 Circle()
                     .stroke(
@@ -161,7 +182,7 @@ struct InfinityZenView: View {
                     )
                     .frame(width: 200, height: 200)
                     .blur(radius: 2)
-                
+
                 Circle()
                     .stroke(
                         AngularGradient(colors: [accentColor, primaryColor, accentColor], center: .center, angle: .degrees(-phase * 360)),
@@ -189,7 +210,7 @@ struct PrismZenView: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.75).ignoresSafeArea()
-            
+
             ZStack {
                 Path { path in
                     path.move(to: CGPoint(x: 200, y: 50))
@@ -223,7 +244,7 @@ struct StardustZenView: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.9).ignoresSafeArea()
-            
+
             GeometryReader { geometry in
                 ZStack {
                     ForEach(0..<50, id: \.self) { index in
@@ -378,13 +399,13 @@ struct OrbZenView: View {
                     .frame(width: 300, height: 300)
                     .offset(x: -50, y: -50)
                     .blur(radius: 40)
-                
+
                 Circle()
                     .fill(accentColor.opacity(0.5))
                     .frame(width: 250, height: 250)
                     .offset(x: 60, y: 40)
                     .blur(radius: 50)
-                
+
                 Circle()
                     .fill(primaryColor)
                     .frame(width: 150, height: 150)
@@ -422,7 +443,7 @@ struct LotusZenView: View {
                         .offset(y: isBlooming ? 150 : 50)
                         .rotationEffect(.degrees(Double(index) * 30))
                 }
-                
+
                 Circle()
                     .fill(accentColor)
                     .frame(width: isBlooming ? 80 : 40, height: isBlooming ? 80 : 40)
@@ -454,7 +475,7 @@ struct WavesZenView: View {
                     SineWave(phase: phase1, amplitude: 60)
                         .stroke(primaryColor.opacity(0.6), lineWidth: 4)
                         .shadow(color: primaryColor, radius: 10)
-                    
+
                     SineWave(phase: phase2, amplitude: 80)
                         .stroke(accentColor.opacity(0.6), lineWidth: 3)
                         .shadow(color: accentColor, radius: 10)
@@ -489,15 +510,15 @@ struct SineWave: Shape {
         let midHeight = height / 2
 
         let wavelength = width / 2
-        
+
         path.move(to: CGPoint(x: 0, y: midHeight))
-        
+
         for x in stride(from: 0, through: width, by: 1) {
             let relativeX = x / wavelength
             let y = midHeight + sin(relativeX * .pi * 2 + phase) * amplitude
             path.addLine(to: CGPoint(x: x, y: y))
         }
-        
+
         return path
     }
 }
@@ -519,7 +540,7 @@ struct EclipseZenView: View {
                     .frame(width: 300, height: 300)
                     .shadow(color: accentColor, radius: 60)
                     .blur(radius: 5)
-                
+
                 // Moon
                 Circle()
                     .fill(Color.black)

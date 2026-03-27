@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import Combine
+import os
 
 @MainActor
 @Observable
@@ -30,7 +32,9 @@ final class AppModel {
     var showImmersive: Bool = false
     var showCommandPalette: Bool = false
     var isReady: Bool = false
-    private var isStarting = false
+    var isStarting: Bool = false
+    private var cancellables = Set<AnyCancellable>()
+    private let startupTimeout: Duration = .seconds(8)
 
     init(persistence: PersistenceController) {
         let themeManager = ThemeManager()
@@ -61,6 +65,7 @@ final class AppModel {
         self.playlistViewModel = PlaylistViewModel(playlistEngine: playlistEngine)
         self.settingsViewModel = SettingsViewModel(settingsEngine: settingsEngine)
         self.wallpaperEngine.setWebsiteWallpaperInteractive(self.settingsViewModel.settings.websiteWallpaperInteractive)
+        Logger.app.info("🟢 [AppModel] Initialization started")
     }
 
     @MainActor
@@ -71,19 +76,30 @@ final class AppModel {
     func start() async {
         guard !isReady, !isStarting else { return }
         isStarting = true
-        print("🟢 [AppModel] Starting engines...")
-        await moodEngine.start()
-        print("🟢 [AppModel] Mood engine started.")
+        wallpaperEngine.setPresentationSuppressed(true)
+        defer {
+            if !isReady {
+                wallpaperEngine.setPresentationSuppressed(false)
+            }
+            isStarting = false
+        }
+        Logger.app.info("🟢 [AppModel] Starting engines...")
+        let startupCompleted = await runInitialStartupSequence()
+        if !startupCompleted {
+            Logger.app.warning("🟧 [AppModel] Startup timed out, continuing with partial readiness.")
+        }
+        Logger.app.info("🟢 [AppModel] Mood engine started.")
         presetEngine.loadDefaultPresets()
-        weatherEngine.start()
         let settings = settingsEngine.loadSettings()
+        isReady = true
+        wallpaperEngine.setPresentationSuppressed(false)
+        await moodEngine.completeDeferredStartupIfNeeded()
+        weatherEngine.start()
         if settings.randomAmbienceInterval > 0 {
             soundEngine.startRandomization(interval: settings.randomAmbienceInterval, validRange: 0.1...0.9)
-            print("🟢 [AppModel] Randomization started.")
+            Logger.app.info("🟢 [AppModel] Randomization started.")
         }
-        print("🟢 [AppModel] Start complete.")
-        isReady = true
-        isStarting = false
+        Logger.app.info("🟢 [AppModel] Start complete.")
     }
 
     func startIfNeeded() async {
@@ -97,6 +113,24 @@ final class AppModel {
         }
 
         await start()
+    }
+
+    private func runInitialStartupSequence() async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask { [moodEngine] in
+                await moodEngine.start(deferInitialPresentation: true)
+                return true
+            }
+
+            group.addTask { [startupTimeout] in
+                try? await Task.sleep(for: startupTimeout)
+                return false
+            }
+
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
     }
 
     func performShortcut(_ routine: ShortcutRoutine) async throws {

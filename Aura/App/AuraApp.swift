@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import AppIntents
+import os
 
 @main
 struct AuraApp: App {
@@ -15,10 +16,7 @@ struct AuraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
-        // Disable os_log to fix "Logging Error: Failed to receive 1 log messages"
-        setenv("OS_ACTIVITY_MODE", "disable", 1)
-
-        print("🟢 [AuraApp] Initialization started")
+        Logger.app.info("🟢 [AuraApp] Initialization started")
 
         // Disable state restoration to prevent NSPersistentUIRemoteStorage errors
         UserDefaults.standard.register(defaults: [
@@ -32,7 +30,7 @@ struct AuraApp: App {
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
 
-        print("🟢 [AuraApp] State restoration disabled")
+        Logger.app.info("🟢 [AuraApp] State restoration disabled")
 
         // Remove any previously saved restoration data
         if let bundleID = Bundle.main.bundleIdentifier,

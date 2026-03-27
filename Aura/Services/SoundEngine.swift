@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Observation
+import os
 
 @MainActor
 @Observable
@@ -36,7 +37,7 @@ final class SoundEngine {
     private let customPlayer = AVAudioPlayerNode()
     private let customEQ = AVAudioUnitEQ(numberOfBands: 1)
 
-    var state: EngineState = .uninitialized
+    private(set) var state: EngineState = .uninitialized
     var volumes: [String: Float] = [:]
     var masterVolume: Float = 0.6 {
         didSet {
@@ -55,17 +56,19 @@ final class SoundEngine {
         for id in SoundLayerID.allCases.map(\.rawValue) {
             volumes[id] = 0
         }
+        Logger.sound.info("🟢 [SoundEngine] Initializing...")
     }
 
     func prepare() async throws {
         guard state == .uninitialized || state == .error else { return }
         state = .preparing
+        Logger.sound.info("🟢 [SoundEngine] Starting engine...")
 
         // 1. Preload buffers first to know their format
         do {
             try await preloadBuffers()
         } catch {
-            print("🟥 [SoundEngine] Failed to preload buffers: \(error.localizedDescription)")
+            Logger.sound.error("🟥 [SoundEngine] Failed to preload buffers: \(error.localizedDescription)")
             state = .error
             throw error
         }
@@ -96,13 +99,14 @@ final class SoundEngine {
         do {
             try engine.start()
         } catch {
-            print("🟥 [SoundEngine] Failed to start engine: \(error.localizedDescription)")
+            Logger.sound.error("🟥 [SoundEngine] Failed to start engine: \(error.localizedDescription)")
             state = .error
             throw SoundEngineError.engineStartFailed(error.localizedDescription)
         }
 
         startAllLoops()
         state = .ready
+        Logger.sound.info("🟢 [SoundEngine] Engine started and ready.")
     }
 
     func stop() {

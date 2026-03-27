@@ -237,6 +237,7 @@ struct MenuBarPopoverView: View {
                     MoodCarouselCard(
                         mood: mood,
                         isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
+                        appModel: appModel,
                         onDelete: UUID(uuidString: mood.id) != nil ? {
                             withAnimation { appModel.moodViewModel.removeMood(mood) }
                         } : nil
@@ -248,19 +249,9 @@ struct MenuBarPopoverView: View {
                 }
 
                 Button { isShowingCreateMood = true } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        Text("New Mood")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                    .frame(width: 140, height: 220)
-                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    NewMoodButtonContent(reduceTransparency: reduceTransparency)
                 }
                 .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
         .contentMargins(.horizontal, 24, for: .scrollContent)
@@ -390,11 +381,44 @@ struct MenuBarPopoverView: View {
     }
 }
 
+// MARK: - NewMoodButtonContent
+
+private struct NewMoodButtonContent: View {
+    let reduceTransparency: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+            Text("New Mood")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .frame(width: 140, height: 220)
+        .background {
+            if reduceTransparency {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.regularMaterial)
+            } else {
+                Color.clear
+                    .glassEffect(isHovered ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .onHover { isHovered = $0 }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+    }
+}
+
 // MARK: - MoodCarouselCard
 
 private struct MoodCarouselCard: View {
     let mood: Mood
     let isSelected: Bool
+    var appModel: AppModel
     var onDelete: (() -> Void)?
     let action: () -> Void
 
@@ -531,15 +555,19 @@ private struct MoodCarouselCard: View {
     @ViewBuilder
     private var cardBackground: some View {
         if mood.wallpaper.type == .time {
-            TimeWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
+            let style = mood.wallpaper.resources.first ?? "minimal"
+            TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
                 .frame(width: 140, height: 220)
                 .clipped()
         } else if mood.wallpaper.type == .quote {
-            QuoteWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
+            let style = mood.wallpaper.resources.first ?? "motivational"
+            let quoteID = mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
+            QuoteWallpaperView(style: style, palette: mood.palette, quoteID: quoteID, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
                 .frame(width: 140, height: 220)
                 .clipped()
         } else if mood.wallpaper.type == .zen {
-            ZenWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
+            let style = mood.wallpaper.resources.first ?? "breathing"
+            ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
                 .frame(width: 140, height: 220)
                 .clipped()
         } else if mood.wallpaper.type == .website {

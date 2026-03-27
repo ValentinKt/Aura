@@ -14,6 +14,7 @@ struct CreateMoodView: View {
     @State private var selectedFileURL: URL?
     @State private var isShowingFilePicker = false
     @State private var isShowingImagePlayground = false
+    @State private var isCreatingMood = false
     @State private var errorMessage: String?
 
     init(
@@ -303,12 +304,25 @@ struct CreateMoodView: View {
                         .contentShape(buttonShape)
                 }
                 .buttonStyle(.plain)
+                .disabled(isCreatingMood)
 
-                let isFormValid = !trimmedMoodName.isEmpty && selectedFileURL != nil
+                let isFormValid = !trimmedMoodName.isEmpty && selectedFileURL != nil && !isCreatingMood
 
-                Button(action: createMood) {
-                    Text("Create Mood")
-                        .font(.headline)
+                Button {
+                    Task {
+                        await createMood()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isCreatingMood {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+
+                        Text(isCreatingMood ? (shouldUpscaleSelectedWallpaper ? "Upscaling..." : "Creating...") : "Create Mood")
+                            .font(.headline)
+                    }
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(Color.black.opacity(0.001))
@@ -350,10 +364,23 @@ struct CreateMoodView: View {
         moodName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func createMood() {
+    private var shouldUpscaleSelectedWallpaper: Bool {
+        defaultSubtheme == "Image Playground"
+    }
+
+    @MainActor
+    private func createMood() async {
+        guard let url = selectedFileURL else { return }
+
+        isCreatingMood = true
+        errorMessage = nil
+
+        defer {
+            isCreatingMood = false
+        }
+
         do {
-            guard let url = selectedFileURL else { return }
-            let wallpaperPath = try CustomAssetManager.saveCustomWallpaper(from: url)
+            let wallpaperPath = try await saveWallpaper(from: url)
 
             appModel.moodViewModel.addCustomMood(
                 name: trimmedMoodName,
@@ -368,6 +395,39 @@ struct CreateMoodView: View {
             print("🟥 [CreateMoodView] Failed to save wallpaper: \(error.localizedDescription)")
             errorMessage = "Failed to save wallpaper: \(error.localizedDescription)"
         }
+    }
+
+    private func saveWallpaper(from url: URL) async throws -> String {
+        if shouldUpscaleSelectedWallpaper {
+            do {
+                return try await upscaleImagePlaygroundWallpaper(from: url)
+            } catch ImageUpscaler.UpscalingError.modelNotFound {
+                return try CustomAssetManager.saveCustomWallpaper(from: url)
+            }
+        }
+
+        return try CustomAssetManager.saveCustomWallpaper(from: url)
+    }
+
+    private func upscaleImagePlaygroundWallpaper(from url: URL) async throws -> String {
+        let imageData = try await Task.detached(priority: .userInitiated) { () throws -> Data in
+            let isSecurityScoped = url.startAccessingSecurityScopedResource()
+            defer {
+                if isSecurityScoped {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            return try Data(contentsOf: url)
+        }.value
+
+        guard let image = NSImage(data: imageData) else {
+            throw ImageUpscaler.UpscalingError.imageConversionFailed
+        }
+
+        let upscaler = try ImageUpscaler()
+        let upscaledImage = try await upscaler.upscale(image)
+        return try CustomAssetManager.saveCustomWallpaper(from: upscaledImage, preferredFileExtension: "png")
     }
 
 }

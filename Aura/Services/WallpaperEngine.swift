@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import Observation
 import SwiftUI
 import WebKit
 
@@ -9,6 +10,7 @@ struct WallpaperApplyResult: Hashable {
 }
 
 @MainActor
+@Observable
 final class WallpaperEngine {
     private let fileManager = FileManager.default
     private var animationTimers: [String: Timer] = [:]
@@ -23,6 +25,10 @@ final class WallpaperEngine {
         guard let selectedWallpaperResource else { return nil }
         return resolveResourceURL(selectedWallpaperResource)
     }
+
+    /// The last resolved image/video URL from a static or animated wallpaper.
+    /// Quote/Zen/Time views use this to render the Image Playground (or other) wallpaper as their background.
+    var backgroundImageURL: URL?
 
     private var selectedWallpaperResource: String?
 
@@ -49,7 +55,15 @@ final class WallpaperEngine {
     func applyWallpaper(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         print("🟢 [WallpaperEngine] Applying wallpaper of type: \(descriptor.type)")
         self.selectedWallpaperResource = descriptor.resources.first
-        
+
+        // Update backgroundImageURL whenever we apply a concrete image/video wallpaper,
+        // so dynamic views (Quote, Zen, Time) can use it as their background even after switching.
+        if descriptor.type == .staticImage || descriptor.type == .animated || descriptor.type == .dynamic {
+            if let resource = descriptor.resources.first {
+                backgroundImageURL = resolveResourceURL(resource)
+            }
+        }
+
         if isPresentationSuppressed {
             print("🟢 [WallpaperEngine] Presentation suppressed, skipping application")
             return WallpaperApplyResult(success: true, permissionDenied: false)
@@ -235,7 +249,7 @@ final class WallpaperEngine {
     private func startTime(_ descriptor: WallpaperDescriptor) {
         let style = descriptor.resources.first ?? "minimal"
         let palette = themeManager.palette
-        let timeView = TimeWallpaperView(style: style, palette: palette, selectedWallpaperURL: selectedWallpaperURL)
+        let timeView = TimeWallpaperView(style: style, palette: palette, selectedWallpaperURL: backgroundImageURL)
         wallpaperWindowController.showSwiftUIView(timeView)
     }
 
@@ -243,21 +257,43 @@ final class WallpaperEngine {
         let style = descriptor.resources.first ?? "motivational"
         let palette = themeManager.palette
         let quoteID = descriptor.resources.count > 1 ? UUID(uuidString: descriptor.resources[1]) : nil
-        let quoteView = QuoteWallpaperView(style: style, palette: palette, quoteID: quoteID, selectedWallpaperURL: selectedWallpaperURL)
+        let quoteView = QuoteWallpaperView(style: style, palette: palette, quoteID: quoteID, selectedWallpaperURL: backgroundImageURL)
         wallpaperWindowController.showSwiftUIView(quoteView)
     }
 
     private func startZen(_ descriptor: WallpaperDescriptor) {
         let style = descriptor.resources.first ?? "breathing"
         let palette = themeManager.palette
-        let zenView = ZenWallpaperView(style: style, palette: palette, selectedWallpaperURL: selectedWallpaperURL)
+        let zenView = ZenWallpaperView(style: style, palette: palette, selectedWallpaperURL: backgroundImageURL)
         wallpaperWindowController.showSwiftUIView(zenView)
     }
 
     private func startWebsite(_ descriptor: WallpaperDescriptor) {
         guard let urlString = descriptor.resources.first,
-              let url = WebsiteWallpaperView.resolvedURL(from: urlString) else { return }
+              let url = resolvedWebsiteURL(from: urlString) else { return }
         wallpaperWindowController.showWebsite(url: url)
+    }
+
+    private func resolvedWebsiteURL(from urlString: String) -> URL? {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // If it's already a valid URL with a scheme, use it as-is
+        if let url = URL(string: trimmed), let scheme = url.scheme, !scheme.isEmpty {
+            return url
+        }
+
+        // If it points to a local file path, return a file URL
+        if FileManager.default.fileExists(atPath: trimmed) {
+            return URL(fileURLWithPath: trimmed)
+        }
+
+        // Otherwise, try to assume https if no scheme provided
+        if let url = URL(string: "https://\(trimmed)") {
+            return url
+        }
+
+        return nil
     }
 
     @MainActor

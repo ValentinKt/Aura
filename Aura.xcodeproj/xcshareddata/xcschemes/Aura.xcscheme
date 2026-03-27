@@ -51,11 +51,11 @@
          </BuildableReference>
       </BuildableProductRunnable>
       <EnvironmentVariables>
-         <EnvironmentVariable
+        <!-- <EnvironmentVariable
             key = "OS_ACTIVITY_MODE"
             value = "disable"
             isEnabled = "YES">
-         </EnvironmentVariable>
+         </EnvironmentVariable> -->
       </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction

@@ -1,7 +1,16 @@
 import SwiftUI
 import WebKit
 
-struct WebsiteWallpaperView: NSViewRepresentable {
+struct WebsiteWallpaperView: View {
+    let urlString: String
+    var isPreview: Bool = false
+
+    var body: some View {
+        WebsiteWebView(urlString: urlString)
+    }
+}
+
+struct WebsiteWebView: NSViewRepresentable {
     let urlString: String
 
     func makeNSView(context: Context) -> WKWebView {

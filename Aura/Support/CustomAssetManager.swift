@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum CustomAssetManager {
@@ -52,6 +53,37 @@ enum CustomAssetManager {
         }
 
         try fileManager.copyItem(at: url, to: destination)
+        return destination.path
+    }
+
+    static func saveCustomWallpaper(from image: NSImage, preferredFileExtension: String = "png") throws -> String {
+        guard let tiffRepresentation = image.tiffRepresentation,
+              let bitmapRepresentation = NSBitmapImageRep(data: tiffRepresentation) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        let normalizedExtension = preferredFileExtension.lowercased()
+        let imageFileType: NSBitmapImageRep.FileType
+
+        switch normalizedExtension {
+        case "jpg", "jpeg":
+            imageFileType = .jpeg
+        default:
+            imageFileType = .png
+        }
+
+        guard let imageData = bitmapRepresentation.representation(using: imageFileType, properties: [:]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        let filename = "\(UUID().uuidString).\(normalizedExtension)"
+        let destination = customWallpapersDirectory.appendingPathComponent(filename)
+
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+
+        try imageData.write(to: destination, options: [.atomic])
         return destination.path
     }
 

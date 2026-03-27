@@ -5,7 +5,9 @@ struct TimeWallpaperView: View {
     let style: String
     let palette: ThemePalette
     @State private var currentTime = Date()
-    @State private var desktopImage: NSImage?
+    let selectedWallpaperURL: URL?
+    var isPreview: Bool = false
+    @State private var backgroundImage: NSImage?
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var primaryColor: Color {
@@ -22,14 +24,20 @@ struct TimeWallpaperView: View {
 
     var body: some View {
         ZStack {
-            // Actual System Wallpaper Background
-            if let image = desktopImage {
+            if !isPreview, let selectedWallpaperURL, Self.isVideoURL(selectedWallpaperURL) {
+                VideoBackgroundView(url: selectedWallpaperURL)
+                    .ignoresSafeArea()
+            } else if let image = backgroundImage {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .ignoresSafeArea()
             } else {
                 Color.black.ignoresSafeArea()
+            }
+
+            if selectedWallpaperURL != nil {
+                Color.black.opacity(0.18).ignoresSafeArea()
             }
 
             // Render specific style
@@ -58,20 +66,37 @@ struct TimeWallpaperView: View {
                 MinimalTimeView(date: currentTime, color: accentColor)
             }
         }
-        .onAppear {
-            loadDesktopImage()
-        }
         .onReceive(timer) { input in
             currentTime = input
         }
+        .task(id: backgroundTaskKey) {
+            await loadBackgroundImage()
+        }
     }
 
-    private func loadDesktopImage() {
-        if let screen = NSScreen.main,
-           let url = NSWorkspace.shared.desktopImageURL(for: screen),
-           let image = NSImage(contentsOf: url) {
-            desktopImage = image
+    private var backgroundTaskKey: String {
+        selectedWallpaperURL?.absoluteString ?? "system-wallpaper"
+    }
+
+    private func loadBackgroundImage() async {
+        guard let url = selectedWallpaperURL else {
+            if let screen = NSScreen.main, let desktopURL = NSWorkspace.shared.desktopImageURL(for: screen) {
+                backgroundImage = await MediaUtils.loadImage(from: desktopURL)
+            } else {
+                backgroundImage = nil
+            }
+            return
         }
+
+        if Self.isVideoURL(url) {
+            backgroundImage = await MediaUtils.videoPosterImage(from: url)
+        } else {
+            backgroundImage = await MediaUtils.loadImage(from: url)
+        }
+    }
+
+    private static func isVideoURL(_ url: URL) -> Bool {
+        ["mp4", "mov"].contains(url.pathExtension.lowercased())
     }
 }
 

@@ -33,7 +33,7 @@ struct WebsiteManagerView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Website Name")
                                 .font(.headline)
-                            
+
                             TextField("e.g. My Dashboard", text: $websiteName)
                                 .textFieldStyle(.plain)
                                 .padding(12)
@@ -47,7 +47,7 @@ struct WebsiteManagerView: View {
                             Text("Website URL")
                                 .font(.headline)
                                 .padding(.top, 8)
-                            
+
                             TextField("https://...", text: $websiteURL)
                                 .textFieldStyle(.plain)
                                 .padding(12)
@@ -117,7 +117,7 @@ struct WebsiteManagerView: View {
 
         websiteName = ""
         websiteURL = "https://"
-        
+
         dismiss()
     }
 }

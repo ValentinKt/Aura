@@ -258,7 +258,7 @@ struct QuotesManagerView: View {
                         Text("Preview")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        
+
                         quotePreview
                             .liquidGlass(RoundedRectangle(cornerRadius: 16), opacity: 0.1, interactive: false, variant: .regular)
                     }
@@ -268,7 +268,7 @@ struct QuotesManagerView: View {
                         Text("Saved Quotes")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        
+
                         if quotes.isEmpty {
                             VStack {
                                 Spacer()
@@ -288,7 +288,7 @@ struct QuotesManagerView: View {
                                                 Text(quote.text)
                                                     .font(.system(size: 14, weight: .semibold))
                                                     .lineLimit(1)
-                                                
+
                                                 HStack(spacing: 8) {
                                                     Text(quote.style.capitalized)
                                                     Text("•")
@@ -299,9 +299,9 @@ struct QuotesManagerView: View {
                                                 .font(.system(size: 12))
                                                 .foregroundStyle(.secondary)
                                             }
-                                            
+
                                             Spacer()
-                                            
+
                                             Circle()
                                                 .fill(Color(
                                                     red: quote.textColor.red,
@@ -311,7 +311,7 @@ struct QuotesManagerView: View {
                                                 ))
                                                 .frame(width: 16, height: 16)
                                                 .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                            
+
                                             Button {
                                                 deleteQuote(quote)
                                             } label: {
