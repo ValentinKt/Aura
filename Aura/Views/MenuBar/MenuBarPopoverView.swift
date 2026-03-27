@@ -392,7 +392,7 @@ private struct NewMoodButtonContent: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 10) {
-                Image(systemName: "plus")
+                Image(systemName: "wand.and.stars")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
 
@@ -403,39 +403,8 @@ private struct NewMoodButtonContent: View {
                     .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
             }
             .padding(16)
-            .frame(width: 120, height: 160)
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(.regularMaterial)
-                } else if #available(macOS 16.0, *) {
-                    Color.clear
-                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            .white.opacity(0.2),
-                                            .clear,
-                                            .white.opacity(0.1)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                                .blendMode(.plusLighter)
-                        }
-                } else {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(.regularMaterial)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                        }
-                }
-            }
+            .frame(width: 140, height: 160)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
