@@ -386,30 +386,45 @@ struct MenuBarPopoverView: View {
 private struct NewMoodButtonContent: View {
     let reduceTransparency: Bool
     @State private var isHovered = false
+    @State private var isPressed = false
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 10) {
             Image(systemName: "plus")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.95))
+
             Text("New Mood")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.system(size: 14, weight: .bold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
         }
+        .padding(16)
         .frame(width: 140, height: 220)
         .background {
             if reduceTransparency {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(.regularMaterial)
-            } else {
-                Color.clear
-                    .glassEffect(isHovered ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
+        .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: false, variant: .clear)
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
+        }
+        .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
+        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
+        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .scaleEffect(isHovered ? 1.02 : 1.0)
         .onHover { isHovered = $0 }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 
