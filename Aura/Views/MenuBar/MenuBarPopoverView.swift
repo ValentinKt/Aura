@@ -410,10 +410,30 @@ private struct NewMoodButtonContent: View {
                         .fill(.regularMaterial)
                 } else if #available(macOS 16.0, *) {
                     Color.clear
-                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            .white.opacity(0.2),
+                                            .clear,
+                                            .white.opacity(0.1)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                                .blendMode(.plusLighter)
+                        }
                 } else {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(.regularMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                        }
                 }
             }
             .overlay {
