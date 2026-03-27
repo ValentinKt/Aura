@@ -16,7 +16,19 @@ final class WallpaperEngine {
     private let wallpaperDirectory: URL
     private let renderQueue = DispatchQueue(label: "com.Aura.wallpaper.render", qos: .userInitiated)
     private var isRendering = false
+    private var isPresentationSuppressed = false
     private let wallpaperWindowController = WallpaperWindowController()
+
+    var selectedWallpaperURL: URL? {
+        guard let selectedWallpaperResource else { return nil }
+        return resolveResourceURL(selectedWallpaperResource)
+    }
+
+    private var selectedWallpaperResource: String?
+
+    func setPresentationSuppressed(_ suppressed: Bool) {
+        isPresentationSuppressed = suppressed
+    }
 
     init(themeManager: ThemeManager) {
         self.themeManager = themeManager
@@ -36,12 +48,30 @@ final class WallpaperEngine {
 
     func applyWallpaper(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         print("🟢 [WallpaperEngine] Applying wallpaper of type: \(descriptor.type)")
-        stopAnimation()
+        self.selectedWallpaperResource = descriptor.resources.first
+        
+        if isPresentationSuppressed {
+            print("🟢 [WallpaperEngine] Presentation suppressed, skipping application")
+            return WallpaperApplyResult(success: true, permissionDenied: false)
+        }
+
+        let isStatic = descriptor.type == WallpaperType.staticImage || descriptor.type == WallpaperType.dynamic
+        if !isStatic {
+            stopAnimation()
+        } else {
+            // Stop timers but keep the current view/video until the new desktop image is applied to avoid a flash
+            for timer in animationTimers.values {
+                timer.invalidate()
+            }
+            animationTimers.removeAll()
+            isRendering = false
+        }
 
         let result: WallpaperApplyResult
         switch descriptor.type {
         case .staticImage:
-            result = applyStatic(descriptor)
+            result = await applyStaticAsync(descriptor)
+            if isStatic { wallpaperWindowController.stopAll() }
         case .gradient:
             result = await applyGradientAsync(descriptor)
         case .animated:
@@ -55,9 +85,11 @@ final class WallpaperEngine {
         case .current:
             // Explicitly do nothing to keep current wallpaper
             result = WallpaperApplyResult(success: true, permissionDenied: false)
+            if isStatic { wallpaperWindowController.stopAll() }
         case .dynamic:
             // For macOS, setting a .heic file automatically enables dynamic features if the file supports it
-            result = applyStatic(descriptor)
+            result = await applyStaticAsync(descriptor)
+            if isStatic { wallpaperWindowController.stopAll() }
         case .time:
             startTime(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
@@ -74,6 +106,19 @@ final class WallpaperEngine {
         }
 
         return result
+    }
+
+    private func applyStaticAsync(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
+        guard let resource = descriptor.resources.first else {
+            return WallpaperApplyResult(success: false, permissionDenied: false)
+        }
+
+        if let resolvedURL = resolveResourceURL(resource) {
+            return await applyImageURLsAsync([resolvedURL])
+        }
+
+        print("🟥 [WallpaperEngine] Error: Could not find wallpaper resource: \(resource)")
+        return WallpaperApplyResult(success: false, permissionDenied: false)
     }
 
     private func applyStatic(_ descriptor: WallpaperDescriptor) -> WallpaperApplyResult {
@@ -190,7 +235,7 @@ final class WallpaperEngine {
     private func startTime(_ descriptor: WallpaperDescriptor) {
         let style = descriptor.resources.first ?? "minimal"
         let palette = themeManager.palette
-        let timeView = TimeWallpaperView(style: style, palette: palette)
+        let timeView = TimeWallpaperView(style: style, palette: palette, selectedWallpaperURL: selectedWallpaperURL)
         wallpaperWindowController.showSwiftUIView(timeView)
     }
 
@@ -198,14 +243,14 @@ final class WallpaperEngine {
         let style = descriptor.resources.first ?? "motivational"
         let palette = themeManager.palette
         let quoteID = descriptor.resources.count > 1 ? UUID(uuidString: descriptor.resources[1]) : nil
-        let quoteView = QuoteWallpaperView(style: style, palette: palette, quoteID: quoteID)
+        let quoteView = QuoteWallpaperView(style: style, palette: palette, quoteID: quoteID, selectedWallpaperURL: selectedWallpaperURL)
         wallpaperWindowController.showSwiftUIView(quoteView)
     }
 
     private func startZen(_ descriptor: WallpaperDescriptor) {
         let style = descriptor.resources.first ?? "breathing"
         let palette = themeManager.palette
-        let zenView = ZenWallpaperView(style: style, palette: palette)
+        let zenView = ZenWallpaperView(style: style, palette: palette, selectedWallpaperURL: selectedWallpaperURL)
         wallpaperWindowController.showSwiftUIView(zenView)
     }
 
@@ -215,7 +260,8 @@ final class WallpaperEngine {
         wallpaperWindowController.showWebsite(url: url)
     }
 
-    private func applyImageURLs(_ urls: [URL]) -> WallpaperApplyResult {
+    @MainActor
+    private func applyImageURLsAsync(_ urls: [URL]) async -> WallpaperApplyResult {
         var permissionDenied = false
         var applied = false
         let screens = NSScreen.screens
@@ -229,8 +275,35 @@ final class WallpaperEngine {
         for screen in screens {
             for url in urls {
                 do {
-                    // This must be on main thread but we are calling it from background task sometimes
-                    // Actually NSWorkspace.shared.setDesktopImageURL is thread-safe or handles its own thread management
+                    // Running this inside a Task.detached to prevent blocking MainActor if possible
+                    // But NSScreen is not Sendable. We can use setDesktopImageURL on MainActor.
+                    try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
+                    applied = true
+                } catch let error as NSError {
+                    print("🟥 [WallpaperEngine] Error setting desktop image URL: \(error.localizedDescription)")
+                    if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
+                        permissionDenied = true
+                    }
+                }
+            }
+        }
+        return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
+    }
+
+    private func applyImageURLs(_ urls: [URL]) -> WallpaperApplyResult {
+        // Fallback for synchronous calls if needed
+        var permissionDenied = false
+        var applied = false
+        let screens = NSScreen.screens
+
+        if screens.isEmpty {
+            let allExist = urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
+            return WallpaperApplyResult(success: allExist, permissionDenied: false)
+        }
+
+        for screen in screens {
+            for url in urls {
+                do {
                     try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
                     applied = true
                 } catch let error as NSError {

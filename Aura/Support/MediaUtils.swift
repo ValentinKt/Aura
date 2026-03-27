@@ -1,7 +1,11 @@
+import AppKit
 import AVFoundation
-import SwiftUI
+import os
 
 enum MediaUtils {
+    @MainActor private static let imageCache = NSCache<NSURL, NSImage>()
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
+
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
         // Try the local absolute path first
         let absolutePath = "/Users/valentin/XCode/Aura/Aura/Resources/Image/\(name).jpg"
@@ -23,7 +27,6 @@ enum MediaUtils {
     }
 
     nonisolated static func resolveResourceURL(_ resource: String) -> URL? {
-        print("🟢 [MediaUtils] Resolving resource: \(resource)")
         if resource.hasPrefix("/") {
             let url = URL(fileURLWithPath: resource)
             if FileManager.default.fileExists(atPath: url.path) {
@@ -305,5 +308,33 @@ enum MediaUtils {
             print("🟥 [MediaUtils] Failed to generate thumbnail for \(url.lastPathComponent): \(error)")
             return nil
         }
+    }
+
+    nonisolated static func loadImage(from url: URL) async -> NSImage? {
+        let cacheKey = url as NSURL
+
+        if let cachedImage = await MainActor.run(body: { imageCache.object(forKey: cacheKey) }) {
+            return cachedImage
+        }
+
+        let data: Data? = await Task.detached(priority: .userInitiated) { () -> Data? in
+            let isSecurityScoped = url.startAccessingSecurityScopedResource()
+            defer {
+                if isSecurityScoped {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            return try? Data(contentsOf: url)
+        }.value
+
+        guard let data else { return nil }
+
+        let image = await MainActor.run { NSImage(data: data) }
+
+        if let image {
+            await MainActor.run { imageCache.setObject(image, forKey: cacheKey) }
+        }
+
+        return image
     }
 }
