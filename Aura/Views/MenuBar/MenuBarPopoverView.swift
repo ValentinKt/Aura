@@ -252,11 +252,16 @@ struct MenuBarPopoverView: View {
                     NewMoodButtonContent(reduceTransparency: reduceTransparency)
                 }
                 .buttonStyle(.plain)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in }
+                        .onEnded { _ in }
+                )
             }
         }
         .contentMargins(.horizontal, 24, for: .scrollContent)
         .frame(maxWidth: .infinity)
-        .frame(height: 236)
+        .frame(height: 180)
     }
 
     // MARK: - Footer
@@ -401,7 +406,7 @@ private struct NewMoodButtonContent: View {
                 .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
         }
         .padding(16)
-        .frame(width: 140, height: 220)
+        .frame(width: 120, height: 160)
         .background {
             if reduceTransparency {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -425,6 +430,8 @@ private struct NewMoodButtonContent: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
+        .accessibilityLabel("New Mood")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -439,6 +446,7 @@ private struct MoodCarouselCard: View {
 
     @State private var image: NSImage?
     @State private var isHovered = false
+    @State private var isPressed = false
 
     private var primaryResource: String {
         mood.wallpaper.resources.first ?? ""
@@ -449,7 +457,7 @@ private struct MoodCarouselCard: View {
             Button(action: handleAction) {
                 ZStack(alignment: .bottomLeading) {
                     cardBackground
-                        .frame(width: 140, height: 220)
+                        .frame(width: 120, height: 160)
 
                     LinearGradient(
                         colors: [.clear, .black.opacity(0.55)],
@@ -464,7 +472,7 @@ private struct MoodCarouselCard: View {
                         .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
                         .padding(12)
                 }
-                .frame(width: 140, height: 220)
+                .frame(width: 120, height: 160)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay {
@@ -513,6 +521,10 @@ private struct MoodCarouselCard: View {
                     y: 4
                 )
                 .scaleEffect(isHovered && !isSelected ? 1.02 : 1.0)
+                .scaleEffect(isPressed ? 0.98 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+                .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
             }
             .buttonStyle(.plain)
 
@@ -528,10 +540,13 @@ private struct MoodCarouselCard: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onHover { isHovered = $0 }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
         .task {
             if !primaryResource.isEmpty {
                 DownloadManager.shared.checkStatus(for: primaryResource)
@@ -572,37 +587,40 @@ private struct MoodCarouselCard: View {
         if mood.wallpaper.type == .time {
             let style = mood.wallpaper.resources.first ?? "minimal"
             TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
-                .frame(width: 140, height: 220)
+                .frame(width: 120, height: 160)
                 .clipped()
         } else if mood.wallpaper.type == .quote {
             let style = mood.wallpaper.resources.first ?? "motivational"
             let quoteID = mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
             QuoteWallpaperView(style: style, palette: mood.palette, quoteID: quoteID, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
-                .frame(width: 140, height: 220)
+                .frame(width: 120, height: 160)
                 .clipped()
         } else if mood.wallpaper.type == .zen {
             let style = mood.wallpaper.resources.first ?? "breathing"
             ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
-                .frame(width: 140, height: 220)
+                .frame(width: 120, height: 160)
                 .clipped()
         } else if mood.wallpaper.type == .website {
-            WebsiteWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 140, height: 220))
-                .frame(width: 140, height: 220)
+            WebsiteWallpaperPreview(mood: mood, isPressed: false, targetSize: CGSize(width: 120, height: 160))
+                .frame(width: 120, height: 160)
                 .clipped()
         } else if isSelected,
                   let resource = mood.wallpaper.resources.first,
                   let url = MediaUtils.resolveResourceURL(resource),
                   ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
             VideoBackgroundView(url: url)
-                .frame(width: 140, height: 220)
+                .frame(width: 120, height: 160)
                 .clipped()
         } else if let image {
             Image(nsImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
+                .frame(width: 120, height: 160)
+                .clipped()
         } else {
             Color.clear
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .frame(width: 120, height: 160)
         }
     }
 
