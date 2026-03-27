@@ -404,13 +404,13 @@ private struct NewMoodButtonContent: View {
         .frame(width: 140, height: 220)
         .background {
             if reduceTransparency {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(.regularMaterial)
             }
         }
-        .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: false, variant: .clear)
+        .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
         }
         .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
@@ -418,7 +418,7 @@ private struct NewMoodButtonContent: View {
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
         .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onHover { isHovered = $0 }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
