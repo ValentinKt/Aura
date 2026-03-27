@@ -248,15 +248,9 @@ struct MenuBarPopoverView: View {
                     }
                 }
 
-                Button { isShowingCreateMood = true } label: {
-                    NewMoodButtonContent(reduceTransparency: reduceTransparency)
+                NewMoodButtonContent {
+                    isShowingCreateMood = true
                 }
-                .buttonStyle(.plain)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in }
-                        .onEnded { _ in }
-                )
             }
         }
         .contentMargins(.horizontal, 24, for: .scrollContent)
@@ -389,48 +383,48 @@ struct MenuBarPopoverView: View {
 // MARK: - NewMoodButtonContent
 
 private struct NewMoodButtonContent: View {
-    let reduceTransparency: Bool
+    let action: () -> Void
+
     @State private var isHovered = false
     @State private var isPressed = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "plus")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.95))
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.95))
 
-            Text("New Mood")
-                .font(.system(size: 14, weight: .bold))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-        }
-        .padding(16)
-        .frame(width: 120, height: 160)
-        .background {
-            if reduceTransparency {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.regularMaterial)
+                Text("Create a\nnew Mood")
+                    .font(.system(size: 14, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
             }
+            .padding(16)
+            .frame(width: 120, height: 160)
+            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
+            }
+            .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
-        }
-        .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
-        .scaleEffect(isHovered ? 1.03 : 1.0)
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .buttonStyle(.plain)
+        .focusable(false)
         .onHover { isHovered = $0 }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
-        .accessibilityLabel("New Mood")
+        .accessibilityLabel("Create a new mood")
         .accessibilityAddTraits(.isButton)
     }
 }
