@@ -115,7 +115,11 @@ final class MoodViewModel {
         let dynamicSubthemes = allSubthemes
             .filter { Self.dynamicSubthemes.contains($0) }
             .union(Self.pinnedDynamicSubthemes)
-            .sorted()
+            .sorted { a, b in
+                if a == "Websites" { return false }
+                if b == "Websites" { return true }
+                return a < b
+            }
         var sections: [MoodSubthemeSection] = []
 
         if !atmosphereSubthemes.isEmpty {
