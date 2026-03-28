@@ -11,8 +11,9 @@ struct ContentView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var selectedTab: Tab? = .moods
-    @State private var isMoodsExpanded = true
-    @State private var isPlaylistsExpanded = true
+    @State private var isMoodsExpanded = false
+    @State private var isPlaylistsExpanded = false
+    @State private var expandedSubthemeSections: Set<String> = []
     @State private var selectedPlaylistID: UUID?
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -216,25 +217,50 @@ struct ContentView: View {
                                 ForEach(subthemeSections) { section in
                                     VStack(alignment: .leading, spacing: 4) {
                                         if subthemeSections.count > 1 {
-                                            Text(section.title.uppercased())
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundStyle(.white.opacity(0.45))
+                                            Button {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                                    if expandedSubthemeSections.contains(section.id) {
+                                                        expandedSubthemeSections.remove(section.id)
+                                                    } else {
+                                                        expandedSubthemeSections.insert(section.id)
+                                                    }
+                                                }
+                                            } label: {
+                                                HStack {
+                                                    Text(section.title.uppercased())
+                                                        .font(.system(size: 10, weight: .bold))
+                                                        .foregroundStyle(.white.opacity(0.45))
+                                                    
+                                                    Spacer()
+                                                    
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.system(size: 8, weight: .bold))
+                                                        .foregroundStyle(.white.opacity(0.35))
+                                                        .rotationEffect(.degrees(expandedSubthemeSections.contains(section.id) ? 90 : 0))
+                                                }
                                                 .padding(.horizontal, 16)
                                                 .padding(.top, 4)
+                                                .padding(.bottom, 2)
+                                                .contentShape(Rectangle())
+                                            }
+                                            .buttonStyle(.plain)
                                         }
 
-                                        ForEach(section.subthemes, id: \.self) { subtheme in
-                                            SidebarItem(
-                                                title: subtheme,
-                                                isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
-                                                systemImage: iconForSubtheme(subtheme),
-                                                action: {
-                                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                        selectedTab = .moods
+                                        if subthemeSections.count <= 1 || expandedSubthemeSections.contains(section.id) {
+                                            ForEach(section.subthemes, id: \.self) { subtheme in
+                                                SidebarItem(
+                                                    title: subtheme,
+                                                    isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
+                                                    systemImage: iconForSubtheme(subtheme),
+                                                    action: {
+                                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                            selectedTab = .moods
+                                                        }
+                                                        appModel.moodViewModel.selectedSubtheme = subtheme
                                                     }
-                                                    appModel.moodViewModel.selectedSubtheme = subtheme
-                                                }
-                                            )
+                                                )
+                                            }
+                                            .padding(.leading, subthemeSections.count > 1 ? 8 : 0)
                                         }
                                     }
                                 }
