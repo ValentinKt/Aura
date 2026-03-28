@@ -199,7 +199,7 @@ struct ContentView: View {
                                 Label("Moods", systemImage: "swatchpalette.fill")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.8))
-                                Spacer()
+                                Spacer(minLength: 0)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.5))
@@ -207,9 +207,10 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .contentShape(Rectangle())
 
                         if isMoodsExpanded {
                             let subthemeSections = appModel.moodViewModel.subthemeSections
@@ -231,7 +232,7 @@ struct ContentView: View {
                                                         .font(.system(size: 10, weight: .bold))
                                                         .foregroundStyle(.white.opacity(0.45))
                                                     
-                                                    Spacer()
+                                                    Spacer(minLength: 0)
                                                     
                                                     Image(systemName: "chevron.right")
                                                         .font(.system(size: 8, weight: .bold))
@@ -278,7 +279,7 @@ struct ContentView: View {
                                 Label("Playlists", systemImage: "music.note.list")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.8))
-                                Spacer()
+                                Spacer(minLength: 0)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(.white.opacity(0.5))
@@ -286,9 +287,10 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .contentShape(Rectangle())
 
                         if isPlaylistsExpanded {
                             LazyVStack(spacing: 2) {
