@@ -154,6 +154,7 @@ struct MenuBarPopoverView: View {
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 52, height: 52)
+                    .liquidGlass(Circle(), interactive: true, variant: .regular)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -327,6 +328,7 @@ struct MenuBarPopoverView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
+                    .liquidGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true, variant: .regular)
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -342,6 +344,7 @@ struct MenuBarPopoverView: View {
                     .font(.system(size: 17))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
+                    .liquidGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true, variant: .regular)
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -353,6 +356,7 @@ struct MenuBarPopoverView: View {
                     .font(.system(size: 17))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
+                    .liquidGlass(RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true, variant: .regular)
                     .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -511,6 +515,7 @@ private struct MoodCarouselCard: View {
                         .padding(12)
                 }
                 .frame(width: 120, height: 160)
+                .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: true, variant: .clear)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay {
