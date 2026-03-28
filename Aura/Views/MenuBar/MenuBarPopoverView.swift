@@ -8,6 +8,7 @@ struct MenuBarPopoverView: View {
 
     @State private var isShowingCreateMood = false
     @State private var selectedSubtheme: String = ""
+    @State private var expandedSections: Set<String> = []
 
     // ── Background media state ────────────────────────────────────────────────
     // Only one of these is non-nil at a time.
@@ -196,33 +197,78 @@ struct MenuBarPopoverView: View {
     // so pills stay visually separated (no merging into one dark bar).
 
     private var subthemeSelectorSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(appModel.moodViewModel.subthemes, id: \.self) { subtheme in
-                    let isActive = selectedSubtheme == subtheme
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(appModel.moodViewModel.subthemeSections) { section in
+                VStack(alignment: .leading, spacing: 4) {
+                    // Section Header (Toggle)
                     Button {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            selectedSubtheme = subtheme
+                            if expandedSections.contains(section.id) {
+                                expandedSections.remove(section.id)
+                            } else {
+                                expandedSections.insert(section.id)
+                            }
                         }
                     } label: {
-                        Text(subtheme)
-                            .font(.system(size: 13, weight: isActive ? .semibold : .medium))
-                            .foregroundStyle(isActive ? .white : .white.opacity(0.65))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .contentShape(Capsule())
+                        HStack {
+                            Text(section.title)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .rotationEffect(.degrees(expandedSections.contains(section.id) ? 90 : 0))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .glassEffect(
-                        isActive
-                            ? .regular.interactive().tint(.white.opacity(0.12))
-                            : .regular.interactive(),
-                        in: Capsule()
+                        .regular.interactive(),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                     )
+                    .padding(.horizontal, 24)
+
+                    // Subthemes (if expanded)
+                    if expandedSections.contains(section.id) {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(section.subthemes, id: \.self) { subtheme in
+                                    let isActive = selectedSubtheme == subtheme
+                                    Button {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            selectedSubtheme = subtheme
+                                        }
+                                    } label: {
+                                        Text(subtheme)
+                                            .font(.system(size: 13, weight: isActive ? .semibold : .medium))
+                                            .foregroundStyle(isActive ? .white : .white.opacity(0.65))
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 7)
+                                            .contentShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .glassEffect(
+                                        isActive
+                                            ? .regular.interactive().tint(.white.opacity(0.12))
+                                            : .regular.interactive(),
+                                        in: Capsule()
+                                    )
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .contentMargins(.horizontal, 24, for: .scrollContent)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
             }
         }
-        .contentMargins(.horizontal, 24, for: .scrollContent)
         .frame(maxWidth: .infinity)
     }
 
