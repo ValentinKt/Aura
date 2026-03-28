@@ -447,7 +447,7 @@ private struct NewMoodButtonContent: View {
                     .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
             }
             .padding(16)
-            .frame(width: 140, height: 160)
+            .frame(width: 120, height: 160)
             .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
             .overlay {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
