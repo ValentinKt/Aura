@@ -54,11 +54,14 @@ final class WallpaperEngine {
 
     func applyWallpaper(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         print("🟢 [WallpaperEngine] Applying wallpaper of type: \(descriptor.type)")
-        self.selectedWallpaperResource = descriptor.resources.first
+        let storesConcreteWallpaper = descriptor.type == .staticImage || descriptor.type == .animated || descriptor.type == .dynamic
+        if storesConcreteWallpaper {
+            selectedWallpaperResource = descriptor.resources.first
+        }
 
         // Update backgroundImageURL whenever we apply a concrete image/video wallpaper,
         // so dynamic views (Quote, Zen, Time) can use it as their background even after switching.
-        if descriptor.type == .staticImage || descriptor.type == .animated || descriptor.type == .dynamic {
+        if storesConcreteWallpaper {
             if let resource = descriptor.resources.first {
                 backgroundImageURL = resolveResourceURL(resource)
             }
@@ -214,7 +217,7 @@ final class WallpaperEngine {
 
     private func resolveResourceURL(_ resource: String) -> URL? {
         // Use shared logic from MediaUtils if possible, or replicate it here for independence
-        if let sharedResolved = MediaUtils.resolveResourceURL(resource) {
+        if let sharedResolved = MediaUtils.resolveExactResourceURL(resource) ?? MediaUtils.resolveResourceURL(resource) {
             return sharedResolved
         }
 

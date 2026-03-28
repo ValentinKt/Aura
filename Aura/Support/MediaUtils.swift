@@ -26,7 +26,15 @@ enum MediaUtils {
         return nil
     }
 
+    nonisolated static func resolveExactResourceURL(_ resource: String) -> URL? {
+        resolveResourceURL(resource, allowVideoFallback: false)
+    }
+
     nonisolated static func resolveResourceURL(_ resource: String) -> URL? {
+        resolveResourceURL(resource, allowVideoFallback: true)
+    }
+
+    nonisolated private static func resolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
         if resource.hasPrefix("/") {
             let url = URL(fileURLWithPath: resource)
             if FileManager.default.fileExists(atPath: url.path) {
@@ -55,7 +63,7 @@ enum MediaUtils {
         }
 
         let bundle = Bundle.main
-        if isVideo && !name.hasSuffix("_1") {
+        if allowVideoFallback, isVideo && !name.hasSuffix("_1") {
             if let imageFallbackURL = resolveImageFallback(for: name) {
                 print("🟢 [MediaUtils] Returning image fallback for \(name)")
                 return imageFallbackURL
@@ -151,7 +159,7 @@ enum MediaUtils {
             }
         }
 
-        if isVideo {
+        if allowVideoFallback, isVideo {
             if let imageFallbackURL = resolveImageFallback(for: name) {
                 print("🟢 [MediaUtils] Returning image fallback for missing video \(name)")
                 return imageFallbackURL
