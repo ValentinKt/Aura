@@ -15,7 +15,8 @@ final class MoodViewModel {
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
     private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Zen", "Website"]
+    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Zen"]
+    private static let miscellaneousSubthemes: Set<String> = ["Website"]
     private static let pinnedDynamicSubthemes: Set<String> = ["Image Playground"]
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
@@ -111,15 +112,16 @@ final class MoodViewModel {
 
     var subthemeSections: [MoodSubthemeSection] {
         let allSubthemes = Set(moodsBySubtheme.keys)
-        let atmosphereSubthemes = allSubthemes.filter { !Self.dynamicSubthemes.contains($0) }.sorted()
+        let atmosphereSubthemes = allSubthemes
+            .filter { !Self.dynamicSubthemes.contains($0) && !Self.miscellaneousSubthemes.contains($0) }
+            .sorted()
         let dynamicSubthemes = allSubthemes
             .filter { Self.dynamicSubthemes.contains($0) }
             .union(Self.pinnedDynamicSubthemes)
-            .sorted { a, b in
-                if a == "Website" { return false }
-                if b == "Website" { return true }
-                return a < b
-            }
+            .sorted()
+        let miscellaneousSubthemes = allSubthemes
+            .filter { Self.miscellaneousSubthemes.contains($0) }
+            .sorted()
         var sections: [MoodSubthemeSection] = []
 
         if !atmosphereSubthemes.isEmpty {
@@ -128,6 +130,10 @@ final class MoodViewModel {
 
         if !dynamicSubthemes.isEmpty {
             sections.append(MoodSubthemeSection(title: "Dynamic", subthemes: dynamicSubthemes))
+        }
+
+        if !miscellaneousSubthemes.isEmpty {
+            sections.append(MoodSubthemeSection(title: "Miscellaneous", subthemes: miscellaneousSubthemes))
         }
 
         return sections
