@@ -15,7 +15,7 @@ final class MoodViewModel {
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
     private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Website", "Websites", "Zen"]
+    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Zen", "Website"]
     private static let pinnedDynamicSubthemes: Set<String> = ["Image Playground"]
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
@@ -116,8 +116,8 @@ final class MoodViewModel {
             .filter { Self.dynamicSubthemes.contains($0) }
             .union(Self.pinnedDynamicSubthemes)
             .sorted { a, b in
-                if a == "Websites" { return false }
-                if b == "Websites" { return true }
+                if a == "Website" { return false }
+                if b == "Website" { return true }
                 return a < b
             }
         var sections: [MoodSubthemeSection] = []
