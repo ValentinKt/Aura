@@ -18,7 +18,6 @@ struct TahoeMenuBarPopoverView: View {
     private let panelShape = RoundedRectangle(cornerRadius: 30, style: .continuous)
     private let sectionShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
     private let controlShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
-    private let pillShape = Capsule()
 
     var body: some View {
         panelContainer
@@ -109,7 +108,6 @@ struct TahoeMenuBarPopoverView: View {
 
     private var contentStack: some View {
         VStack(alignment: .leading, spacing: 18) {
-            utilitySection
             heroSection
             volumeSection
             themesHeader
@@ -185,99 +183,32 @@ struct TahoeMenuBarPopoverView: View {
         }
     }
 
-    private var utilitySection: some View {
-        HStack(alignment: .top, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles.rectangle.stack.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(primaryForegroundStyle)
-                    .frame(width: 38, height: 38)
-                    .background(accentColor.opacity(0.18), in: Circle())
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Aura Focus")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(primaryForegroundStyle)
-
-                    Text(currentMood?.theme ?? "Ambient control")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(secondaryForegroundStyle)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .tahoeGlassID("utility-brand", in: glassNamespace)
-            .tahoeGlass(sectionShape, tint: accentColor.opacity(0.10), strokeOpacity: 0.34, shadowOpacity: 0.14)
-
-            VStack(spacing: 10) {
-                utilityPill(
-                    id: "utility-playback",
-                    icon: appModel.playerViewModel.isPlaying ? "waveform" : "pause.fill",
-                    label: appModel.playerViewModel.isPlaying ? "Playing" : "Paused",
-                    tint: accentColor.opacity(0.22)
-                )
-
-                utilityPill(
-                    id: "utility-count",
-                    icon: "square.stack.3d.up.fill",
-                    label: "\(currentSubthemeMoods.count) moods",
-                    tint: .white.opacity(0.06)
-                )
-            }
-        }
-    }
-
     private var heroSection: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text((appModel.moodViewModel.currentMood?.theme ?? "Aura").uppercased())
-                    .font(.system(size: 11, weight: .bold))
-                    .kerning(1.2)
-                    .foregroundStyle(secondaryForegroundStyle)
+        HStack(alignment: .center) {
+            Text(appModel.moodViewModel.currentMood?.name ?? "Aura")
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(primaryForegroundStyle)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-                Text(appModel.moodViewModel.currentMood?.name ?? "Aura")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                    .foregroundStyle(primaryForegroundStyle)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+            Spacer()
 
-                Text(selectedSubtheme.isEmpty ? "Curated soundscape" : selectedSubtheme)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(secondaryForegroundStyle)
-                    .padding(.top, 4)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
-            .tahoeGlassID("hero-title", in: glassNamespace)
-            .tahoeGlass(sectionShape, tint: accentColor.opacity(0.10), strokeOpacity: 0.34, shadowOpacity: 0.18)
-
-            VStack(spacing: 10) {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
-                        appModel.playerViewModel.togglePlayback()
-                    }
-                } label: {
-                    Image(systemName: appModel.playerViewModel.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(primaryForegroundStyle)
-                        .frame(width: 84, height: 84)
-                        .contentShape(Circle())
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                    appModel.playerViewModel.togglePlayback()
                 }
-                .buttonStyle(.plain)
-                .focusable(false)
-                .tahoeGlassID("hero-play", in: glassNamespace)
-                .tahoeGlass(Circle(), interactive: true, tint: accentColor.opacity(0.18), strokeOpacity: 0.40, shadowOpacity: 0.20)
-
-                utilityPill(
-                    id: "hero-status",
-                    icon: "speaker.wave.2.fill",
-                    label: "\(Int(appModel.playerViewModel.masterVolume * 100))%",
-                    tint: .white.opacity(0.08)
-                )
+            } label: {
+                Image(systemName: appModel.playerViewModel.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
+            .focusable(false)
         }
+        .padding(.horizontal, 2)
+        .padding(.top, 10)
     }
 
     private var volumeSection: some View {
@@ -304,44 +235,15 @@ struct TahoeMenuBarPopoverView: View {
                     .frame(width: 42, alignment: .trailing)
             }
         }
-        .padding(18)
-        .tahoeGlassID("volume", in: glassNamespace)
-        .tahoeGlass(sectionShape, tint: .white.opacity(0.04), strokeOpacity: 0.30, shadowOpacity: 0.12)
+        .padding(.horizontal, 2)
     }
 
     private var themesHeader: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "square.grid.2x2.fill")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(primaryForegroundStyle)
-                .frame(width: 34, height: 34)
-                .background(accentColor.opacity(0.18), in: Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Themes")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(primaryForegroundStyle)
-
-                Text("\(appModel.moodViewModel.subthemeSections.count) curated groups")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(secondaryForegroundStyle)
-            }
-
-            Spacer(minLength: 0)
-
-            Text(selectedSubtheme.isEmpty ? "Browse" : selectedSubtheme)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(primaryForegroundStyle)
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .tahoeGlassID("themes-selected", in: glassNamespace)
-                .tahoeGlass(pillShape, tint: accentColor.opacity(0.14), strokeOpacity: 0.34, shadowOpacity: 0.10)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .tahoeGlassID("themes-header", in: glassNamespace)
-        .tahoeGlass(sectionShape, tint: .white.opacity(0.04), strokeOpacity: 0.32, shadowOpacity: 0.12)
+        Text("Themes")
+            .font(.system(size: 17, weight: .bold, design: .rounded))
+            .foregroundStyle(primaryForegroundStyle)
+            .padding(.horizontal, 2)
+            .padding(.top, 4)
     }
 
     private var subthemeSections: some View {
@@ -383,8 +285,6 @@ struct TahoeMenuBarPopoverView: View {
                 .contentShape(controlShape)
             }
             .buttonStyle(.plain)
-            .tahoeGlassID("section-\(section.id)", in: glassNamespace)
-            .tahoeGlass(controlShape, interactive: true, tint: .white.opacity(0.04), strokeOpacity: 0.32, shadowOpacity: 0.10)
 
             if isExpanded {
                 subthemeGrid(for: section)
@@ -418,14 +318,7 @@ struct TahoeMenuBarPopoverView: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .tahoeGlassID("subtheme-\(subtheme)", in: glassNamespace)
-                .tahoeGlass(
-                    Capsule(),
-                    interactive: true,
-                    tint: isSelected ? .white.opacity(0.14) : .white.opacity(0.03),
-                    strokeOpacity: isSelected ? 0.42 : 0.30,
-                    shadowOpacity: isSelected ? 0.16 : 0.08
-                )
+                .background(isSelected ? Color.white.opacity(0.14) : Color.white.opacity(0.03), in: Capsule())
             }
         }
     }
@@ -453,8 +346,6 @@ struct TahoeMenuBarPopoverView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .tahoeGlassID("mood-header", in: glassNamespace)
-            .tahoeGlass(sectionShape, tint: accentColor.opacity(0.08), strokeOpacity: 0.32, shadowOpacity: 0.12)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
@@ -502,8 +393,7 @@ struct TahoeMenuBarPopoverView: View {
                     .contentShape(controlShape)
             }
             .buttonStyle(.plain)
-            .tahoeGlassID("footer-open", in: glassNamespace)
-            .tahoeGlass(controlShape, interactive: true, tint: accentColor.opacity(0.18), strokeOpacity: 0.38, shadowOpacity: 0.18)
+            .background(accentColor.opacity(0.18), in: controlShape)
 
             Button {
                 appModel.showCommandPalette.toggle()
@@ -517,8 +407,7 @@ struct TahoeMenuBarPopoverView: View {
             }
             .buttonStyle(.plain)
             .help("Search")
-            .tahoeGlassID("footer-search", in: glassNamespace)
-            .tahoeGlass(controlShape, interactive: true, strokeOpacity: 0.36, shadowOpacity: 0.18)
+            .background(Color.white.opacity(0.05), in: controlShape)
 
             Button {
                 NSApp.terminate(nil)
@@ -531,8 +420,7 @@ struct TahoeMenuBarPopoverView: View {
             }
             .buttonStyle(.plain)
             .help("Quit Aura")
-            .tahoeGlassID("footer-quit", in: glassNamespace)
-            .tahoeGlass(controlShape, interactive: true, strokeOpacity: 0.36, shadowOpacity: 0.18)
+            .background(Color.white.opacity(0.05), in: controlShape)
         }
     }
 
@@ -555,23 +443,6 @@ struct TahoeMenuBarPopoverView: View {
 
     private var secondaryForegroundStyle: AnyShapeStyle {
         AnyShapeStyle(.secondary)
-    }
-
-    private func utilityPill(id: String, icon: String, label: String, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(primaryForegroundStyle)
-
-            Text(label)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(primaryForegroundStyle)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .tahoeGlassID(id, in: glassNamespace)
-        .tahoeGlass(pillShape, tint: tint, strokeOpacity: 0.34, shadowOpacity: 0.10)
     }
 
     private func revealMainWindow() {
