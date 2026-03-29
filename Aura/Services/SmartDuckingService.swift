@@ -14,44 +14,44 @@ final class SmartDuckingService {
             }
         }
     }
-    
+
     private(set) var isDuckingActive: Bool = false
-    
+
     private let soundEngine: SoundEngine
     private var monitoringTask: Task<Void, Never>?
-    
+
     // MediaRemote dynamically loaded
-    private typealias MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
-    private typealias MRMediaRemoteGetNowPlayingInfoFunction = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
-    
-    private var MRMediaRemoteGetNowPlayingApplicationIsPlaying: MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction?
-    private var MRMediaRemoteGetNowPlayingInfo: MRMediaRemoteGetNowPlayingInfoFunction?
-    
+    private typealias MediaRemoteNowPlayingIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
+    private typealias MediaRemoteNowPlayingInfoFunction = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
+
+    private var mediaRemoteNowPlayingIsPlaying: MediaRemoteNowPlayingIsPlayingFunction?
+    private var mediaRemoteNowPlayingInfo: MediaRemoteNowPlayingInfoFunction?
+
     init(soundEngine: SoundEngine) {
         self.soundEngine = soundEngine
         loadMediaRemote()
         startMonitoring()
     }
-    
+
     private func loadMediaRemote() {
         let bundlePath = "/System/Library/PrivateFrameworks/MediaRemote.framework"
         guard let bundle = CFBundleCreate(kCFAllocatorDefault, URL(fileURLWithPath: bundlePath) as CFURL) else { return }
-        
+
         if let pointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) {
-            MRMediaRemoteGetNowPlayingApplicationIsPlaying = unsafeBitCast(
+            mediaRemoteNowPlayingIsPlaying = unsafeBitCast(
                 pointer,
-                to: MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction.self
+                to: MediaRemoteNowPlayingIsPlayingFunction.self
             )
         }
-        
+
         if let infoPointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingInfo" as CFString) {
-            MRMediaRemoteGetNowPlayingInfo = unsafeBitCast(
+            mediaRemoteNowPlayingInfo = unsafeBitCast(
                 infoPointer,
-                to: MRMediaRemoteGetNowPlayingInfoFunction.self
+                to: MediaRemoteNowPlayingInfoFunction.self
             )
         }
     }
-    
+
     func startMonitoring() {
         monitoringTask?.cancel()
         monitoringTask = Task { [weak self] in
@@ -60,12 +60,12 @@ final class SmartDuckingService {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     continue
                 }
-                
+
                 let micActive = self.isMicActive()
                 let mediaPlaying = await self.isMediaPlaying()
-                
+
                 let shouldDuck = micActive || mediaPlaying
-                
+
                 if shouldDuck && !self.isDuckingActive {
                     self.isDuckingActive = true
                     print("🟢 [SmartDucking] Activity detected, fading out...")
@@ -75,13 +75,13 @@ final class SmartDuckingService {
                     print("🟢 [SmartDucking] Activity ended, fading in...")
                     self.soundEngine.fadeDucking(to: 1.0, duration: 2.0)
                 }
-                
+
                 // Check every 2 seconds
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
     }
-    
+
     private func isMicActive() -> Bool {
         var propertySize: UInt32 = 0
         var propertyAddress = AudioObjectPropertyAddress(
@@ -89,7 +89,7 @@ final class SmartDuckingService {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        
+
         var result = AudioObjectGetPropertyDataSize(
             AudioObjectID(kAudioObjectSystemObject),
             &propertyAddress,
@@ -97,12 +97,12 @@ final class SmartDuckingService {
             nil,
             &propertySize
         )
-        
+
         guard result == noErr else { return false }
-        
+
         let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
-        
+
         result = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
             &propertyAddress,
@@ -111,9 +111,9 @@ final class SmartDuckingService {
             &propertySize,
             &deviceIDs
         )
-        
+
         guard result == noErr else { return false }
-        
+
         for deviceID in deviceIDs {
             // Check if device has input streams
             var streamSize: UInt32 = 0
@@ -122,10 +122,10 @@ final class SmartDuckingService {
                 mScope: kAudioDevicePropertyScopeInput,
                 mElement: kAudioObjectPropertyElementMain
             )
-            
+
             result = AudioObjectGetPropertyDataSize(deviceID, &streamAddress, 0, nil, &streamSize)
             guard result == noErr && streamSize > 0 else { continue }
-            
+
             var isRunning: UInt32 = 0
             var isRunningSize = UInt32(MemoryLayout<UInt32>.size)
             var isRunningAddress = AudioObjectPropertyAddress(
@@ -133,7 +133,7 @@ final class SmartDuckingService {
                 mScope: kAudioObjectPropertyScopeGlobal,
                 mElement: kAudioObjectPropertyElementMain
             )
-            
+
             result = AudioObjectGetPropertyData(
                 deviceID,
                 &isRunningAddress,
@@ -142,18 +142,18 @@ final class SmartDuckingService {
                 &isRunningSize,
                 &isRunning
             )
-            
+
             if result == noErr && isRunning > 0 {
                 return true
             }
         }
-        
+
         return false
     }
-    
+
     private func isMediaPlaying() async -> Bool {
         let isPlayingViaApp = await withCheckedContinuation { continuation in
-            guard let checkMedia = MRMediaRemoteGetNowPlayingApplicationIsPlaying else {
+            guard let checkMedia = mediaRemoteNowPlayingIsPlaying else {
                 continuation.resume(returning: false)
                 return
             }
@@ -161,11 +161,11 @@ final class SmartDuckingService {
                 continuation.resume(returning: isPlaying)
             }
         }
-        
+
         if isPlayingViaApp { return true }
-        
+
         let isPlayingViaInfo = await withCheckedContinuation { continuation in
-            guard let getInfo = MRMediaRemoteGetNowPlayingInfo else {
+            guard let getInfo = mediaRemoteNowPlayingInfo else {
                 continuation.resume(returning: false)
                 return
             }
@@ -181,7 +181,7 @@ final class SmartDuckingService {
                 continuation.resume(returning: rate > 0.0)
             }
         }
-        
+
         return isPlayingViaInfo
     }
 }

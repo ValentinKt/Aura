@@ -130,6 +130,33 @@ struct AuraShortcuts: AppShortcutsProvider {
 
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: LaunchAuraSceneIntent(),
+            phrases: [
+                "Launch a scene in \(.applicationName)",
+                "Start an Aura scene in \(.applicationName)"
+            ],
+            shortTitle: "Launch Scene",
+            systemImageName: "sparkles"
+        )
+        AppShortcut(
+            intent: ResumeAuraSceneIntent(),
+            phrases: [
+                "Resume my last scene in \(.applicationName)",
+                "Quick resume in \(.applicationName)"
+            ],
+            shortTitle: "Resume Scene",
+            systemImageName: "arrow.clockwise"
+        )
+        AppShortcut(
+            intent: StartAuraSleepTimerIntent(),
+            phrases: [
+                "Start an Aura sleep timer in \(.applicationName)",
+                "Set Aura timer in \(.applicationName)"
+            ],
+            shortTitle: "Sleep Timer",
+            systemImageName: "timer"
+        )
+        AppShortcut(
             intent: StartDeepFocusJourneyIntent(),
             phrases: [
                 "Start Deep Focus Journey in \(.applicationName)",
@@ -156,6 +183,59 @@ struct AuraShortcuts: AppShortcutsProvider {
             shortTitle: "Zen Breath Mode",
             systemImageName: "wind"
         )
+    }
+}
+
+struct AuraSceneNameOptionsProvider: DynamicOptionsProvider {
+    func results() async throws -> [String] {
+        await MainActor.run {
+            AppModel.shared.availableAutomationScenes().map(\.name)
+        }
+    }
+}
+
+struct LaunchAuraSceneIntent: AppIntent {
+    static let title: LocalizedStringResource = "Launch Aura Scene"
+    static let description = IntentDescription("Launches any Aura scene so it can be triggered from Shortcuts automations such as Focus, time, location, or calendar events.")
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Scene", optionsProvider: AuraSceneNameOptionsProvider())
+    var sceneName: String
+
+    @Parameter(title: "Immersive Mode", default: true)
+    var immersiveMode: Bool
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let mood = try await AppModel.shared.launchScene(named: sceneName, immersive: immersiveMode, resumePlayback: true)
+        return .result(dialog: "Aura launched \(mood.name).")
+    }
+}
+
+struct ResumeAuraSceneIntent: AppIntent {
+    static let title: LocalizedStringResource = "Resume Last Aura Scene"
+    static let description = IntentDescription("Restarts the most recent Aura scene for quick resume from Shortcuts or Focus automations.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let mood = try await AppModel.shared.resumeLastScene()
+        return .result(dialog: "Aura resumed \(mood.name).")
+    }
+}
+
+struct StartAuraSleepTimerIntent: AppIntent {
+    static let title: LocalizedStringResource = "Start Aura Sleep Timer"
+    static let description = IntentDescription("Starts or updates Aura's sleep timer so audio pauses automatically after the selected delay.")
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Minutes", default: 30)
+    var minutes: Int
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        AppModel.shared.startSleepTimer(minutes: minutes)
+        return .result(dialog: "Aura sleep timer set for \(minutes) minutes.")
     }
 }
 

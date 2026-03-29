@@ -12,6 +12,12 @@ final class AppModel {
         case zenBreathMode
     }
 
+    private enum StorageKey {
+        static let favoriteSceneIDs = "Aura.favoriteSceneIDs"
+        static let recentSceneIDs = "Aura.recentSceneIDs"
+        static let lastResumableSceneID = "Aura.lastResumableSceneID"
+    }
+
     static let shared = AppModel(persistence: PersistenceController.shared)
 
     let persistence: PersistenceController
@@ -34,8 +40,15 @@ final class AppModel {
     var showCommandPalette: Bool = false
     var isReady: Bool = false
     var isStarting: Bool = false
+    var favoriteSceneIDs: [String]
+    var recentSceneIDs: [String]
+    var lastResumableSceneID: String?
+    var sleepTimerEndDate: Date?
+    var sleepTimerTick: Date = .now
     private var cancellables = Set<AnyCancellable>()
     private let startupTimeout: Duration = .seconds(8)
+    private let recentSceneLimit = 6
+    private var sleepTimerTask: Task<Void, Never>?
 
     init(persistence: PersistenceController) {
         let themeManager = ThemeManager()
@@ -60,6 +73,9 @@ final class AppModel {
         self.presetEngine = presetEngine
         self.quoteEngine = quoteEngine
         self.smartDuckingService = smartDuckingService
+        self.favoriteSceneIDs = UserDefaults.standard.stringArray(forKey: StorageKey.favoriteSceneIDs) ?? []
+        self.recentSceneIDs = UserDefaults.standard.stringArray(forKey: StorageKey.recentSceneIDs) ?? []
+        self.lastResumableSceneID = UserDefaults.standard.string(forKey: StorageKey.lastResumableSceneID)
 
         let playerViewModel = PlayerViewModel(soundEngine: soundEngine, settingsEngine: settingsEngine, moodEngine: moodEngine)
         let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, quoteEngine: quoteEngine)
@@ -69,6 +85,9 @@ final class AppModel {
         self.settingsViewModel = SettingsViewModel(settingsEngine: settingsEngine)
         self.wallpaperEngine.setWebsiteWallpaperInteractive(self.settingsViewModel.settings.websiteWallpaperInteractive)
         self.smartDuckingService.isEnabled = self.settingsViewModel.settings.smartDuckingEnabled
+        self.moodViewModel.onMoodSelected = { [weak self] mood in
+            self?.recordSceneActivation(moodID: mood.id)
+        }
         Logger.app.info("🟢 [AppModel] Initialization started")
     }
 
@@ -102,6 +121,9 @@ final class AppModel {
         if settings.randomAmbienceInterval > 0 {
             soundEngine.startRandomization(interval: settings.randomAmbienceInterval, validRange: 0.1...0.9)
             Logger.app.info("🟢 [AppModel] Randomization started.")
+        }
+        if let currentMood = moodViewModel.currentMood {
+            recordSceneActivation(moodID: currentMood.id)
         }
         Logger.app.info("🟢 [AppModel] Start complete.")
     }
@@ -159,6 +181,139 @@ final class AppModel {
         moodViewModel.selectMood(mood)
     }
 
+    var favoriteScenes: [Mood] {
+        favoriteSceneIDs.compactMap(moodViewModel.mood(for:))
+    }
+
+    var recentScenes: [Mood] {
+        recentSceneIDs.compactMap(moodViewModel.mood(for:))
+    }
+
+    var lastResumableScene: Mood? {
+        guard let lastResumableSceneID else { return nil }
+        return moodViewModel.mood(for: lastResumableSceneID)
+    }
+
+    var currentSceneIsFavorite: Bool {
+        guard let currentMood = moodViewModel.currentMood else { return false }
+        return favoriteSceneIDs.contains(currentMood.id)
+    }
+
+    var sleepTimerRemainingDescription: String? {
+        guard let sleepTimerEndDate else { return nil }
+        let remaining = max(0, Int(sleepTimerEndDate.timeIntervalSince(sleepTimerTick)))
+        let minutes = remaining / 60
+        let seconds = remaining % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    func toggleFavoriteForCurrentScene() {
+        guard let currentMood = moodViewModel.currentMood else { return }
+        toggleFavoriteScene(currentMood.id)
+    }
+
+    func toggleFavoriteScene(_ moodID: String) {
+        if let index = favoriteSceneIDs.firstIndex(of: moodID) {
+            favoriteSceneIDs.remove(at: index)
+        } else {
+            favoriteSceneIDs.insert(moodID, at: 0)
+        }
+        favoriteSceneIDs = Array(favoriteSceneIDs.prefix(recentSceneLimit))
+        persistSceneState()
+    }
+
+    func launchScene(id moodID: String, immersive: Bool = true, resumePlayback: Bool = true) async throws -> Mood {
+        await startIfNeeded()
+
+        guard let mood = moodViewModel.mood(for: moodID) else {
+            throw ShortcutExecutionError.moodUnavailable
+        }
+
+        showImmersive = immersive
+        moodViewModel.selectedSubtheme = mood.subtheme
+        moodViewModel.selectMood(mood)
+
+        if resumePlayback, !playerViewModel.isPlaying {
+            soundEngine.resume()
+        }
+
+        return mood
+    }
+
+    func launchScene(named name: String, immersive: Bool = true, resumePlayback: Bool = true) async throws -> Mood {
+        await startIfNeeded()
+
+        guard let mood = moodViewModel.moods.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+            throw ShortcutExecutionError.moodUnavailable
+        }
+
+        return try await launchScene(id: mood.id, immersive: immersive, resumePlayback: resumePlayback)
+    }
+
+    func resumeLastScene() async throws -> Mood {
+        guard let lastResumableScene else {
+            throw ShortcutExecutionError.moodUnavailable
+        }
+
+        return try await launchScene(id: lastResumableScene.id, immersive: showImmersive, resumePlayback: true)
+    }
+
+    func startSleepTimer(minutes: Int) {
+        guard minutes > 0 else {
+            cancelSleepTimer()
+            return
+        }
+
+        sleepTimerTask?.cancel()
+        let endDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        sleepTimerEndDate = endDate
+        sleepTimerTick = .now
+
+        sleepTimerTask = Task { [weak self] in
+            guard let self else { return }
+
+            while !Task.isCancelled {
+                self.sleepTimerTick = .now
+
+                guard let activeEndDate = self.sleepTimerEndDate else {
+                    return
+                }
+
+                if activeEndDate.timeIntervalSinceNow <= 0 {
+                    self.pauseForSleepTimer()
+                    self.sleepTimerEndDate = nil
+                    self.sleepTimerTick = .now
+                    return
+                }
+
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+    }
+
+    func cancelSleepTimer() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        sleepTimerEndDate = nil
+        sleepTimerTick = .now
+    }
+
+    func availableAutomationScenes() -> [Mood] {
+        moodViewModel.moods.sorted {
+            if $0.subtheme == $1.subtheme {
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            return $0.subtheme.localizedCaseInsensitiveCompare($1.subtheme) == .orderedAscending
+        }
+    }
+
+    func automationSceneName(for sceneID: String) -> String {
+        guard let mood = moodViewModel.mood(for: sceneID) else {
+            return sceneID
+        }
+        return "\(mood.name) · \(mood.subtheme)"
+    }
+
     func toggleWeatherSync(_ enabled: Bool) {
         settingsViewModel.toggleWeatherSync(enabled)
         if enabled {
@@ -176,6 +331,27 @@ final class AppModel {
     func setSmartDuckingEnabled(_ enabled: Bool) {
         settingsViewModel.updateSmartDuckingEnabled(enabled)
         smartDuckingService.isEnabled = enabled
+    }
+
+    private func recordSceneActivation(moodID: String) {
+        recentSceneIDs.removeAll { $0 == moodID }
+        recentSceneIDs.insert(moodID, at: 0)
+        recentSceneIDs = Array(recentSceneIDs.prefix(recentSceneLimit))
+        lastResumableSceneID = moodID
+        persistSceneState()
+    }
+
+    private func persistSceneState() {
+        let defaults = UserDefaults.standard
+        defaults.set(favoriteSceneIDs, forKey: StorageKey.favoriteSceneIDs)
+        defaults.set(recentSceneIDs, forKey: StorageKey.recentSceneIDs)
+        defaults.set(lastResumableSceneID, forKey: StorageKey.lastResumableSceneID)
+    }
+
+    private func pauseForSleepTimer() {
+        if playerViewModel.isPlaying {
+            soundEngine.pause()
+        }
     }
 }
 

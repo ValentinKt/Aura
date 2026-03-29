@@ -18,6 +18,7 @@ final class MoodViewModel {
     private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Zen"]
     private static let miscellaneousSubthemes: Set<String> = ["Website"]
     private static let pinnedDynamicSubthemes: Set<String> = ["Image Playground"]
+    var onMoodSelected: ((Mood) -> Void)?
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
         uniqueKeysWithValues: MoodEngine.builtInMoods()
@@ -46,6 +47,7 @@ final class MoodViewModel {
     }
 
     func selectMood(_ mood: Mood) {
+        onMoodSelected?(mood)
         Task {
             await moodEngine.applyMood(mood)
         }

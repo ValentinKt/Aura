@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import CoreImage
 import Observation
 import SwiftUI
 import WebKit
@@ -17,6 +18,7 @@ final class WallpaperEngine {
     private let themeManager: ThemeManager
     private let wallpaperDirectory: URL
     private let renderQueue = DispatchQueue(label: "com.Aura.wallpaper.render", qos: .userInitiated)
+    private let imageProcessingContext = CIContext()
     private var isRendering = false
     private var isPresentationSuppressed = false
     private let wallpaperWindowController = WallpaperWindowController()
@@ -131,7 +133,8 @@ final class WallpaperEngine {
         }
 
         if let resolvedURL = resolveResourceURL(resource) {
-            return await applyImageURLsAsync([resolvedURL])
+            let secondaryURL = await renderSecondaryWallpaperVariantURL(from: resolvedURL)
+            return await applyScreenWallpaperURLsAsync(primaryURL: resolvedURL, secondaryURL: secondaryURL)
         }
 
         print("🟥 [WallpaperEngine] Error: Could not find wallpaper resource: \(resource)")
@@ -153,8 +156,9 @@ final class WallpaperEngine {
 
     private func applyGradientAsync(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         if let image = await renderGradientImageAsync(stops: descriptor.gradientStops),
-           let url = await writeImageAsync(image) {
-            return applyImageURLs([url])
+           let secondaryImage = await renderGradientImageAsync(stops: subduedGradientStops(from: descriptor.gradientStops)),
+           let urls = await writeWallpaperImagesAsync([image, secondaryImage]) {
+            return await applyScreenWallpaperURLsAsync(primaryURL: urls[0], secondaryURL: urls[1])
         }
         return WallpaperApplyResult(success: false, permissionDenied: false)
     }
@@ -166,11 +170,19 @@ final class WallpaperEngine {
 
             let ext = resolvedURL.pathExtension.lowercased()
             if ["mp4", "mov"].contains(ext) {
+                Task {
+                    await self.applyOverlayBackdrops(primaryResourceURL: resolvedURL)
+                }
                 startVideoAnimated(resourceURL: resolvedURL, fps: fps)
                 return
             } else if ["jpg", "jpeg", "png", "heic"].contains(ext) {
                 // If it resolved to an image (e.g., fallback), apply it statically
-                _ = applyImageURLs([resolvedURL])
+                Task {
+                    _ = await self.applyScreenWallpaperURLsAsync(
+                        primaryURL: resolvedURL,
+                        secondaryURL: await self.renderSecondaryWallpaperVariantURL(from: resolvedURL)
+                    )
+                }
                 return
             }
         }
@@ -250,6 +262,9 @@ final class WallpaperEngine {
     }
 
     private func startTime(_ descriptor: WallpaperDescriptor) {
+        Task {
+            await applyOverlayBackdrops()
+        }
         let style = descriptor.resources.first ?? "minimal"
         let palette = themeManager.palette
         let timeView = TimeWallpaperView(style: style, palette: palette, selectedWallpaperURL: backgroundImageURL)
@@ -257,6 +272,9 @@ final class WallpaperEngine {
     }
 
     private func startQuote(_ descriptor: WallpaperDescriptor) {
+        Task {
+            await applyOverlayBackdrops()
+        }
         let style = descriptor.resources.first ?? "motivational"
         let palette = themeManager.palette
         let quoteID = descriptor.resources.count > 1 ? UUID(uuidString: descriptor.resources[1]) : nil
@@ -265,6 +283,9 @@ final class WallpaperEngine {
     }
 
     private func startZen(_ descriptor: WallpaperDescriptor) {
+        Task {
+            await applyOverlayBackdrops()
+        }
         let style = descriptor.resources.first ?? "breathing"
         let palette = themeManager.palette
         let zenView = ZenWallpaperView(style: style, palette: palette, selectedWallpaperURL: backgroundImageURL)
@@ -274,6 +295,9 @@ final class WallpaperEngine {
     private func startWebsite(_ descriptor: WallpaperDescriptor) {
         guard let urlString = descriptor.resources.first,
               let url = resolvedWebsiteURL(from: urlString) else { return }
+        Task {
+            await applyOverlayBackdrops()
+        }
         wallpaperWindowController.showWebsite(url: url)
     }
 
@@ -326,6 +350,43 @@ final class WallpaperEngine {
                 }
             }
         }
+        return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
+    }
+
+    @MainActor
+    private func applyScreenWallpaperURLsAsync(primaryURL: URL, secondaryURL: URL?) async -> WallpaperApplyResult {
+        var permissionDenied = false
+        var applied = false
+        let screens = NSScreen.screens
+
+        if screens.isEmpty {
+            return WallpaperApplyResult(
+                success: FileManager.default.fileExists(atPath: primaryURL.path),
+                permissionDenied: false
+            )
+        }
+
+        let primaryScreenID = primaryScreenIdentifier(from: screens)
+
+        for screen in screens {
+            let targetURL: URL
+            if screen.localizedName == primaryScreenID {
+                targetURL = primaryURL
+            } else {
+                targetURL = secondaryURL ?? primaryURL
+            }
+
+            do {
+                try NSWorkspace.shared.setDesktopImageURL(targetURL, for: screen, options: [:])
+                applied = true
+            } catch let error as NSError {
+                print("🟥 [WallpaperEngine] Error setting desktop image URL: \(error.localizedDescription)")
+                if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
+                    permissionDenied = true
+                }
+            }
+        }
+
         return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
     }
 
@@ -389,6 +450,28 @@ final class WallpaperEngine {
                 }
             }
         }
+    }
+
+    private func subduedGradientStops(from stops: [ColorComponents]) -> [ColorComponents] {
+        guard !stops.isEmpty else {
+            let palette = themeManager.palette
+            return [
+                palette.primary,
+                palette.secondary
+            ].map(subduedColor(_:))
+        }
+
+        return stops.map(subduedColor(_:))
+    }
+
+    private func subduedColor(_ color: ColorComponents) -> ColorComponents {
+        let luminance = (color.red * 0.299) + (color.green * 0.587) + (color.blue * 0.114)
+        return ColorComponents(
+            red: max(0, min(1, (luminance * 0.78) + 0.06)),
+            green: max(0, min(1, (luminance * 0.80) + 0.07)),
+            blue: max(0, min(1, (luminance * 0.84) + 0.08)),
+            alpha: color.alpha
+        )
     }
 
     private func renderParticleImageAsync(seed: Int) async -> NSImage? {
@@ -464,11 +547,168 @@ final class WallpaperEngine {
         }
     }
 
+    private func writeWallpaperImagesAsync(_ images: [NSImage]) async -> [URL]? {
+        await withCheckedContinuation { continuation in
+            renderQueue.async {
+                var urls: [URL] = []
+
+                for image in images {
+                    guard let tiff = image.tiffRepresentation,
+                          let bitmap = NSBitmapImageRep(data: tiff),
+                          let jpeg = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+
+                    let url = self.wallpaperDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+
+                    do {
+                        try jpeg.write(to: url, options: [.atomic])
+                        urls.append(url)
+                    } catch {
+                        print("🟥 [WallpaperEngine] Error writing image: \(error.localizedDescription)")
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                }
+
+                DispatchQueue.main.async {
+                    self.cleanupOldWallpapers(except: Set(urls))
+                }
+                continuation.resume(returning: urls)
+            }
+        }
+    }
+
     private func cleanupOldWallpapers(except currentURL: URL) {
+        cleanupOldWallpapers(except: [currentURL])
+    }
+
+    private func cleanupOldWallpapers(except currentURLs: Set<URL>) {
         let urls = (try? fileManager.contentsOfDirectory(at: wallpaperDirectory, includingPropertiesForKeys: nil)) ?? []
-        for url in urls where url != currentURL {
+        for url in urls where !currentURLs.contains(url) {
             try? fileManager.removeItem(at: url)
         }
+    }
+
+    private func primaryScreenIdentifier(from screens: [NSScreen]) -> String {
+        if let mainScreen = NSScreen.main,
+           screens.contains(where: { $0.localizedName == mainScreen.localizedName }) {
+            return mainScreen.localizedName
+        }
+        return screens.first?.localizedName ?? ""
+    }
+
+    private func applyOverlayBackdrops(primaryResourceURL: URL? = nil) async {
+        let primaryURL: URL?
+
+        if let primaryResourceURL {
+            primaryURL = await preparedBackdropURL(from: primaryResourceURL)
+        } else if let backgroundImageURL {
+            primaryURL = await preparedBackdropURL(from: backgroundImageURL)
+        } else if let selectedWallpaperURL {
+            primaryURL = await preparedBackdropURL(from: selectedWallpaperURL)
+        } else {
+            primaryURL = await renderPaletteBackdropURL(secondary: false)
+        }
+
+        guard let primaryURL else { return }
+        let secondaryURL = await renderSecondaryWallpaperVariantURL(from: primaryURL)
+        let fallbackSecondaryURL = await renderPaletteBackdropURL(secondary: true)
+        _ = await applyScreenWallpaperURLsAsync(
+            primaryURL: primaryURL,
+            secondaryURL: secondaryURL ?? fallbackSecondaryURL
+        )
+    }
+
+    private func preparedBackdropURL(from url: URL) async -> URL? {
+        let ext = url.pathExtension.lowercased()
+
+        if ["mp4", "mov"].contains(ext) {
+            return await renderVideoPosterURL(from: url)
+        }
+
+        return url
+    }
+
+    private func renderSecondaryWallpaperVariantURL(from url: URL) async -> URL? {
+        let baseURL = await preparedBackdropURL(from: url) ?? url
+
+        return await Task.detached(priority: .userInitiated) { [wallpaperDirectory, imageProcessingContext] in
+            guard let imageSource = CIImage(contentsOf: baseURL) else {
+                return nil
+            }
+
+            let adjusted = imageSource
+                .applyingFilter("CIColorControls", parameters: [
+                    kCIInputSaturationKey: 0.45,
+                    kCIInputBrightnessKey: -0.03,
+                    kCIInputContrastKey: 0.88
+                ])
+                .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 1.8])
+                .cropped(to: imageSource.extent)
+
+            let overlay = CIImage(color: CIColor(red: 0.04, green: 0.05, blue: 0.06, alpha: 0.24))
+                .cropped(to: adjusted.extent)
+            let composited = overlay.composited(over: adjusted).cropped(to: adjusted.extent)
+
+            guard let cgImage = imageProcessingContext.createCGImage(composited, from: composited.extent) else {
+                return nil
+            }
+
+            let image = NSImage(cgImage: cgImage, size: NSSize(width: composited.extent.width, height: composited.extent.height))
+            guard let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let jpeg = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.74]) else {
+                return nil
+            }
+
+            let outputURL = wallpaperDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+            do {
+                try jpeg.write(to: outputURL, options: [.atomic])
+                return outputURL
+            } catch {
+                return nil
+            }
+        }.value
+    }
+
+    private func renderPaletteBackdropURL(secondary: Bool) async -> URL? {
+        let palette = themeManager.palette
+        let stops = secondary
+            ? subduedGradientStops(from: [palette.primary, palette.secondary, palette.accent])
+            : [palette.primary, palette.secondary, palette.accent]
+
+        guard let image = await renderGradientImageAsync(stops: stops) else {
+            return nil
+        }
+
+        return await writeImageAsync(image)
+    }
+
+    private func renderVideoPosterURL(from url: URL) async -> URL? {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+
+        let image: NSImage? = await withCheckedContinuation { continuation in
+            generator.generateCGImageAsynchronously(for: .zero) { cgImage, _, error in
+                guard error == nil, let cgImage else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                continuation.resume(
+                    returning: NSImage(
+                        cgImage: cgImage,
+                        size: NSSize(width: cgImage.width, height: cgImage.height)
+                    )
+                )
+            }
+        }
+
+        guard let image else { return nil }
+        return await writeImageAsync(image)
     }
 
     private func stopAnimation() {
