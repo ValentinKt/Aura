@@ -58,6 +58,21 @@ struct SettingsView: View {
                             }
                         }
                         .toggleStyle(.switch)
+                        Divider()
+
+                        Toggle(isOn: Binding(
+                            get: { appModel.settingsViewModel.settings.smartDuckingEnabled },
+                            set: { appModel.setSmartDuckingEnabled($0) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Auto-Pause & Smart Ducking")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("Automatically fade out volume when you are on a call or playing media, and fade it back in afterwards.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .toggleStyle(.switch)
                     }
                 }
 

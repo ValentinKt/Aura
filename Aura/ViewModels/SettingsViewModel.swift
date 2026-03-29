@@ -36,4 +36,9 @@ final class SettingsViewModel {
         settings.websiteWallpaperInteractive = enabled
         settingsEngine.updateWebsiteWallpaperInteractive(enabled)
     }
+
+    func updateSmartDuckingEnabled(_ enabled: Bool) {
+        settings.smartDuckingEnabled = enabled
+        settingsEngine.updateSmartDuckingEnabled(enabled)
+    }
 }

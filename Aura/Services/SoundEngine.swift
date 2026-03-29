@@ -41,7 +41,49 @@ final class SoundEngine {
     var volumes: [String: Float] = [:]
     var masterVolume: Float = 0.6 {
         didSet {
-            engine.mainMixerNode.outputVolume = masterVolume
+            updateOutputVolume()
+        }
+    }
+    
+    private var duckingMultiplier: Float = 1.0 {
+        didSet {
+            updateOutputVolume()
+        }
+    }
+    
+    private var duckingTask: Task<Void, Never>?
+
+    func updateOutputVolume() {
+        engine.mainMixerNode.outputVolume = masterVolume * duckingMultiplier
+    }
+
+    func fadeDucking(to target: Float, duration: TimeInterval) {
+        duckingTask?.cancel()
+        let safeDuration = max(0.1, duration)
+        let steps = max(8, min(30, Int(safeDuration * 15)))
+        let interval = safeDuration / Double(steps)
+        let start = duckingMultiplier
+        
+        guard abs(start - target) > 0.01 else {
+            duckingMultiplier = target
+            return
+        }
+        
+        duckingTask = Task { [weak self] in
+            for step in 1...steps {
+                if Task.isCancelled { return }
+                let progress = Float(step) / Float(steps)
+                let value = start + (target - start) * progress
+                await MainActor.run {
+                    self?.duckingMultiplier = value
+                }
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+            }
+            if !Task.isCancelled {
+                await MainActor.run {
+                    self?.duckingMultiplier = target
+                }
+            }
         }
     }
 

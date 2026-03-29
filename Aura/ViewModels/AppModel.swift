@@ -24,6 +24,7 @@ final class AppModel {
     let weatherEngine: WeatherEngine
     let presetEngine: PresetEngine
     let quoteEngine: QuoteEngine
+    let smartDuckingService: SmartDuckingService
 
     var moodViewModel: MoodViewModel
     var playerViewModel: PlayerViewModel
@@ -46,6 +47,7 @@ final class AppModel {
         let weatherEngine = WeatherEngine(moodEngine: moodEngine, settingsEngine: settingsEngine)
         let presetEngine = PresetEngine(persistence: persistence)
         let quoteEngine = QuoteEngine(persistence: persistence)
+        let smartDuckingService = SmartDuckingService(soundEngine: soundEngine)
 
         self.persistence = persistence
         self.themeManager = themeManager
@@ -57,6 +59,7 @@ final class AppModel {
         self.weatherEngine = weatherEngine
         self.presetEngine = presetEngine
         self.quoteEngine = quoteEngine
+        self.smartDuckingService = smartDuckingService
 
         let playerViewModel = PlayerViewModel(soundEngine: soundEngine, settingsEngine: settingsEngine, moodEngine: moodEngine)
         let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, quoteEngine: quoteEngine)
@@ -65,6 +68,7 @@ final class AppModel {
         self.playlistViewModel = PlaylistViewModel(playlistEngine: playlistEngine)
         self.settingsViewModel = SettingsViewModel(settingsEngine: settingsEngine)
         self.wallpaperEngine.setWebsiteWallpaperInteractive(self.settingsViewModel.settings.websiteWallpaperInteractive)
+        self.smartDuckingService.isEnabled = self.settingsViewModel.settings.smartDuckingEnabled
         Logger.app.info("🟢 [AppModel] Initialization started")
     }
 
@@ -167,6 +171,11 @@ final class AppModel {
     func setWebsiteWallpaperInteractive(_ enabled: Bool) {
         settingsViewModel.updateWebsiteWallpaperInteractive(enabled)
         wallpaperEngine.setWebsiteWallpaperInteractive(enabled)
+    }
+
+    func setSmartDuckingEnabled(_ enabled: Bool) {
+        settingsViewModel.updateSmartDuckingEnabled(enabled)
+        smartDuckingService.isEnabled = enabled
     }
 }
 

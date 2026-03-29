@@ -56,23 +56,42 @@ enum CustomAssetManager {
         return destination.path
     }
 
-    static func saveCustomWallpaper(from image: NSImage, preferredFileExtension: String = "png") throws -> String {
-        guard let tiffRepresentation = image.tiffRepresentation,
+    static func saveCustomWallpaper(from image: NSImage, preferredFileExtension: String = "jpg") throws -> String {
+        let maxDimension: CGFloat = 3840.0
+        var finalImage = image
+        
+        let size = image.size
+        if size.width > maxDimension || size.height > maxDimension {
+            let ratio = min(maxDimension / size.width, maxDimension / size.height)
+            let newSize = NSSize(width: round(size.width * ratio), height: round(size.height * ratio))
+            
+            let newImage = NSImage(size: newSize)
+            newImage.lockFocus()
+            NSGraphicsContext.current?.imageInterpolation = .high
+            image.draw(in: NSRect(origin: .zero, size: newSize), from: NSRect(origin: .zero, size: size), operation: .copy, fraction: 1.0)
+            newImage.unlockFocus()
+            finalImage = newImage
+        }
+
+        guard let tiffRepresentation = finalImage.tiffRepresentation,
               let bitmapRepresentation = NSBitmapImageRep(data: tiffRepresentation) else {
             throw CocoaError(.fileWriteUnknown)
         }
 
         let normalizedExtension = preferredFileExtension.lowercased()
         let imageFileType: NSBitmapImageRep.FileType
+        let properties: [NSBitmapImageRep.PropertyKey: Any]
 
         switch normalizedExtension {
         case "jpg", "jpeg":
             imageFileType = .jpeg
+            properties = [.compressionFactor: 0.8]
         default:
             imageFileType = .png
+            properties = [:]
         }
 
-        guard let imageData = bitmapRepresentation.representation(using: imageFileType, properties: [:]) else {
+        guard let imageData = bitmapRepresentation.representation(using: imageFileType, properties: properties) else {
             throw CocoaError(.fileWriteUnknown)
         }
 

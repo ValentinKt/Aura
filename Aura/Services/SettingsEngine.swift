@@ -10,8 +10,9 @@ struct UserSettings: Codable, Hashable {
     var keepCurrentWallpaper: Bool
     var websiteWallpaperInteractive: Bool
     var masterVolume: Float
+    var smartDuckingEnabled: Bool
 
-    init(weatherSyncEnabled: Bool = false, defaultMoodID: String = "mountain_stream", transitionDuration: Double = 2.5, randomAmbienceInterval: Double = 300, lastUsedMoodID: String? = nil, keepCurrentWallpaper: Bool = false, websiteWallpaperInteractive: Bool = true, masterVolume: Float = 0.6) {
+    init(weatherSyncEnabled: Bool = false, defaultMoodID: String = "mountain_stream", transitionDuration: Double = 2.5, randomAmbienceInterval: Double = 300, lastUsedMoodID: String? = nil, keepCurrentWallpaper: Bool = false, websiteWallpaperInteractive: Bool = true, masterVolume: Float = 0.6, smartDuckingEnabled: Bool = true) {
         self.weatherSyncEnabled = weatherSyncEnabled
         self.defaultMoodID = defaultMoodID
         self.transitionDuration = transitionDuration
@@ -20,6 +21,7 @@ struct UserSettings: Codable, Hashable {
         self.keepCurrentWallpaper = keepCurrentWallpaper
         self.websiteWallpaperInteractive = websiteWallpaperInteractive
         self.masterVolume = masterVolume
+        self.smartDuckingEnabled = smartDuckingEnabled
     }
 }
 
@@ -44,7 +46,8 @@ final class SettingsEngine {
                 lastUsedMoodID: entity.value(forKey: "lastUsedMoodID") as? String,
                 keepCurrentWallpaper: entity.value(forKey: "keepCurrentWallpaper") as? Bool ?? false,
                 websiteWallpaperInteractive: entity.value(forKey: "websiteWallpaperInteractive") as? Bool ?? true,
-                masterVolume: entity.value(forKey: "masterVolume") as? Float ?? 0.6
+                masterVolume: entity.value(forKey: "masterVolume") as? Float ?? 0.6,
+                smartDuckingEnabled: entity.value(forKey: "smartDuckingEnabled") as? Bool ?? true
             )
 
             if UserDefaults.standard.bool(forKey: websiteInteractionMigrationKey) == false {
@@ -74,6 +77,7 @@ final class SettingsEngine {
         entity.setValue(settings.keepCurrentWallpaper, forKey: "keepCurrentWallpaper")
         entity.setValue(settings.websiteWallpaperInteractive, forKey: "websiteWallpaperInteractive")
         entity.setValue(settings.masterVolume, forKey: "masterVolume")
+        entity.setValue(settings.smartDuckingEnabled, forKey: "smartDuckingEnabled")
         persistence.saveContext()
     }
 
@@ -116,6 +120,12 @@ final class SettingsEngine {
     func updateWebsiteWallpaperInteractive(_ enabled: Bool) {
         var settings = loadSettings()
         settings.websiteWallpaperInteractive = enabled
+        saveSettings(settings)
+    }
+
+    func updateSmartDuckingEnabled(_ enabled: Bool) {
+        var settings = loadSettings()
+        settings.smartDuckingEnabled = enabled
         saveSettings(settings)
     }
 

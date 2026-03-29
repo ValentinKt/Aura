@@ -427,7 +427,7 @@ struct CreateMoodView: View {
 
         let upscaler = try ImageUpscaler()
         let upscaledImage = try await upscaler.upscale(image)
-        return try CustomAssetManager.saveCustomWallpaper(from: upscaledImage, preferredFileExtension: "png")
+        return try CustomAssetManager.saveCustomWallpaper(from: upscaledImage, preferredFileExtension: "jpg")
     }
 
 }
