@@ -119,6 +119,7 @@ struct TahoeMenuBarPopoverView: View {
 
             footerSection
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -294,9 +295,7 @@ struct TahoeMenuBarPopoverView: View {
     }
 
     private func subthemeGrid(for section: MoodSubthemeSection) -> some View {
-        let columns = [GridItem(.adaptive(minimum: 76), spacing: 10)]
-
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+        TahoeWrappingLayout(spacing: 10, rowSpacing: 10) {
             ForEach(section.subthemes, id: \.self) { subtheme in
                 let isSelected = selectedSubtheme.caseInsensitiveCompare(subtheme) == .orderedSame
 
@@ -311,8 +310,7 @@ struct TahoeMenuBarPopoverView: View {
                         .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
                         .foregroundStyle(primaryForegroundStyle)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
+                        .fixedSize()
                         .padding(.horizontal, 14)
                         .frame(height: 38)
                         .contentShape(Capsule())
@@ -328,6 +326,7 @@ struct TahoeMenuBarPopoverView: View {
                 )
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var moodCarouselSection: some View {
@@ -837,6 +836,92 @@ private struct TahoeMoodCarouselCard: View {
         }
 
         image = loaded
+    }
+}
+
+private struct TahoeWrappingLayout: Layout {
+    let spacing: CGFloat
+    let rowSpacing: CGFloat
+
+    init(spacing: CGFloat = 10, rowSpacing: CGFloat = 10) {
+        self.spacing = spacing
+        self.rowSpacing = rowSpacing
+    }
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let rows = makeRows(maxWidth: proposal.width, subviews: subviews)
+        let width = rows.map(\.width).max() ?? 0
+        let height = rows.enumerated().reduce(CGFloat.zero) { partialResult, entry in
+            let (index, row) = entry
+            return partialResult + row.height + (index == rows.indices.last ? 0 : rowSpacing)
+        }
+
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let rows = makeRows(maxWidth: bounds.width, subviews: subviews)
+        var y = bounds.minY
+
+        for row in rows {
+            var x = bounds.minX
+
+            for element in row.elements {
+                subviews[element.index].place(
+                    at: CGPoint(x: x, y: y),
+                    proposal: ProposedViewSize(width: element.size.width, height: element.size.height)
+                )
+                x += element.size.width + spacing
+            }
+
+            y += row.height + rowSpacing
+        }
+    }
+
+    private func makeRows(maxWidth: CGFloat?, subviews: Subviews) -> [Row] {
+        let availableWidth = maxWidth ?? .greatestFiniteMagnitude
+        var rows: [Row] = []
+        var currentRow = Row()
+
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let nextWidth = currentRow.elements.isEmpty ? size.width : currentRow.width + spacing + size.width
+
+            if nextWidth > availableWidth, !currentRow.elements.isEmpty {
+                rows.append(currentRow)
+                currentRow = Row()
+            }
+
+            currentRow.elements.append(Row.Element(index: index, size: size))
+            currentRow.width = currentRow.elements.count == 1 ? size.width : currentRow.width + spacing + size.width
+            currentRow.height = max(currentRow.height, size.height)
+        }
+
+        if !currentRow.elements.isEmpty {
+            rows.append(currentRow)
+        }
+
+        return rows
+    }
+
+    private struct Row {
+        var elements: [Element] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+
+        struct Element {
+            let index: Int
+            let size: CGSize
+        }
     }
 }
 
