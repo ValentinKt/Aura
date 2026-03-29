@@ -294,7 +294,7 @@ struct TahoeMenuBarPopoverView: View {
     }
 
     private func subthemeGrid(for section: MoodSubthemeSection) -> some View {
-        let columns = [GridItem(.adaptive(minimum: 96), spacing: 10)]
+        let columns = [GridItem(.adaptive(minimum: 76), spacing: 10)]
 
         return LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
             ForEach(section.subthemes, id: \.self) { subtheme in
@@ -318,35 +318,20 @@ struct TahoeMenuBarPopoverView: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .background(isSelected ? Color.white.opacity(0.14) : Color.white.opacity(0.03), in: Capsule())
+                .tahoeGlassID("subtheme-\(subtheme)", in: glassNamespace)
+                .tahoeGlass(
+                    Capsule(),
+                    interactive: true,
+                    tint: isSelected ? .white.opacity(0.14) : .white.opacity(0.03),
+                    strokeOpacity: isSelected ? 0.42 : 0.30,
+                    shadowOpacity: isSelected ? 0.16 : 0.08
+                )
             }
         }
     }
 
     private var moodCarouselSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(selectedSubtheme.isEmpty ? "Moods" : selectedSubtheme)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(primaryForegroundStyle)
-
-                    Text("\(currentSubthemeMoods.count) available")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(secondaryForegroundStyle)
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "circle.grid.2x2.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(primaryForegroundStyle)
-                    .frame(width: 36, height: 36)
-                    .background(accentColor.opacity(0.18), in: Circle())
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(currentSubthemeMoods, id: \.id) { mood in
@@ -393,7 +378,6 @@ struct TahoeMenuBarPopoverView: View {
                     .contentShape(controlShape)
             }
             .buttonStyle(.plain)
-            .background(accentColor.opacity(0.18), in: controlShape)
 
             Button {
                 appModel.showCommandPalette.toggle()
@@ -407,7 +391,6 @@ struct TahoeMenuBarPopoverView: View {
             }
             .buttonStyle(.plain)
             .help("Search")
-            .background(Color.white.opacity(0.05), in: controlShape)
 
             Button {
                 NSApp.terminate(nil)
@@ -420,7 +403,6 @@ struct TahoeMenuBarPopoverView: View {
             }
             .buttonStyle(.plain)
             .help("Quit Aura")
-            .background(Color.white.opacity(0.05), in: controlShape)
         }
     }
 
