@@ -22,7 +22,10 @@ final class SmartDuckingService {
     
     // MediaRemote dynamically loaded
     private typealias MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
+    private typealias MRMediaRemoteGetNowPlayingInfoFunction = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
+    
     private var MRMediaRemoteGetNowPlayingApplicationIsPlaying: MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction?
+    private var MRMediaRemoteGetNowPlayingInfo: MRMediaRemoteGetNowPlayingInfoFunction?
     
     init(soundEngine: SoundEngine) {
         self.soundEngine = soundEngine
@@ -34,12 +37,19 @@ final class SmartDuckingService {
         let bundlePath = "/System/Library/PrivateFrameworks/MediaRemote.framework"
         guard let bundle = CFBundleCreate(kCFAllocatorDefault, URL(fileURLWithPath: bundlePath) as CFURL) else { return }
         
-        guard let pointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) else { return }
+        if let pointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) {
+            MRMediaRemoteGetNowPlayingApplicationIsPlaying = unsafeBitCast(
+                pointer,
+                to: MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction.self
+            )
+        }
         
-        MRMediaRemoteGetNowPlayingApplicationIsPlaying = unsafeBitCast(
-            pointer,
-            to: MRMediaRemoteGetNowPlayingApplicationIsPlayingFunction.self
-        )
+        if let infoPointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingInfo" as CFString) {
+            MRMediaRemoteGetNowPlayingInfo = unsafeBitCast(
+                infoPointer,
+                to: MRMediaRemoteGetNowPlayingInfoFunction.self
+            )
+        }
     }
     
     func startMonitoring() {
@@ -142,11 +152,36 @@ final class SmartDuckingService {
     }
     
     private func isMediaPlaying() async -> Bool {
-        guard let checkMedia = MRMediaRemoteGetNowPlayingApplicationIsPlaying else { return false }
-        return await withCheckedContinuation { continuation in
+        let isPlayingViaApp = await withCheckedContinuation { continuation in
+            guard let checkMedia = MRMediaRemoteGetNowPlayingApplicationIsPlaying else {
+                continuation.resume(returning: false)
+                return
+            }
             checkMedia(DispatchQueue.global(qos: .background)) { isPlaying in
                 continuation.resume(returning: isPlaying)
             }
         }
+        
+        if isPlayingViaApp { return true }
+        
+        let isPlayingViaInfo = await withCheckedContinuation { continuation in
+            guard let getInfo = MRMediaRemoteGetNowPlayingInfo else {
+                continuation.resume(returning: false)
+                return
+            }
+            getInfo(DispatchQueue.global(qos: .background)) { info in
+                var rate: Double = 0.0
+                if let info = info {
+                    if let r = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double {
+                        rate = r
+                    } else if let r = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? NSNumber {
+                        rate = r.doubleValue
+                    }
+                }
+                continuation.resume(returning: rate > 0.0)
+            }
+        }
+        
+        return isPlayingViaInfo
     }
 }
