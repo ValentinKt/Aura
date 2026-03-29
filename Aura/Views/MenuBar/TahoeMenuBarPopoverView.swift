@@ -1,0 +1,1082 @@
+import AppKit
+import SwiftUI
+
+struct TahoeMenuBarPopoverView: View {
+    @Bindable var appModel: AppModel
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.openWindow) private var openWindow
+    @Namespace private var glassNamespace
+
+    @State private var isShowingCreateMood = false
+    @State private var selectedSubtheme: String = ""
+    @State private var expandedSections: Set<String> = []
+    @State private var backgroundImage: NSImage?
+    @State private var backgroundVideoURL: URL?
+
+    private let panelWidth: CGFloat = 392
+    private let panelHeight: CGFloat = 744
+    private let panelShape = RoundedRectangle(cornerRadius: 30, style: .continuous)
+    private let sectionShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+    private let controlShape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+    private let pillShape = Capsule()
+
+    var body: some View {
+        panelContainer
+            .sheet(isPresented: $isShowingCreateMood) {
+                CreateMoodView(
+                    appModel: appModel,
+                    defaultTheme: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Dynamic" : "Custom",
+                    defaultSubtheme: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Personal",
+                    initialWallpaperSource: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .importedMedia
+                )
+            }
+            .environment(\.colorScheme, .dark)
+            .task(id: appModel.moodViewModel.currentMood?.id) {
+                syncSelectionFromCurrentMood()
+                await loadBackgroundMedia()
+            }
+            .onChange(of: appModel.moodViewModel.selectedSubtheme) { _, newValue in
+                guard let newValue, !newValue.isEmpty else { return }
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                    selectedSubtheme = newValue
+                    expandSectionIfNeeded(for: newValue)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ReopenMainWindow"))) { _ in
+                revealMainWindow()
+            }
+    }
+
+    private var panelContainer: some View {
+        panelContent
+            .frame(width: panelWidth, height: panelHeight)
+            .background { panelBackground }
+            .clipShape(panelShape)
+            .overlay { panelBorder }
+            .shadow(color: .black.opacity(0.28), radius: 28, y: 18)
+    }
+
+    private var panelContent: some View {
+        ZStack {
+            panelBackdrop
+
+            ScrollView(showsIndicators: false) {
+                glassRoot
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    @ViewBuilder
+    private var panelBackground: some View {
+        if reduceTransparency {
+            panelShape.fill(.regularMaterial)
+        } else if #available(macOS 26.0, *) {
+            Color.clear
+                .glassEffect(.clear, in: panelShape)
+        } else {
+            panelShape.fill(.regularMaterial)
+        }
+    }
+
+    private var panelBorder: some View {
+        panelShape
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        .white.opacity(reduceTransparency ? 0.18 : 0.34),
+                        .white.opacity(reduceTransparency ? 0.08 : 0.12)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+    }
+
+    @ViewBuilder
+    private var glassRoot: some View {
+        if #available(macOS 26.0, *) {
+            SwiftUI.GlassEffectContainer(spacing: 16) {
+                contentStack
+            }
+        } else {
+            contentStack
+        }
+    }
+
+    private var contentStack: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            utilitySection
+            heroSection
+            volumeSection
+            themesHeader
+            subthemeSections
+
+            if !currentSubthemeMoods.isEmpty {
+                moodCarouselSection
+            }
+
+            footerSection
+        }
+    }
+
+    @ViewBuilder
+    private var panelBackdrop: some View {
+        if reduceTransparency {
+            Color(NSColor.windowBackgroundColor)
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.12, green: 0.20, blue: 0.15),
+                        Color(red: 0.05, green: 0.08, blue: 0.07)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                if let videoURL = backgroundVideoURL {
+                    VideoBackgroundView(url: videoURL)
+                        .aspectRatio(contentMode: .fill)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.35)))
+                } else if let backgroundImage {
+                    Image(nsImage: backgroundImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .saturation(1.05)
+                        .brightness(-0.02)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.35)))
+                }
+
+                LinearGradient(
+                    colors: [
+                        .black.opacity(0.10),
+                        .black.opacity(0.22),
+                        .black.opacity(0.42)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                RadialGradient(
+                    colors: [
+                        accentColor.opacity(0.28),
+                        .white.opacity(0.08),
+                        .clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 20,
+                    endRadius: 320
+                )
+
+                RadialGradient(
+                    colors: [
+                        accentColor.opacity(0.20),
+                        .clear
+                    ],
+                    center: .bottomTrailing,
+                    startRadius: 40,
+                    endRadius: 300
+                )
+            }
+        }
+    }
+
+    private var utilitySection: some View {
+        HStack(alignment: .top, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .frame(width: 38, height: 38)
+                    .background(accentColor.opacity(0.18), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Aura Focus")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(primaryForegroundStyle)
+
+                    Text(currentMood?.theme ?? "Ambient control")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(secondaryForegroundStyle)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .tahoeGlassID("utility-brand", in: glassNamespace)
+            .tahoeGlass(sectionShape, tint: accentColor.opacity(0.10), strokeOpacity: 0.34, shadowOpacity: 0.14)
+
+            VStack(spacing: 10) {
+                utilityPill(
+                    id: "utility-playback",
+                    icon: appModel.playerViewModel.isPlaying ? "waveform" : "pause.fill",
+                    label: appModel.playerViewModel.isPlaying ? "Playing" : "Paused",
+                    tint: accentColor.opacity(0.22)
+                )
+
+                utilityPill(
+                    id: "utility-count",
+                    icon: "square.stack.3d.up.fill",
+                    label: "\(currentSubthemeMoods.count) moods",
+                    tint: .white.opacity(0.06)
+                )
+            }
+        }
+    }
+
+    private var heroSection: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text((appModel.moodViewModel.currentMood?.theme ?? "Aura").uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .kerning(1.2)
+                    .foregroundStyle(secondaryForegroundStyle)
+
+                Text(appModel.moodViewModel.currentMood?.name ?? "Aura")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(selectedSubtheme.isEmpty ? "Curated soundscape" : selectedSubtheme)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(secondaryForegroundStyle)
+                    .padding(.top, 4)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+            .tahoeGlassID("hero-title", in: glassNamespace)
+            .tahoeGlass(sectionShape, tint: accentColor.opacity(0.10), strokeOpacity: 0.34, shadowOpacity: 0.18)
+
+            VStack(spacing: 10) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                        appModel.playerViewModel.togglePlayback()
+                    }
+                } label: {
+                    Image(systemName: appModel.playerViewModel.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(primaryForegroundStyle)
+                        .frame(width: 84, height: 84)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .tahoeGlassID("hero-play", in: glassNamespace)
+                .tahoeGlass(Circle(), interactive: true, tint: accentColor.opacity(0.18), strokeOpacity: 0.40, shadowOpacity: 0.20)
+
+                utilityPill(
+                    id: "hero-status",
+                    icon: "speaker.wave.2.fill",
+                    label: "\(Int(appModel.playerViewModel.masterVolume * 100))%",
+                    tint: .white.opacity(0.08)
+                )
+            }
+        }
+    }
+
+    private var volumeSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Master Volume")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(primaryForegroundStyle)
+
+            HStack(spacing: 14) {
+                Slider(
+                    value: Binding(
+                        get: { Double(appModel.playerViewModel.masterVolume) },
+                        set: { appModel.playerViewModel.masterVolume = Float($0) }
+                    ),
+                    in: 0...1
+                )
+                .controlSize(.large)
+                .tint(accentColor)
+
+                Text("\(Int(appModel.playerViewModel.masterVolume * 100))%")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .monospacedDigit()
+                    .frame(width: 42, alignment: .trailing)
+            }
+        }
+        .padding(18)
+        .tahoeGlassID("volume", in: glassNamespace)
+        .tahoeGlass(sectionShape, tint: .white.opacity(0.04), strokeOpacity: 0.30, shadowOpacity: 0.12)
+    }
+
+    private var themesHeader: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "square.grid.2x2.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(primaryForegroundStyle)
+                .frame(width: 34, height: 34)
+                .background(accentColor.opacity(0.18), in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Themes")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryForegroundStyle)
+
+                Text("\(appModel.moodViewModel.subthemeSections.count) curated groups")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(secondaryForegroundStyle)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(selectedSubtheme.isEmpty ? "Browse" : selectedSubtheme)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(primaryForegroundStyle)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .tahoeGlassID("themes-selected", in: glassNamespace)
+                .tahoeGlass(pillShape, tint: accentColor.opacity(0.14), strokeOpacity: 0.34, shadowOpacity: 0.10)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .tahoeGlassID("themes-header", in: glassNamespace)
+        .tahoeGlass(sectionShape, tint: .white.opacity(0.04), strokeOpacity: 0.32, shadowOpacity: 0.12)
+    }
+
+    private var subthemeSections: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(appModel.moodViewModel.subthemeSections) { section in
+                sectionDisclosure(section)
+            }
+        }
+    }
+
+    private func sectionDisclosure(_ section: MoodSubthemeSection) -> some View {
+        let isExpanded = expandedSections.contains(section.id)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                    if isExpanded {
+                        expandedSections.remove(section.id)
+                    } else {
+                        expandedSections.insert(section.id)
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Text(section.title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(primaryForegroundStyle)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(secondaryForegroundStyle)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 42)
+                .frame(maxWidth: .infinity)
+                .contentShape(controlShape)
+            }
+            .buttonStyle(.plain)
+            .tahoeGlassID("section-\(section.id)", in: glassNamespace)
+            .tahoeGlass(controlShape, interactive: true, tint: .white.opacity(0.04), strokeOpacity: 0.32, shadowOpacity: 0.10)
+
+            if isExpanded {
+                subthemeGrid(for: section)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private func subthemeGrid(for section: MoodSubthemeSection) -> some View {
+        let columns = [GridItem(.adaptive(minimum: 96), spacing: 10)]
+
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+            ForEach(section.subthemes, id: \.self) { subtheme in
+                let isSelected = selectedSubtheme.caseInsensitiveCompare(subtheme) == .orderedSame
+
+                Button {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                        selectedSubtheme = subtheme
+                        appModel.moodViewModel.selectedSubtheme = subtheme
+                        expandSectionIfNeeded(for: subtheme)
+                    }
+                } label: {
+                    Text(subtheme)
+                        .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                        .foregroundStyle(primaryForegroundStyle)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .tahoeGlassID("subtheme-\(subtheme)", in: glassNamespace)
+                .tahoeGlass(
+                    Capsule(),
+                    interactive: true,
+                    tint: isSelected ? .white.opacity(0.14) : .white.opacity(0.03),
+                    strokeOpacity: isSelected ? 0.42 : 0.30,
+                    shadowOpacity: isSelected ? 0.16 : 0.08
+                )
+            }
+        }
+    }
+
+    private var moodCarouselSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(selectedSubtheme.isEmpty ? "Moods" : selectedSubtheme)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(primaryForegroundStyle)
+
+                    Text("\(currentSubthemeMoods.count) available")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(secondaryForegroundStyle)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "circle.grid.2x2.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .frame(width: 36, height: 36)
+                    .background(accentColor.opacity(0.18), in: Circle())
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .tahoeGlassID("mood-header", in: glassNamespace)
+            .tahoeGlass(sectionShape, tint: accentColor.opacity(0.08), strokeOpacity: 0.32, shadowOpacity: 0.12)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(currentSubthemeMoods, id: \.id) { mood in
+                        TahoeMoodCarouselCard(
+                            mood: mood,
+                            isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
+                            appModel: appModel,
+                            namespace: glassNamespace,
+                            onDelete: UUID(uuidString: mood.id) != nil ? {
+                                withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                                    appModel.moodViewModel.removeMood(mood)
+                                    syncSelectionAfterDeletion(for: mood)
+                                }
+                            } : nil
+                        ) {
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                                selectedSubtheme = mood.subtheme
+                                appModel.moodViewModel.selectedSubtheme = mood.subtheme
+                                appModel.moodViewModel.selectMood(mood)
+                            }
+                        }
+                    }
+
+                    TahoeNewMoodCard(namespace: glassNamespace) {
+                        isShowingCreateMood = true
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .contentMargins(.horizontal, 2, for: .scrollContent)
+        }
+    }
+
+    private var footerSection: some View {
+        HStack(spacing: 10) {
+            Button {
+                revealMainWindow()
+            } label: {
+                Text("Open Aura")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .contentShape(controlShape)
+            }
+            .buttonStyle(.plain)
+            .tahoeGlassID("footer-open", in: glassNamespace)
+            .tahoeGlass(controlShape, interactive: true, tint: accentColor.opacity(0.18), strokeOpacity: 0.38, shadowOpacity: 0.18)
+
+            Button {
+                appModel.showCommandPalette.toggle()
+                revealMainWindow()
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .frame(width: 50, height: 50)
+                    .contentShape(controlShape)
+            }
+            .buttonStyle(.plain)
+            .help("Search")
+            .tahoeGlassID("footer-search", in: glassNamespace)
+            .tahoeGlass(controlShape, interactive: true, strokeOpacity: 0.36, shadowOpacity: 0.18)
+
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(primaryForegroundStyle)
+                    .frame(width: 50, height: 50)
+                    .contentShape(controlShape)
+            }
+            .buttonStyle(.plain)
+            .help("Quit Aura")
+            .tahoeGlassID("footer-quit", in: glassNamespace)
+            .tahoeGlass(controlShape, interactive: true, strokeOpacity: 0.36, shadowOpacity: 0.18)
+        }
+    }
+
+    private var currentSubthemeMoods: [Mood] {
+        appModel.moodViewModel.moodsBySubtheme[selectedSubtheme] ?? []
+    }
+
+    private var currentMood: Mood? {
+        appModel.moodViewModel.currentMood
+    }
+
+    private var accentColor: Color {
+        let accent = currentMood?.palette.accent ?? ColorComponents(red: 0.38, green: 0.70, blue: 0.58)
+        return Color(red: accent.red, green: accent.green, blue: accent.blue)
+    }
+
+    private var primaryForegroundStyle: AnyShapeStyle {
+        AnyShapeStyle(.primary)
+    }
+
+    private var secondaryForegroundStyle: AnyShapeStyle {
+        AnyShapeStyle(.secondary)
+    }
+
+    private func utilityPill(id: String, icon: String, label: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(primaryForegroundStyle)
+
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(primaryForegroundStyle)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .tahoeGlassID(id, in: glassNamespace)
+        .tahoeGlass(pillShape, tint: tint, strokeOpacity: 0.34, shadowOpacity: 0.10)
+    }
+
+    private func revealMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "main")
+
+        for window in NSApp.windows where window.identifier?.rawValue == "main" {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    private func syncSelectionFromCurrentMood() {
+        let fallbackSubtheme = appModel.moodViewModel.currentMood?.subtheme
+            ?? appModel.moodViewModel.selectedSubtheme
+            ?? appModel.moodViewModel.subthemes.first
+            ?? ""
+
+        if !fallbackSubtheme.isEmpty {
+            selectedSubtheme = fallbackSubtheme
+            appModel.moodViewModel.selectedSubtheme = fallbackSubtheme
+        }
+
+        let sectionIDs = Set(appModel.moodViewModel.subthemeSections.map(\.id))
+        if expandedSections.isEmpty {
+            expandedSections = sectionIDs
+        } else {
+            expandedSections.formIntersection(sectionIDs)
+        }
+
+        if !fallbackSubtheme.isEmpty {
+            expandSectionIfNeeded(for: fallbackSubtheme)
+        }
+    }
+
+    private func expandSectionIfNeeded(for subtheme: String) {
+        guard let section = appModel.moodViewModel.subthemeSections.first(where: { $0.subthemes.contains(subtheme) }) else {
+            return
+        }
+        expandedSections.insert(section.id)
+    }
+
+    private func syncSelectionAfterDeletion(for deletedMood: Mood) {
+        let remainingMoods = appModel.moodViewModel.moodsBySubtheme[deletedMood.subtheme] ?? []
+
+        if let replacement = remainingMoods.first {
+            selectedSubtheme = replacement.subtheme
+            appModel.moodViewModel.selectedSubtheme = replacement.subtheme
+            appModel.moodViewModel.selectMood(replacement)
+            return
+        }
+
+        if let fallbackSubtheme = appModel.moodViewModel.subthemes.first,
+           let fallbackMood = appModel.moodViewModel.moodsBySubtheme[fallbackSubtheme]?.first {
+            selectedSubtheme = fallbackSubtheme
+            appModel.moodViewModel.selectedSubtheme = fallbackSubtheme
+            appModel.moodViewModel.selectMood(fallbackMood)
+        } else {
+            selectedSubtheme = ""
+        }
+    }
+
+    @MainActor
+    private func loadBackgroundMedia() async {
+        guard let mood = appModel.moodViewModel.currentMood,
+              mood.wallpaper.type != .time,
+              mood.wallpaper.type != .zen,
+              mood.wallpaper.type != .quote,
+              let resource = mood.wallpaper.resources.first else {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                backgroundImage = nil
+                backgroundVideoURL = nil
+            }
+            return
+        }
+
+        guard let url = MediaUtils.resolveResourceURL(resource) else {
+            let image = NSImage(named: resource)
+            withAnimation(.easeInOut(duration: 0.35)) {
+                backgroundVideoURL = nil
+                backgroundImage = image
+            }
+            return
+        }
+
+        if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                backgroundImage = nil
+                backgroundVideoURL = url
+            }
+        } else {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                backgroundVideoURL = nil
+            }
+
+            let loaded = await Task.detached(priority: .userInitiated) {
+                NSImage(contentsOf: url)
+            }.value
+
+            withAnimation(.easeInOut(duration: 0.35)) {
+                backgroundImage = loaded
+            }
+        }
+    }
+}
+
+private struct TahoeNewMoodCard: View {
+    let namespace: Namespace.ID
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var isPressed = false
+
+    private let cardShape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Spacer()
+
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Create")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+
+                    Text("Build a new mood")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(16)
+            .frame(width: 148, height: 184)
+            .contentShape(cardShape)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .scaleEffect(isPressed ? 0.98 : (isHovered ? 1.02 : 1))
+        .tahoeGlassID("create-mood", in: namespace)
+        .tahoeGlass(cardShape, interactive: true, tint: .white.opacity(0.05), strokeOpacity: 0.36, shadowOpacity: 0.18)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isHovered)
+        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+        .onHover { isHovered = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+private struct TahoeMoodCarouselCard: View {
+    let mood: Mood
+    let isSelected: Bool
+    var appModel: AppModel
+    let namespace: Namespace.ID
+    var onDelete: (() -> Void)?
+    let action: () -> Void
+
+    @State private var image: NSImage?
+    @State private var isHovered = false
+    @State private var isPressed = false
+
+    private let cardShape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+
+    private var primaryResource: String {
+        mood.wallpaper.resources.first ?? ""
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: handleAction) {
+                ZStack(alignment: .bottomLeading) {
+                    cardArtwork
+                        .clipShape(cardShape)
+
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.58)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .clipShape(cardShape)
+
+                    Text(mood.name)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .padding(14)
+
+                    if !primaryResource.isEmpty,
+                       mood.wallpaper.type != .time,
+                       mood.wallpaper.type != .zen,
+                       mood.wallpaper.type != .quote {
+                        downloadOverlay
+                    }
+                }
+                .frame(width: 148, height: 184)
+                .contentShape(cardShape)
+            }
+            .buttonStyle(.plain)
+
+            if let onDelete, isHovered {
+                Button(action: onDelete) {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.red.opacity(0.95))
+                        .padding(10)
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .frame(width: 148, height: 184)
+        .scaleEffect(isPressed ? 0.98 : (isHovered ? 1.015 : 1))
+        .tahoeGlassID("mood-\(mood.id)", in: namespace)
+        .tahoeGlass(
+            cardShape,
+            interactive: true,
+            tint: isSelected ? .white.opacity(0.10) : nil,
+            strokeOpacity: isSelected ? 0.52 : 0.34,
+            shadowOpacity: isSelected ? 0.22 : 0.16
+        )
+        .overlay {
+            if isSelected {
+                cardShape
+                    .strokeBorder(.white.opacity(0.72), lineWidth: 1.4)
+            }
+        }
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: isHovered)
+        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
+        .onHover { isHovered = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+        .task(id: mood.id) {
+            if !primaryResource.isEmpty {
+                DownloadManager.shared.checkStatus(for: primaryResource)
+            }
+            await loadPreviewImage()
+        }
+        .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
+            if newState == .downloaded {
+                Task {
+                    await loadPreviewImage()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var downloadOverlay: some View {
+        let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
+
+        if downloadState == .notDownloaded {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Image(systemName: "icloud.and.arrow.down")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(14)
+                }
+            }
+        } else if case .downloading(let progress) = downloadState {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    ProgressView(value: progress)
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .padding(14)
+                }
+            }
+        }
+    }
+
+    private func handleAction() {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
+            action()
+            return
+        }
+
+        if DownloadManager.shared.isDownloaded(resource: primaryResource) {
+            action()
+            return
+        }
+
+        Task {
+            await DownloadManager.shared.download(primaryResource)
+            if DownloadManager.shared.isDownloaded(resource: primaryResource) {
+                await loadPreviewImage()
+                action()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cardArtwork: some View {
+        if mood.wallpaper.type == .time {
+            let style = mood.wallpaper.resources.first ?? "minimal"
+            TimeWallpaperView(
+                style: style,
+                palette: mood.palette,
+                selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
+                isPreview: true
+            )
+            .frame(width: 148, height: 184)
+        } else if mood.wallpaper.type == .quote {
+            let style = mood.wallpaper.resources.first ?? "motivational"
+            let quoteID = mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
+            QuoteWallpaperView(
+                style: style,
+                palette: mood.palette,
+                quoteID: quoteID,
+                selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
+                isPreview: true
+            )
+            .frame(width: 148, height: 184)
+        } else if mood.wallpaper.type == .zen {
+            let style = mood.wallpaper.resources.first ?? "breathing"
+            ZenWallpaperView(
+                style: style,
+                palette: mood.palette,
+                selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
+                isPreview: true
+            )
+            .frame(width: 148, height: 184)
+        } else if mood.wallpaper.type == .website {
+            WebsiteWallpaperPreview(
+                mood: mood,
+                isPressed: false,
+                targetSize: CGSize(width: 148, height: 184)
+            )
+            .frame(width: 148, height: 184)
+        } else if isSelected,
+                  let resource = mood.wallpaper.resources.first,
+                  let url = MediaUtils.resolveResourceURL(resource),
+                  ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
+            VideoBackgroundView(url: url)
+                .frame(width: 148, height: 184)
+        } else if let image {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 148, height: 184)
+        } else {
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.16),
+                    Color.white.opacity(0.04)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(width: 148, height: 184)
+        }
+    }
+
+    @MainActor
+    private func loadPreviewImage() async {
+        guard mood.wallpaper.type != .time,
+              mood.wallpaper.type != .zen,
+              mood.wallpaper.type != .quote,
+              let resource = mood.wallpaper.resources.first else {
+            return
+        }
+
+        if let cached = MoodCard.imageCache.object(forKey: resource as NSString) {
+            image = cached
+            return
+        }
+
+        let loaded = await Task(priority: .utility) { () -> NSImage? in
+            if Task.isCancelled {
+                return nil
+            }
+
+            let resolvedURL = MediaUtils.resolveResourceURL(resource)
+            let ext = (resolvedURL?.pathExtension ?? (resource as NSString).pathExtension).lowercased()
+            let isVideo = ["mp4", "mov"].contains(ext)
+
+            if let url = resolvedURL, url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
+                if isVideo {
+                    return await MediaUtils.videoPosterImage(from: url)
+                }
+
+                return NSImage(contentsOf: url)
+            }
+
+            let baseName = (resource as NSString).deletingPathExtension
+            if let image = NSImage(named: baseName) {
+                return image
+            }
+
+            return NSImage(named: resource)
+        }.value
+
+        if let loaded {
+            MoodCard.imageCache.setObject(loaded, forKey: resource as NSString)
+        }
+
+        image = loaded
+    }
+}
+
+private struct TahoeGlassModifier<S: InsettableShape>: ViewModifier {
+    let shape: S
+    let interactive: Bool
+    let tint: Color?
+    let strokeOpacity: Double
+    let shadowOpacity: Double
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content
+                .background(shape.fill(.regularMaterial))
+                .overlay { strokeOverlay }
+                .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
+        } else if #available(macOS 26.0, *) {
+            if interactive {
+                if let tint {
+                    content
+                        .glassEffect(.regular.interactive().tint(tint), in: shape)
+                        .overlay { strokeOverlay }
+                        .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
+                } else {
+                    content
+                        .glassEffect(.regular.interactive(), in: shape)
+                        .overlay { strokeOverlay }
+                        .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
+                }
+            } else {
+                if let tint {
+                    content
+                        .glassEffect(.regular.tint(tint), in: shape)
+                        .overlay { strokeOverlay }
+                        .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
+                } else {
+                    content
+                        .glassEffect(.regular, in: shape)
+                        .overlay { strokeOverlay }
+                        .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
+                }
+            }
+        } else {
+            content
+                .background(shape.fill(.regularMaterial))
+                .overlay { strokeOverlay }
+                .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
+        }
+    }
+
+    private var strokeOverlay: some View {
+        shape
+            .strokeBorder(
+                LinearGradient(
+                    colors: [
+                        .white.opacity(reduceTransparency ? strokeOpacity * 0.6 : strokeOpacity),
+                        .white.opacity(reduceTransparency ? strokeOpacity * 0.18 : strokeOpacity * 0.35)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
+    }
+}
+
+private extension View {
+    func tahoeGlass<S: InsettableShape>(
+        _ shape: S,
+        interactive: Bool = false,
+        tint: Color? = nil,
+        strokeOpacity: Double = 0.3,
+        shadowOpacity: Double = 0.12
+    ) -> some View {
+        modifier(
+            TahoeGlassModifier(
+                shape: shape,
+                interactive: interactive,
+                tint: tint,
+                strokeOpacity: strokeOpacity,
+                shadowOpacity: shadowOpacity
+            )
+        )
+    }
+
+    @ViewBuilder
+    func tahoeGlassID<ID: Hashable>(_ id: ID, in namespace: Namespace.ID) -> some View {
+        if #available(macOS 26.0, *) {
+            glassEffectID(id, in: namespace)
+        } else {
+            self
+        }
+    }
+}
