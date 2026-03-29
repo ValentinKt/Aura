@@ -21,6 +21,7 @@
         <attribute name="randomAmbienceInterval" attributeType="Double" optional="NO" defaultValueString="300"/>
         <attribute name="transitionDuration" attributeType="Double" optional="NO" defaultValueString="2.5"/>
         <attribute name="weatherSyncEnabled" attributeType="Boolean" optional="NO" defaultValueString="NO"/>
+        <attribute name="smartDuckingEnabled" attributeType="Boolean" optional="NO" defaultValueString="YES"/>
     </entity>
     <entity name="CustomMood" representedClassName="NSManagedObject" syncable="YES">
         <attribute name="id" attributeType="String" optional="NO"/>

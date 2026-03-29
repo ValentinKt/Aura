@@ -111,7 +111,8 @@ final class PersistenceController {
             attribute("lastUsedMoodID", .stringAttributeType, optional: true),
             attribute("keepCurrentWallpaper", .booleanAttributeType, optional: false),
             attribute("websiteWallpaperInteractive", .booleanAttributeType, optional: false),
-            attribute("masterVolume", .floatAttributeType, optional: false)
+            attribute("masterVolume", .floatAttributeType, optional: false),
+            attribute("smartDuckingEnabled", .booleanAttributeType, optional: false)
         ]
 
         let customMood = NSEntityDescription()
