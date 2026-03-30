@@ -5,7 +5,8 @@ struct ImmersiveModeView: View {
     @Bindable var appModel: AppModel
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var showControls = true
-    @State private var timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
+    @State private var lastActivityTime = Date()
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var isHoveringControls = false
 
     var body: some View {
@@ -14,18 +15,19 @@ struct ImmersiveModeView: View {
             contentLayer
         }
         .onContinuousHover { _ in
+            lastActivityTime = Date()
             if !showControls {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     showControls = true
                 }
             }
-            // Reset timer
-            timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
         }
         .onReceive(timer) { _ in
             if showControls && !isHoveringControls {
-                withAnimation(.easeInOut(duration: 1.5)) {
-                    showControls = false
+                if Date().timeIntervalSince(lastActivityTime) > 5 {
+                    withAnimation(.easeInOut(duration: 1.5)) {
+                        showControls = false
+                    }
                 }
             }
         }

@@ -929,6 +929,7 @@ final class WallpaperWindowController: NSObject {
         // Create and pin the SwiftUI hosting view
         let host = NSHostingView(rootView: AnyView(view))
         host.translatesAutoresizingMaskIntoConstraints = false
+        host.wantsLayer = true
 
         guard let container = hostingContainerView else { return }
         container.addSubview(host)
@@ -1153,9 +1154,28 @@ final class WallpaperWindowController: NSObject {
         if currentURL != nil {
             setVideoSuspended(shouldSuspend)
         }
+
+        // Handle SwiftUI
+        if hostingView != nil {
+            setSwiftUISuspended(shouldSuspend)
+        }
     }
 
     private var isVideoSuspended = false
+    private var isSwiftUISuspended = false
+
+    private func setSwiftUISuspended(_ suspended: Bool) {
+        guard suspended != isSwiftUISuspended else { return }
+        isSwiftUISuspended = suspended
+
+        if suspended {
+            hostingView?.layer?.speed = 0.0
+            hostingContainerView?.isHidden = true
+        } else {
+            hostingContainerView?.isHidden = false
+            hostingView?.layer?.speed = 1.0
+        }
+    }
 
     private func setVideoSuspended(_ suspended: Bool) {
         guard suspended != isVideoSuspended else { return }

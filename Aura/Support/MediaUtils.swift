@@ -3,7 +3,13 @@ import AVFoundation
 import os
 
 enum MediaUtils {
-    nonisolated(unsafe) static let imageCache = NSCache<NSURL, NSImage>()
+    nonisolated(unsafe) static let imageCache: NSCache<NSURL, NSImage> = {
+        let cache = NSCache<NSURL, NSImage>()
+        cache.countLimit = 50 // Limit to 50 images to save memory
+        cache.totalCostLimit = 1024 * 1024 * 100 // 100 MB max
+        return cache
+    }()
+
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
 
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
@@ -33,21 +39,32 @@ enum MediaUtils {
     }
 
     // Cache for resolved URLs to avoid expensive bundle enumeration
-    nonisolated(unsafe) private static let resolvedURLCache = NSCache<NSString, NSURL>()
+    nonisolated(unsafe) private static let resolvedURLCache: NSCache<NSString, NSURL> = {
+        let cache = NSCache<NSString, NSURL>()
+        cache.countLimit = 200
+        return cache
+    }()
 
     nonisolated static func resolveResourceURL(_ resource: String) -> URL? {
         resolveResourceURL(resource, allowVideoFallback: true)
     }
 
+    nonisolated private static let notFoundSentinel = NSURL(fileURLWithPath: "/dev/null")
+
     nonisolated static func resolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
         let cacheKey = "\(resource)_\(allowVideoFallback)" as NSString
         if let cached = resolvedURLCache.object(forKey: cacheKey) {
+            if cached === notFoundSentinel {
+                return nil
+            }
             return cached as URL
         }
 
         let url = performResolveResourceURL(resource, allowVideoFallback: allowVideoFallback)
         if let url = url {
             resolvedURLCache.setObject(url as NSURL, forKey: cacheKey)
+        } else {
+            resolvedURLCache.setObject(notFoundSentinel, forKey: cacheKey)
         }
         return url
     }
@@ -315,7 +332,7 @@ enum MediaUtils {
     nonisolated static func videoPosterImage(from url: URL) async -> NSImage? {
         let cacheKey = url as NSURL
 
-        if let cachedImage = await MainActor.run(body: { imageCache.object(forKey: cacheKey) }) {
+        if let cachedImage = imageCache.object(forKey: cacheKey) {
             return cachedImage
         }
 
@@ -336,7 +353,7 @@ enum MediaUtils {
             let (cgImage, _) = try await generator.image(at: time)
             print("🟢 [MediaUtils] Generated thumbnail for \(url.lastPathComponent)")
             let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-            await MainActor.run { imageCache.setObject(image, forKey: cacheKey) }
+            imageCache.setObject(image, forKey: cacheKey)
             return image
         } catch {
             print("🟥 [MediaUtils] Failed to generate thumbnail for \(url.lastPathComponent): \(error)")
