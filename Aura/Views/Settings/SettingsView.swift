@@ -531,7 +531,7 @@ struct FavoriteWallpapersManagerView: View {
                             Image(systemName: "star.slash")
                                 .font(.system(size: 32))
                                 .foregroundStyle(.secondary)
-                            
+
                             VStack(spacing: 8) {
                                 Text("No favorite wallpapers yet")
                                     .font(.system(size: 16, weight: .semibold))

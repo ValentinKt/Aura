@@ -222,6 +222,11 @@ final class AppModel {
         persistSceneState()
     }
 
+    func removeAllFavoriteScenes() {
+        favoriteSceneIDs.removeAll()
+        persistSceneState()
+    }
+
     func launchScene(id moodID: String, immersive: Bool = true, resumePlayback: Bool = true) async throws -> Mood {
         await startIfNeeded()
 

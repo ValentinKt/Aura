@@ -231,9 +231,9 @@ struct ContentView: View {
                                                     Text(section.title.uppercased())
                                                         .font(.system(size: 10, weight: .bold))
                                                         .foregroundStyle(.white.opacity(0.45))
-                                                    
+
                                                     Spacer(minLength: 0)
-                                                    
+
                                                     Image(systemName: "chevron.right")
                                                         .font(.system(size: 8, weight: .bold))
                                                         .foregroundStyle(.white.opacity(0.35))

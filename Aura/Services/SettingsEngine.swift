@@ -38,7 +38,7 @@ final class SettingsEngine {
         let request = NSFetchRequest<NSManagedObject>(entityName: "UserSettings")
         request.fetchLimit = 1
         if let entity = try? context.fetch(request).first {
-            
+
             // Provide a safe fallback for "smartDuckingEnabled" to prevent crashes on older stores
             let smartDuckingEnabled: Bool
             if entity.entity.attributesByName.keys.contains("smartDuckingEnabled") {
@@ -46,7 +46,7 @@ final class SettingsEngine {
             } else {
                 smartDuckingEnabled = true
             }
-            
+
             var settings = UserSettings(
                 weatherSyncEnabled: entity.value(forKey: "weatherSyncEnabled") as? Bool ?? false,
                 defaultMoodID: entity.value(forKey: "defaultMoodID") as? String ?? "mountain_stream",

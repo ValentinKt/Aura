@@ -10,6 +10,14 @@ struct WallpaperApplyResult: Hashable {
     var permissionDenied: Bool
 }
 
+struct WallpaperDisplayPreview: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let wallpaperURL: URL?
+    let isPrimary: Bool
+}
+
 @MainActor
 @Observable
 final class WallpaperEngine {
@@ -31,6 +39,50 @@ final class WallpaperEngine {
     /// The last resolved image/video URL from a static or animated wallpaper.
     /// Quote/Zen/Time views use this to render the Image Playground (or other) wallpaper as their background.
     var backgroundImageURL: URL?
+    var currentPrimaryWallpaperURL: URL?
+    var currentSecondaryWallpaperURL: URL?
+
+    var displayWallpaperPreviews: [WallpaperDisplayPreview] {
+        let screens = NSScreen.screens
+        let primaryURL = currentPrimaryWallpaperURL ?? backgroundImageURL ?? selectedWallpaperURL
+        let secondaryURL = currentSecondaryWallpaperURL ?? primaryURL
+
+        if screens.isEmpty {
+            return [
+                WallpaperDisplayPreview(
+                    id: "current-display",
+                    title: "Current Display",
+                    subtitle: "No external display metadata available",
+                    wallpaperURL: primaryURL,
+                    isPrimary: true
+                )
+            ]
+        }
+
+        let primaryScreenID = primaryScreenIdentifier(from: screens)
+        var secondaryIndex = 1
+
+        return screens.map { screen in
+            let isPrimary = screen.localizedName == primaryScreenID
+            let title: String
+            if screens.count == 1 {
+                title = "Current Display"
+            } else if isPrimary {
+                title = "Primary Display"
+            } else {
+                title = "Secondary Display \(secondaryIndex)"
+                secondaryIndex += 1
+            }
+
+            return WallpaperDisplayPreview(
+                id: screen.localizedName,
+                title: title,
+                subtitle: screen.localizedName,
+                wallpaperURL: isPrimary ? primaryURL : secondaryURL,
+                isPrimary: isPrimary
+            )
+        }
+    }
 
     private var selectedWallpaperResource: String?
 
@@ -328,6 +380,10 @@ final class WallpaperEngine {
         var permissionDenied = false
         var applied = false
         let screens = NSScreen.screens
+        updateCurrentWallpaperURLs(
+            primaryURL: urls.first,
+            secondaryURL: urls.count > 1 ? urls[1] : nil
+        )
 
         if screens.isEmpty {
             // For headless environments (CI/Tests), we assume success if URLs exist
@@ -358,6 +414,7 @@ final class WallpaperEngine {
         var permissionDenied = false
         var applied = false
         let screens = NSScreen.screens
+        updateCurrentWallpaperURLs(primaryURL: primaryURL, secondaryURL: secondaryURL)
 
         if screens.isEmpty {
             return WallpaperApplyResult(
@@ -395,6 +452,10 @@ final class WallpaperEngine {
         var permissionDenied = false
         var applied = false
         let screens = NSScreen.screens
+        updateCurrentWallpaperURLs(
+            primaryURL: urls.first,
+            secondaryURL: urls.count > 1 ? urls[1] : nil
+        )
 
         if screens.isEmpty {
             let allExist = urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
@@ -717,6 +778,11 @@ final class WallpaperEngine {
         }
         animationTimers.removeAll()
         wallpaperWindowController.stopAll()
+    }
+
+    private func updateCurrentWallpaperURLs(primaryURL: URL?, secondaryURL: URL?) {
+        currentPrimaryWallpaperURL = primaryURL
+        currentSecondaryWallpaperURL = secondaryURL ?? primaryURL
     }
 }
 

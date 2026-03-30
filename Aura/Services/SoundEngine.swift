@@ -44,13 +44,13 @@ final class SoundEngine {
             updateOutputVolume()
         }
     }
-    
+
     private var duckingMultiplier: Float = 1.0 {
         didSet {
             updateOutputVolume()
         }
     }
-    
+
     private var duckingTask: Task<Void, Never>?
 
     func updateOutputVolume() {
@@ -63,12 +63,12 @@ final class SoundEngine {
         let steps = max(8, min(30, Int(safeDuration * 15)))
         let interval = safeDuration / Double(steps)
         let start = duckingMultiplier
-        
+
         guard abs(start - target) > 0.01 else {
             duckingMultiplier = target
             return
         }
-        
+
         duckingTask = Task { [weak self] in
             for step in 1...steps {
                 if Task.isCancelled { return }

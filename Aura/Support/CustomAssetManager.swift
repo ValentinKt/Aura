@@ -59,12 +59,12 @@ enum CustomAssetManager {
     static func saveCustomWallpaper(from image: NSImage, preferredFileExtension: String = "jpg") throws -> String {
         let maxDimension: CGFloat = 3840.0
         var finalImage = image
-        
+
         let size = image.size
         if size.width > maxDimension || size.height > maxDimension {
             let ratio = min(maxDimension / size.width, maxDimension / size.height)
             let newSize = NSSize(width: round(size.width * ratio), height: round(size.height * ratio))
-            
+
             let newImage = NSImage(size: newSize)
             newImage.lockFocus()
             NSGraphicsContext.current?.imageInterpolation = .high

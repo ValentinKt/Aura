@@ -901,7 +901,7 @@ private struct TahoeWrappingLayout: Layout {
                 currentRow = Row()
             }
 
-            currentRow.elements.append(Row.Element(index: index, size: size))
+            currentRow.elements.append(RowElement(index: index, size: size))
             currentRow.width = currentRow.elements.count == 1 ? size.width : currentRow.width + spacing + size.width
             currentRow.height = max(currentRow.height, size.height)
         }
@@ -914,14 +914,14 @@ private struct TahoeWrappingLayout: Layout {
     }
 
     private struct Row {
-        var elements: [Element] = []
+        var elements: [RowElement] = []
         var width: CGFloat = 0
         var height: CGFloat = 0
+    }
 
-        struct Element {
-            let index: Int
-            let size: CGSize
-        }
+    private struct RowElement {
+        let index: Int
+        let size: CGSize
     }
 }
 
