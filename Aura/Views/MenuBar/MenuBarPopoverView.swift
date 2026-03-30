@@ -28,10 +28,6 @@ struct MenuBarPopoverView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
 
-            quickControlsSection
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-
             VStack(alignment: .leading, spacing: 16) {
                 Text("Themes")
                     .font(.system(size: 16, weight: .medium))
@@ -142,61 +138,28 @@ struct MenuBarPopoverView: View {
 
     private var headerSection: some View {
         HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(appModel.moodViewModel.currentMood?.name ?? "Aura")
-                    .font(.system(size: 28, weight: .bold))
+            Text(appModel.moodViewModel.currentMood?.name ?? "Aura")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    appModel.playerViewModel.togglePlayback()
+                }
+            } label: {
+                Image(systemName: appModel.playerViewModel.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let currentMood = appModel.moodViewModel.currentMood {
-                    HStack(spacing: 8) {
-                        Text(currentMood.subtheme)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.72))
-
-                        if let remaining = appModel.sleepTimerRemainingDescription {
-                            Label(remaining, systemImage: "timer")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                    }
-                }
+                    .frame(width: 52, height: 52)
+                    .liquidGlass(Circle(), interactive: true, variant: .regular)
+                    .contentShape(Circle())
             }
-
-            HStack(spacing: 10) {
-                Button {
-                    appModel.toggleFavoriteForCurrentScene()
-                } label: {
-                    Image(systemName: appModel.currentSceneIsFavorite ? "star.fill" : "star")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .liquidGlass(Circle(), interactive: true, variant: .regular)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .background(Color.clear)
-                .focusable(false)
-                .help(appModel.currentSceneIsFavorite ? "Remove from favorites" : "Add to favorites")
-
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        appModel.playerViewModel.togglePlayback()
-                    }
-                } label: {
-                    Image(systemName: appModel.playerViewModel.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 52, height: 52)
-                        .liquidGlass(Circle(), interactive: true, variant: .regular)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .background(Color.clear)
-                .focusable(false)
-            }
+            .buttonStyle(.plain)
+            .background(Color.clear)
+            .focusable(false)
         }
     }
 
@@ -229,79 +192,6 @@ struct MenuBarPopoverView: View {
         }
     }
 
-    private var quickControlsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                quickControlButton(
-                    title: "Resume",
-                    systemImage: "arrow.clockwise",
-                    isWide: true
-                ) {
-                    Task { try? await appModel.resumeLastScene() }
-                }
-
-                quickControlButton(
-                    title: "Off",
-                    systemImage: "timer",
-                    isActive: appModel.sleepTimerEndDate != nil && appModel.sleepTimerRemainingDescription == nil
-                ) {
-                    appModel.cancelSleepTimer()
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Sleep Timer")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-
-                    Spacer()
-
-                    if let remaining = appModel.sleepTimerRemainingDescription {
-                        Text(remaining)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .monospacedDigit()
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    ForEach([15, 30, 60], id: \.self) { minutes in
-                        quickControlButton(
-                            title: "\(minutes)m",
-                            systemImage: "timer",
-                            isActive: isSleepTimerSelected(minutes)
-                        ) {
-                            appModel.startSleepTimer(minutes: minutes)
-                        }
-                    }
-
-                    quickControlButton(
-                        title: "Cancel",
-                        systemImage: "xmark",
-                        isWide: true
-                    ) {
-                        appModel.cancelSleepTimer()
-                    }
-                }
-            }
-
-            sceneStripSection(
-                title: "Favorites",
-                emptyTitle: "No favorite scenes yet",
-                emptySubtitle: "Star the current scene for faster access.",
-                moods: appModel.favoriteScenes
-            )
-
-            sceneStripSection(
-                title: "Recent",
-                emptyTitle: "No recent scenes yet",
-                emptySubtitle: "Your latest scenes appear here for quick relaunch.",
-                moods: appModel.recentScenes
-            )
-        }
-    }
-
     // MARK: - Subtheme Selector
     //
     // Each pill gets its own .glassEffect() independently — no GlassEffectContainer
@@ -325,9 +215,9 @@ struct MenuBarPopoverView: View {
                             Text(section.title)
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white)
-
+                            
                             Spacer(minLength: 0)
-
+                            
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(.white.opacity(0.6))
@@ -472,109 +362,6 @@ struct MenuBarPopoverView: View {
             .buttonStyle(.plain)
             .background(Color.clear)
             .help("Quit Aura")
-        }
-    }
-
-    private func quickControlButton(
-        title: String,
-        systemImage: String,
-        isActive: Bool = false,
-        isWide: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .semibold))
-
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 38)
-            .padding(.horizontal, isWide ? 12 : 0)
-            .glassEffect(
-                isActive
-                    ? .regular.interactive().tint(.white.opacity(0.12))
-                    : .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: isWide ? .infinity : nil)
-    }
-
-    @ViewBuilder
-    private func sceneStripSection(
-        title: String,
-        emptyTitle: String,
-        emptySubtitle: String,
-        moods: [Mood]
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-
-            if moods.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(emptyTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.88))
-
-                    Text(emptySubtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(moods, id: \.id) { mood in
-                            Button {
-                                performSceneLaunch(mood)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(mood.name)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .lineLimit(1)
-
-                                    Text(mood.subtheme)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .lineLimit(1)
-                                        .opacity(0.68)
-                                }
-                                .foregroundStyle(.white)
-                                .frame(width: 132, alignment: .leading)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 12)
-                                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-        }
-    }
-
-    private func isSleepTimerSelected(_ minutes: Int) -> Bool {
-        guard let sleepTimerEndDate = appModel.sleepTimerEndDate else { return false }
-        let remaining = Int(sleepTimerEndDate.timeIntervalSince(Date()))
-        return remaining > max((minutes * 60) - 60, 0) && remaining <= (minutes * 60)
-    }
-
-    private func performSceneLaunch(_ mood: Mood) {
-        Task {
-            try? await appModel.launchScene(id: mood.id)
         }
     }
 
