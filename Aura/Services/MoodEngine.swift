@@ -611,48 +611,48 @@ final class MoodEngine {
                 palette: ThemePalette(primary: ColorComponents(red: 0.05, green: 0.06, blue: 0.12), secondary: ColorComponents(red: 0.08, green: 0.09, blue: 0.16), accent: ColorComponents(red: 0.2, green: 0.3, blue: 0.5))
             ),
             Mood(
-                id: "boreal_lights",
-                name: "Boreal Lights",
+                id: "radiant_aura",
+                name: "Radiant Aura",
                 theme: "Cosmos",
-                subtheme: "Aurora",
+                subtheme: "Aura",
                 layerMix: ["night": 0.5, "wind": 0.25, "piano": 0.2, "hum": 0.15],
-                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aurora_1.mov"]),
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_1.mp4"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.15, blue: 0.22), secondary: ColorComponents(red: 0.12, green: 0.25, blue: 0.32), accent: ColorComponents(red: 0.35, green: 0.75, blue: 0.55))
             ),
             Mood(
-                id: "stellar_flow",
-                name: "Stellar Flow",
+                id: "ethereal_aura",
+                name: "Ethereal Aura",
                 theme: "Cosmos",
-                subtheme: "Aurora",
+                subtheme: "Aura",
                 layerMix: ["night": 0.5, "wind": 0.25, "piano": 0.2, "hum": 0.15],
-                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aurora_2.mov"]),
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_2.mov"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.15, blue: 0.22), secondary: ColorComponents(red: 0.12, green: 0.25, blue: 0.32), accent: ColorComponents(red: 0.35, green: 0.75, blue: 0.55))
             ),
             Mood(
-                id: "cosmic_dance",
-                name: "Cosmic Dance",
+                id: "luminous_aura",
+                name: "Luminous Aura",
                 theme: "Cosmos",
-                subtheme: "Aurora",
+                subtheme: "Aura",
                 layerMix: ["night": 0.5, "wind": 0.25, "piano": 0.2, "hum": 0.15],
-                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aurora_3.mov"]),
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_3.mp4"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.15, blue: 0.22), secondary: ColorComponents(red: 0.12, green: 0.25, blue: 0.32), accent: ColorComponents(red: 0.35, green: 0.75, blue: 0.55))
             ),
             Mood(
-                id: "nebula_glow",
-                name: "Nebula Glow",
+                id: "mystic_aura",
+                name: "Mystic Aura",
                 theme: "Cosmos",
-                subtheme: "Aurora",
+                subtheme: "Aura",
                 layerMix: ["night": 0.5, "wind": 0.25, "piano": 0.2, "hum": 0.15],
-                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aurora_4.mov"]),
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_4.mov"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.15, blue: 0.22), secondary: ColorComponents(red: 0.12, green: 0.25, blue: 0.32), accent: ColorComponents(red: 0.35, green: 0.75, blue: 0.55))
             ),
             Mood(
-                id: "celestial_void",
-                name: "Celestial Void",
+                id: "serene_aura",
+                name: "Serene Aura",
                 theme: "Cosmos",
-                subtheme: "Aurora",
+                subtheme: "Aura",
                 layerMix: ["night": 0.5, "wind": 0.25, "piano": 0.2, "hum": 0.15],
-                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aurora_5.mov"]),
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_5.mp4"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.15, blue: 0.22), secondary: ColorComponents(red: 0.12, green: 0.25, blue: 0.32), accent: ColorComponents(red: 0.35, green: 0.75, blue: 0.55))
             ),
             Mood(

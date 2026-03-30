@@ -519,6 +519,7 @@ final class DownloadManager {
                     if MediaUtils.extractZip(targetURL, originalResource: resource, destinationDir: videosDir) != nil {
                         print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
                         try? fileManager.removeItem(at: targetURL)
+                        MediaUtils.clearCache(for: resource)
                         downloadStates[resource] = .downloaded
                         return
                     }
@@ -534,6 +535,7 @@ final class DownloadManager {
                 }
 
                 print("✅ [DownloadManager] Successfully downloaded wallpaper from: \(url.absoluteString)")
+                MediaUtils.clearCache(for: resource)
                 downloadStates[resource] = .downloaded
                 return
             } catch {

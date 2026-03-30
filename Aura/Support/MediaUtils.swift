@@ -51,6 +51,11 @@ enum MediaUtils {
 
     nonisolated private static let notFoundSentinel = NSURL(fileURLWithPath: "/dev/null")
 
+    nonisolated static func clearCache(for resource: String) {
+        resolvedURLCache.removeObject(forKey: "\(resource)_true" as NSString)
+        resolvedURLCache.removeObject(forKey: "\(resource)_false" as NSString)
+    }
+
     nonisolated static func resolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
         let cacheKey = "\(resource)_\(allowVideoFallback)" as NSString
         if let cached = resolvedURLCache.object(forKey: cacheKey) {
@@ -85,7 +90,6 @@ enum MediaUtils {
 
         if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             let videosDirectory = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
-
             if let localResourceURL = resolveDownloadedResourceURL(
                 resource: resource,
                 name: name,
@@ -94,6 +98,17 @@ enum MediaUtils {
             ) {
                 print("🟢 [MediaUtils] Found downloaded resource at \(localResourceURL.path)")
                 return localResourceURL
+            }
+            
+            let customDirectory = appSupport.appendingPathComponent("Aura/CustomWallpapers", isDirectory: true)
+            if let customResourceURL = resolveDownloadedResourceURL(
+                resource: resource,
+                name: name,
+                ext: ext,
+                in: customDirectory
+            ) {
+                print("🟢 [MediaUtils] Found custom resource at \(customResourceURL.path)")
+                return customResourceURL
             }
         }
 

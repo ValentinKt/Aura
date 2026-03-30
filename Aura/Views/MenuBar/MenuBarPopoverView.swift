@@ -288,9 +288,11 @@ struct MenuBarPopoverView: View {
                         onDelete: UUID(uuidString: mood.id) != nil ? {
                             withAnimation { appModel.moodViewModel.removeMood(mood) }
                         } : nil
-                    ) {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            appModel.moodViewModel.selectMood(mood)
+                    ) { force in
+                        if force || appModel.moodViewModel.currentMood?.id != mood.id {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                appModel.moodViewModel.selectMood(mood)
+                            }
                         }
                     }
                 }
@@ -481,10 +483,10 @@ private struct NewMoodButtonContent: View {
 
 private struct MoodCarouselCard: View {
     let mood: Mood
-    let isSelected: Bool
+   let isSelected: Bool
     var appModel: AppModel
-    var onDelete: (() -> Void)?
-    let action: () -> Void
+    var onDelete: (() -> Void)? = nil
+    let action: (Bool) -> Void
 
     @State private var image: NSImage?
     @State private var isHovered = false
@@ -607,19 +609,20 @@ private struct MoodCarouselCard: View {
 
     private func handleAction() {
         if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
-            action()
+            action(false)
             return
         }
 
         let isDownloaded = DownloadManager.shared.isDownloaded(resource: primaryResource)
         if isDownloaded {
-            action()
+            action(false)
         } else {
+            action(false)
             Task {
                 await DownloadManager.shared.download(primaryResource)
                 if DownloadManager.shared.isDownloaded(resource: primaryResource) {
                     await loadPreviewImage()
-                    action()
+                    action(true)
                 }
             }
         }

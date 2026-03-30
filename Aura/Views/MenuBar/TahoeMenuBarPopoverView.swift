@@ -345,11 +345,13 @@ struct TahoeMenuBarPopoverView: View {
                                     syncSelectionAfterDeletion(for: mood)
                                 }
                             } : nil
-                        ) {
-                            withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
-                                selectedSubtheme = mood.subtheme
-                                appModel.moodViewModel.selectedSubtheme = mood.subtheme
-                                appModel.moodViewModel.selectMood(mood)
+                        ) { force in
+                            if force || appModel.moodViewModel.currentMood?.id != mood.id {
+                                withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                                    selectedSubtheme = mood.subtheme
+                                    appModel.moodViewModel.selectedSubtheme = mood.subtheme
+                                    appModel.moodViewModel.selectMood(mood)
+                                }
                             }
                         }
                     }
@@ -585,8 +587,8 @@ private struct TahoeMoodCarouselCard: View {
     let isSelected: Bool
     var appModel: AppModel
     let namespace: Namespace.ID
-    var onDelete: (() -> Void)?
-    let action: () -> Void
+    var onDelete: (() -> Void)? = nil
+    let action: (Bool) -> Void
 
     @State private var image: NSImage?
     @State private var isHovered = false
@@ -712,20 +714,21 @@ private struct TahoeMoodCarouselCard: View {
 
     private func handleAction() {
         if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
-            action()
+            action(false)
             return
         }
 
         if DownloadManager.shared.isDownloaded(resource: primaryResource) {
-            action()
+            action(false)
             return
         }
 
+        action(false)
         Task {
             await DownloadManager.shared.download(primaryResource)
             if DownloadManager.shared.isDownloaded(resource: primaryResource) {
                 await loadPreviewImage()
-                action()
+                action(true)
             }
         }
     }
