@@ -262,7 +262,7 @@ final class SoundEngine {
 
         let safeDuration = max(0.1, duration)
         // Reduce the number of crossfade steps to lower CPU load and avoid HAL overload logs
-        let steps = max(8, min(18, Int(safeDuration * 8)))
+        let steps = max(4, min(10, Int(safeDuration * 4)))
         let interval = safeDuration / Double(steps)
         let snapshot = volumes
         let allLayerIDs = SoundLayerID.allCases.map(\.rawValue)

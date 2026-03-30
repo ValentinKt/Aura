@@ -215,9 +215,9 @@ struct MenuBarPopoverView: View {
                             Text(section.title)
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white)
-                            
+
                             Spacer(minLength: 0)
-                            
+
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(.white.opacity(0.6))

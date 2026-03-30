@@ -3,15 +3,17 @@ import AVFoundation
 import os
 
 enum MediaUtils {
-    @MainActor private static let imageCache = NSCache<NSURL, NSImage>()
+    nonisolated(unsafe) static let imageCache = NSCache<NSURL, NSImage>()
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
 
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
-        // Try the local absolute path first
+        #if DEBUG
+        // Try the local absolute path first for development
         let absolutePath = "/Users/valentin/XCode/Aura/Aura/Resources/Image/\(name).jpg"
         if FileManager.default.fileExists(atPath: absolutePath) {
             return URL(fileURLWithPath: absolutePath)
         }
+        #endif
 
         // Then try bundle
         if let url = Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "Resources/Image") {
@@ -30,11 +32,27 @@ enum MediaUtils {
         resolveResourceURL(resource, allowVideoFallback: false)
     }
 
+    // Cache for resolved URLs to avoid expensive bundle enumeration
+    nonisolated(unsafe) private static let resolvedURLCache = NSCache<NSString, NSURL>()
+
     nonisolated static func resolveResourceURL(_ resource: String) -> URL? {
         resolveResourceURL(resource, allowVideoFallback: true)
     }
 
-    nonisolated private static func resolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
+    nonisolated static func resolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
+        let cacheKey = "\(resource)_\(allowVideoFallback)" as NSString
+        if let cached = resolvedURLCache.object(forKey: cacheKey) {
+            return cached as URL
+        }
+
+        let url = performResolveResourceURL(resource, allowVideoFallback: allowVideoFallback)
+        if let url = url {
+            resolvedURLCache.setObject(url as NSURL, forKey: cacheKey)
+        }
+        return url
+    }
+
+    nonisolated private static func performResolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
         if resource.hasPrefix("/") {
             let url = URL(fileURLWithPath: resource)
             if FileManager.default.fileExists(atPath: url.path) {
@@ -295,6 +313,12 @@ enum MediaUtils {
     }
 
     nonisolated static func videoPosterImage(from url: URL) async -> NSImage? {
+        let cacheKey = url as NSURL
+
+        if let cachedImage = await MainActor.run(body: { imageCache.object(forKey: cacheKey) }) {
+            return cachedImage
+        }
+
         let isSecurityScoped = url.startAccessingSecurityScopedResource()
         defer {
             if isSecurityScoped {
@@ -311,7 +335,9 @@ enum MediaUtils {
         do {
             let (cgImage, _) = try await generator.image(at: time)
             print("🟢 [MediaUtils] Generated thumbnail for \(url.lastPathComponent)")
-            return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            await MainActor.run { imageCache.setObject(image, forKey: cacheKey) }
+            return image
         } catch {
             print("🟥 [MediaUtils] Failed to generate thumbnail for \(url.lastPathComponent): \(error)")
             return nil

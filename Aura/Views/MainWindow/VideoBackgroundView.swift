@@ -15,6 +15,12 @@ struct VideoBackgroundView: NSViewRepresentable {
             loopView.play(url: url)
         }
     }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
+        if let loopView = nsView as? VideoLoopView {
+            loopView.teardown()
+        }
+    }
 }
 
 private class VideoLoopView: NSView {
@@ -24,6 +30,7 @@ private class VideoLoopView: NSView {
     private var looper: AVPlayerLooper?
     private var currentURL: URL?
     private var isSecurityScoped: Bool = false
+    private var windowObservation: NSKeyValueObservation?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -33,6 +40,28 @@ private class VideoLoopView: NSView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupLayer()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        windowObservation?.invalidate()
+        windowObservation = nil
+
+        if let window = self.window {
+            windowObservation = window.observe(\.isVisible, options: [.initial, .new]) { [weak self] window, _ in
+                self?.updatePlaybackState(isVisible: window.isVisible)
+            }
+        } else {
+            updatePlaybackState(isVisible: false)
+        }
+    }
+
+    private func updatePlaybackState(isVisible: Bool) {
+        if isVisible {
+            player?.play()
+        } else {
+            player?.pause()
+        }
     }
 
     private func setupLayer() {
@@ -110,7 +139,9 @@ private class VideoLoopView: NSView {
         self.layer?.addSublayer(newLayer)
         self.playerLayer = newLayer
 
-        newPlayer.play()
+        if self.window?.isVisible == true {
+            newPlayer.play()
+        }
     }
 
     func teardown() {

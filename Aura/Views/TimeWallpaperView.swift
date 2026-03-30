@@ -4,11 +4,9 @@ import Combine
 struct TimeWallpaperView: View {
     let style: String
     let palette: ThemePalette
-    @State private var currentTime = Date()
     let selectedWallpaperURL: URL?
     var isPreview: Bool = false
     @State private var backgroundImage: NSImage?
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var primaryColor: Color {
         Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue)
@@ -40,34 +38,34 @@ struct TimeWallpaperView: View {
                 Color.black.opacity(0.18).ignoresSafeArea()
             }
 
-            // Render specific style
-            switch style {
-            case "minimal":
-                MinimalTimeView(date: currentTime, color: accentColor)
-            case "analog":
-                AnalogTimeView(date: currentTime, color: accentColor, secondaryColor: secondaryColor)
-            case "typographic":
-                TypographicTimeView(date: currentTime, color: accentColor)
-            case "binary":
-                BinaryTimeView(date: currentTime, color: accentColor, inactiveColor: primaryColor.opacity(0.3))
-            case "solar":
-                SolarTimeView(date: currentTime, skyColor: primaryColor, sunColor: accentColor)
-            case "glass_blocks":
-                GlassBlocksTimeView(date: currentTime, color: accentColor)
-            case "words":
-                WordsTimeView(date: currentTime, color: accentColor)
-            case "orbit":
-                OrbitTimeView(date: currentTime, color: accentColor)
-            case "neon":
-                NeonTimeView(date: currentTime, color: accentColor)
-            case "fluid":
-                FluidTimeView(date: currentTime, color: accentColor)
-            default:
-                MinimalTimeView(date: currentTime, color: accentColor)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let currentTime = context.date
+                // Render specific style
+                switch style {
+                case "minimal":
+                    MinimalTimeView(date: currentTime, color: accentColor)
+                case "analog":
+                    AnalogTimeView(date: currentTime, color: accentColor, secondaryColor: secondaryColor)
+                case "typographic":
+                    TypographicTimeView(date: currentTime, color: accentColor)
+                case "binary":
+                    BinaryTimeView(date: currentTime, color: accentColor, inactiveColor: primaryColor.opacity(0.3))
+                case "solar":
+                    SolarTimeView(date: currentTime, skyColor: primaryColor, sunColor: accentColor)
+                case "glass_blocks":
+                    GlassBlocksTimeView(date: currentTime, color: accentColor)
+                case "words":
+                    WordsTimeView(date: currentTime, color: accentColor)
+                case "orbit":
+                    OrbitTimeView(date: currentTime, color: accentColor)
+                case "neon":
+                    NeonTimeView(date: currentTime, color: accentColor)
+                case "fluid":
+                    FluidTimeView(date: currentTime, color: accentColor)
+                default:
+                    MinimalTimeView(date: currentTime, color: accentColor)
+                }
             }
-        }
-        .onReceive(timer) { input in
-            currentTime = input
         }
         .task(id: backgroundTaskKey) {
             await loadBackgroundImage()

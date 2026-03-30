@@ -898,7 +898,7 @@ final class WallpaperWindowController: NSObject {
         guard let screen = NSScreen.main else { return }
         window?.setFrame(screen.frame, display: true)
         playerLayer?.frame = window?.contentView?.bounds ?? screen.frame
-        updateWebsitePerformanceState()
+        updatePerformanceState()
     }
 
     private var currentURL: URL?
@@ -1000,6 +1000,7 @@ final class WallpaperWindowController: NSObject {
 
         newPlayer.play()
         window?.orderFront(nil)
+        updatePerformanceState()
     }
 
     func setWebsiteInteractive(_ interactive: Bool) {
@@ -1034,7 +1035,7 @@ final class WallpaperWindowController: NSObject {
         if isWebsiteInteractive {
             window?.makeFirstResponder(webView)
         }
-        updateWebsitePerformanceState()
+        updatePerformanceState()
     }
 
     @objc private func videoPlayerItemFailedToPlayToEndTime(_ notification: Notification) {
@@ -1133,17 +1134,38 @@ final class WallpaperWindowController: NSObject {
     }
 
     @objc private func workspaceStateChanged(_ notification: Notification) {
-        updateWebsitePerformanceState()
+        updatePerformanceState()
     }
 
     @objc private func windowVisibilityChanged(_ notification: Notification) {
-        updateWebsitePerformanceState()
+        updatePerformanceState()
     }
 
-    private func updateWebsitePerformanceState() {
-        guard currentWebsiteURL != nil else { return }
+    private func updatePerformanceState() {
         let shouldSuspend = window?.isVisible != true || isFullscreenApplicationActive()
-        setWebsiteSuspended(shouldSuspend)
+
+        // Handle Website
+        if currentWebsiteURL != nil {
+            setWebsiteSuspended(shouldSuspend)
+        }
+
+        // Handle Video
+        if currentURL != nil {
+            setVideoSuspended(shouldSuspend)
+        }
+    }
+
+    private var isVideoSuspended = false
+
+    private func setVideoSuspended(_ suspended: Bool) {
+        guard suspended != isVideoSuspended else { return }
+        isVideoSuspended = suspended
+
+        if suspended {
+            playerQueue?.pause()
+        } else {
+            playerQueue?.play()
+        }
     }
 
     private func setWebsiteSuspended(_ suspended: Bool) {
@@ -1189,10 +1211,10 @@ final class WallpaperWindowController: NSObject {
     private func startWebsiteHoverProbing() {
         guard websiteHoverProbeTimer == nil else { return }
 
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.probeWebsiteHoverState()
         }
-        timer.tolerance = 0.04
+        timer.tolerance = 0.1
         RunLoop.main.add(timer, forMode: .common)
         websiteHoverProbeTimer = timer
         probeWebsiteHoverState()
