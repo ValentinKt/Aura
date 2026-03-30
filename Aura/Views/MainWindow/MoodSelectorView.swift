@@ -131,7 +131,7 @@ struct SubthemeRow: View {
                             appModel.moodViewModel.removeMood(mood)
                         }
                     } : nil,
-                    action: { selectMood(mood) }
+                    action: { force in selectMood(mood, forceApply: force) }
                 )
                 .id(mood.id)
             }
@@ -158,8 +158,13 @@ struct SubthemeRow: View {
         .padding(.vertical, 4)
     }
 
-    private func selectMood(_ mood: Mood) {
-        guard appModel.moodViewModel.currentMood?.id != mood.id else { return }
+    private func selectMood(_ mood: Mood, forceApply: Bool = false) {
+        if forceApply {
+            // Only force apply if this mood is still the currently selected one
+            guard appModel.moodViewModel.currentMood?.id == mood.id else { return }
+        } else {
+            guard appModel.moodViewModel.currentMood?.id != mood.id else { return }
+        }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             appModel.moodViewModel.selectMood(mood)
             appModel.moodViewModel.selectedSubtheme = nil
@@ -311,8 +316,8 @@ struct MoodCard: View {
     let mood: Mood
     let isSelected: Bool
     let selectedWallpaperURL: URL?
-    var onDelete: (() -> Void)?
-    let action: () -> Void
+    var onDelete: (() -> Void)? = nil
+    let action: (Bool) -> Void
 
     @State private var image: NSImage?
     @State private var isHovered = false
@@ -522,19 +527,22 @@ struct MoodCard: View {
 
     private func handleAction() {
         if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || mood.wallpaper.type == .website || primaryResource.isEmpty {
-            action()
+            action(false)
             return
         }
 
         let isDownloaded = DownloadManager.shared.isDownloaded(resource: primaryResource)
         if isDownloaded {
-            action()
+            action(false)
         } else {
+            // First call action to select the mood immediately and show fallback gradient
+            action(false)
+            
             Task {
                 await DownloadManager.shared.download(primaryResource)
                 if DownloadManager.shared.isDownloaded(resource: primaryResource) {
                     await loadPreview()
-                    action()
+                    action(true) // Force re-apply to trigger wallpaper change
                 }
             }
         }

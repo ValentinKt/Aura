@@ -10,6 +10,46 @@ struct WallpaperApplyResult: Hashable {
     var permissionDenied: Bool
 }
 
+struct FallbackGradientView: View {
+    let stops: [ColorComponents]
+    var body: some View {
+        let colors = stops.map { Color(red: $0.red, green: $0.green, blue: $0.blue, opacity: $0.alpha) }
+        LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+            .ignoresSafeArea()
+    }
+}
+
+struct FallbackImageView: View {
+    let url: URL?
+    let image: NSImage?
+    
+    init(url: URL) {
+        self.url = url
+        self.image = nil
+    }
+    
+    init(image: NSImage) {
+        self.url = nil
+        self.image = image
+    }
+
+    var body: some View {
+        if let image = image {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+        } else if let url = url, let imageFromUrl = NSImage(contentsOf: url) {
+            Image(nsImage: imageFromUrl)
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+        } else {
+            Color.black.ignoresSafeArea()
+        }
+    }
+}
+
 struct WallpaperDisplayPreview: Identifiable, Hashable {
     let id: String
     let title: String
@@ -227,19 +267,32 @@ final class WallpaperEngine {
                     startVideoAnimated(resourceURL: resolvedURL, fps: fps)
                     return
                 } else if ["jpg", "jpeg", "png", "heic"].contains(ext) {
-                    // If it resolved to an image (e.g., fallback), apply it statically
+                    // If it resolved to an image (e.g., fallback), show it in the window instead of changing the system wallpaper
                     Task {
-                        _ = await self.applyScreenWallpaperURLsAsync(
-                            primaryURL: resolvedURL,
-                            secondaryURL: await self.renderSecondaryWallpaperVariantURL(from: resolvedURL)
-                        )
+                        await self.applyOverlayBackdrops(primaryResourceURL: resolvedURL)
                     }
+                    let imageView = FallbackImageView(url: resolvedURL)
+                    wallpaperWindowController.showSwiftUIView(imageView)
                     return
                 }
             } else {
-                // If the video isn't downloaded yet, show the system wallpaper by stopping Aura's window
-                wallpaperWindowController.stopAll()
-                return
+                // If the video isn't downloaded yet, check for a placeholder image from the asset catalog
+                let resourceNameWithoutExtension = (resource as NSString).deletingPathExtension
+                if let placeholderImage = NSImage(named: resource) ?? NSImage(named: resourceNameWithoutExtension) {
+                    Task {
+                        await self.applyOverlayBackdrops()
+                    }
+                    let imageView = FallbackImageView(image: placeholderImage)
+                    wallpaperWindowController.showSwiftUIView(imageView)
+                    return
+                } else {
+                    // Fallback to a gradient based on the theme palette instead of stopping the window
+                    let palette = self.themeManager.palette
+                    let stops = [palette.primary, palette.secondary]
+                    let gradientView = FallbackGradientView(stops: stops)
+                    wallpaperWindowController.showSwiftUIView(gradientView)
+                    return
+                }
             }
         }
 
@@ -284,6 +337,21 @@ final class WallpaperEngine {
     }
 
     private func resolveResourceURL(_ resource: String) -> URL? {
+        let fileManager = FileManager.default
+        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
+            let videoURL = videosDir.appendingPathComponent(resource)
+            if fileManager.fileExists(atPath: videoURL.path) {
+                return videoURL
+            }
+            
+            let customDir = appSupport.appendingPathComponent("Aura/CustomWallpapers", isDirectory: true)
+            let customURL = customDir.appendingPathComponent(resource)
+            if fileManager.fileExists(atPath: customURL.path) {
+                return customURL
+            }
+        }
+
         // Use shared logic from MediaUtils if possible, or replicate it here for independence
         if let sharedResolved = MediaUtils.resolveExactResourceURL(resource) ?? MediaUtils.resolveResourceURL(resource) {
             return sharedResolved
@@ -781,7 +849,6 @@ final class WallpaperEngine {
             timer.invalidate()
         }
         animationTimers.removeAll()
-        wallpaperWindowController.stopAll()
     }
 
     private func updateCurrentWallpaperURLs(primaryURL: URL?, secondaryURL: URL?) {
