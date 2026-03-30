@@ -217,24 +217,28 @@ final class WallpaperEngine {
 
     private func startAnimated(_ descriptor: WallpaperDescriptor) {
         let fps = min(5, max(0.1, descriptor.fps)) // Limit FPS to reasonable background range
-        if let resource = descriptor.resources.first,
-           let resolvedURL = resolveResourceURL(resource) {
-
-            let ext = resolvedURL.pathExtension.lowercased()
-            if ["mp4", "mov"].contains(ext) {
-                Task {
-                    await self.applyOverlayBackdrops(primaryResourceURL: resolvedURL)
+        if let resource = descriptor.resources.first {
+            if let resolvedURL = resolveResourceURL(resource) {
+                let ext = resolvedURL.pathExtension.lowercased()
+                if ["mp4", "mov"].contains(ext) {
+                    Task {
+                        await self.applyOverlayBackdrops(primaryResourceURL: resolvedURL)
+                    }
+                    startVideoAnimated(resourceURL: resolvedURL, fps: fps)
+                    return
+                } else if ["jpg", "jpeg", "png", "heic"].contains(ext) {
+                    // If it resolved to an image (e.g., fallback), apply it statically
+                    Task {
+                        _ = await self.applyScreenWallpaperURLsAsync(
+                            primaryURL: resolvedURL,
+                            secondaryURL: await self.renderSecondaryWallpaperVariantURL(from: resolvedURL)
+                        )
+                    }
+                    return
                 }
-                startVideoAnimated(resourceURL: resolvedURL, fps: fps)
-                return
-            } else if ["jpg", "jpeg", "png", "heic"].contains(ext) {
-                // If it resolved to an image (e.g., fallback), apply it statically
-                Task {
-                    _ = await self.applyScreenWallpaperURLsAsync(
-                        primaryURL: resolvedURL,
-                        secondaryURL: await self.renderSecondaryWallpaperVariantURL(from: resolvedURL)
-                    )
-                }
+            } else {
+                // If the video isn't downloaded yet, show the system wallpaper by stopping Aura's window
+                wallpaperWindowController.stopAll()
                 return
             }
         }

@@ -103,6 +103,34 @@ struct SettingsView: View {
                     )
                 }
 
+                SectionView(title: "Storage & Cache") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Clear Video Cache")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("Remove all downloaded and user-created wallpapers to free up disk space.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Clear Cache") {
+                                appModel.clearVideoCache()
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundStyle(.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+
                 SectionView(title: "Transitions & Ambience") {
                     VStack(spacing: 20) {
                         SettingSlider(

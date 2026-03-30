@@ -338,6 +338,35 @@ final class AppModel {
         smartDuckingService.isEnabled = enabled
     }
 
+    func clearVideoCache() {
+        Task {
+            let fileManager = FileManager.default
+            if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let videosDir = appSupport.appendingPathComponent("Aura/Videos", isDirectory: true)
+                if fileManager.fileExists(atPath: videosDir.path) {
+                    try? fileManager.removeItem(at: videosDir)
+                }
+                
+                let customWallpapersDir = appSupport.appendingPathComponent("Aura/CustomWallpapers", isDirectory: true)
+                if fileManager.fileExists(atPath: customWallpapersDir.path) {
+                    try? fileManager.removeItem(at: customWallpapersDir)
+                }
+            }
+
+            await MainActor.run {
+                DownloadManager.shared.downloadStates.removeAll()
+                // Remove all custom moods that rely on deleted custom wallpapers
+                let moodsToRemove = self.moodViewModel.moods.filter { mood in
+                    guard UUID(uuidString: mood.id) != nil else { return false }
+                    return mood.wallpaper.resources.first?.contains("CustomWallpapers") == true
+                }
+                for mood in moodsToRemove {
+                    self.moodViewModel.removeMood(mood)
+                }
+            }
+        }
+    }
+
     private func recordSceneActivation(moodID: String) {
         recentSceneIDs.removeAll { $0 == moodID }
         recentSceneIDs.insert(moodID, at: 0)
@@ -412,15 +441,6 @@ final class DownloadManager {
 
     func checkStatus(for resource: String) {
         _ = isDownloaded(resource: resource)
-
-        if downloadStates[resource] == .notDownloaded {
-            // Auto-download the first video of each mood if not downloaded
-            if DownloadManager.isFirstVideo(resource) {
-                Task {
-                    await downloadIfNeeded(resource)
-                }
-            }
-        }
     }
 
     static func isFirstVideo(_ resource: String) -> Bool {

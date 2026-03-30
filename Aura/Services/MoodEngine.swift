@@ -139,29 +139,9 @@ final class MoodEngine {
                 deferredStartupMoodID = nil
             }
 
-            if let primaryResource = mood.wallpaper.resources.first, mood.wallpaper.type == .animated {
-                let name = URL(fileURLWithPath: primaryResource).deletingPathExtension().lastPathComponent
-                let isFirst = name.hasSuffix("_1") ||
-                    name == "Donkey_Kong" ||
-                    name == "Mario_Pixel_Room" ||
-                    name == "Pixel_Cosmic" ||
-                    name == "Pixel_Cyberpunk_City" ||
-                    name == "Pixel_Gaming_Room" ||
-                    name == "Sailor_Moon" ||
-                    name == "Zelda_Pixel_Art"
-
-                if isFirst {
-                    if strategy == .deferredStartup {
-                        if !DownloadManager.shared.isDownloaded(resource: primaryResource) {
-                            Task {
-                                _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
-                            }
-                        }
-                    } else {
-                        _ = await DownloadManager.shared.downloadIfNeeded(primaryResource)
-                    }
-                }
-            }
+            if mood.wallpaper.type == .animated {
+            // We no longer pre-download the first video
+        }
 
             let settings = settingsEngine.loadSettings()
             let duration = settings.transitionDuration
