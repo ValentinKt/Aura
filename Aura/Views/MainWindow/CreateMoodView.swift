@@ -16,6 +16,8 @@ struct CreateMoodView: View {
     @State private var isShowingFilePicker = false
     @State private var isShowingImagePlayground = false
     @State private var isCreatingMood = false
+    @State private var creationProgress: Double = 0
+    @State private var creationStatusMessage: String?
     @State private var errorMessage: String?
 
     init(
@@ -78,11 +80,13 @@ struct CreateMoodView: View {
         VStack(spacing: 4) {
             Text(initialWallpaperSource == .imagePlayground ? "Create Dynamic Desktop Mood" : "Create Custom Mood")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(initialWallpaperSource == .imagePlayground ? "Design a wallpaper in Image Playground and Aura will generate a Dynamic Desktop wallpaper from it." : "Combine your favorite wallpaper with a custom audio mix.")
+            Text(initialWallpaperSource == .imagePlayground ? "Design a wallpaper in Image Playground and Aura will build a .heic Dynamic Desktop with 48 upscaled images that change throughout the day." : "Combine your favorite wallpaper with a custom audio mix.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .padding(.top, 24)
+        .padding(.horizontal, 24)
     }
 
     private var nameSection: some View {
@@ -179,6 +183,8 @@ struct CreateMoodView: View {
 
     private var imagePlaygroundSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            dynamicDesktopInfoCard
+
             if supportsImagePlayground {
                 Button {
                     isShowingImagePlayground = true
@@ -220,6 +226,34 @@ struct CreateMoodView: View {
                             .glassEffect(.regular, in: buttonShape)
                     }
                 }
+            }
+        }
+    }
+
+    private var dynamicDesktopInfoCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "sparkles.rectangle.stack")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Dynamic Desktop output")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Aura generates a single .heic wallpaper containing 48 upscaled images. macOS switches between those images over the course of the day.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background {
+            if reduceTransparency {
+                buttonShape.fill(.regularMaterial)
+            } else {
+                Color.clear
+                    .glassEffect(.regular, in: buttonShape)
             }
         }
     }
@@ -289,6 +323,28 @@ struct CreateMoodView: View {
                     .foregroundStyle(.red)
             }
 
+            if isCreatingMood, let creationStatusMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(creationStatusMessage)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+
+                        Spacer()
+
+                        Text(creationProgress.formatted(.percent.precision(.fractionLength(0))))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ProgressView(value: creationProgress)
+                        .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            }
+
             HStack(spacing: 16) {
                 Button(action: { dismiss() }) {
                     Text("Cancel")
@@ -322,7 +378,7 @@ struct CreateMoodView: View {
                                 .tint(.white)
                         }
 
-                        Text(isCreatingMood ? (shouldUpscaleSelectedWallpaper ? "Upscaling..." : "Creating...") : "Create Mood")
+                        Text(createButtonTitle)
                             .font(.headline)
                     }
                         .padding(.horizontal, 24)
@@ -370,11 +426,21 @@ struct CreateMoodView: View {
         initialWallpaperSource == .imagePlayground
     }
 
+    private var createButtonTitle: String {
+        if isCreatingMood {
+            return shouldUpscaleSelectedWallpaper ? "Creating Dynamic Desktop…" : "Creating…"
+        }
+
+        return "Create Mood"
+    }
+
     @MainActor
     private func createMood() async {
         guard let url = selectedFileURL else { return }
 
         isCreatingMood = true
+        creationProgress = shouldUpscaleSelectedWallpaper ? 0 : 0.1
+        creationStatusMessage = shouldUpscaleSelectedWallpaper ? "Preparing Dynamic Desktop frames…" : "Creating mood…"
         errorMessage = nil
 
         defer {
@@ -394,6 +460,7 @@ struct CreateMoodView: View {
 
             dismiss()
         } catch {
+            creationStatusMessage = nil
             print("🟥 [CreateMoodView] Failed to save wallpaper: \(error.localizedDescription)")
             errorMessage = "Failed to save wallpaper: \(error.localizedDescription)"
         }
@@ -412,7 +479,12 @@ struct CreateMoodView: View {
 
         do {
             let generator = try DynamicDesktopGenerator()
-            try await generator.generate(from: url, outputURL: destinationURL)
+            try await generator.generate(from: url, outputURL: destinationURL) { update in
+                Task { @MainActor in
+                    creationProgress = update.fractionCompleted
+                    creationStatusMessage = update.statusMessage
+                }
+            }
             return destinationURL.path
         } catch {
             if FileManager.default.fileExists(atPath: destinationURL.path) {

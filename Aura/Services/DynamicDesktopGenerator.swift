@@ -25,8 +25,37 @@ final class DynamicDesktopGenerator {
         }
     }
 
+    enum ProgressStep: Sendable {
+        case preparing
+        case generatingFrame(index: Int, total: Int)
+        case upscalingFrame(index: Int, total: Int)
+        case encodingFrame(index: Int, total: Int)
+        case finalizing
+    }
+
+    struct ProgressUpdate: Sendable {
+        let fractionCompleted: Double
+        let step: ProgressStep
+
+        var statusMessage: String {
+            switch step {
+            case .preparing:
+                return "Preparing Dynamic Desktop frames…"
+            case .generatingFrame(let index, let total):
+                return "Generating frame \(index) of \(total)…"
+            case .upscalingFrame(let index, let total):
+                return "Upscaling frame \(index) of \(total)…"
+            case .encodingFrame(let index, let total):
+                return "Encoding frame \(index) of \(total) into the HEIC…"
+            case .finalizing:
+                return "Finalizing the 48-image HEIC…"
+            }
+        }
+    }
+
     private let upscaler: ImageUpscaler
     private let ciContext: CIContext
+    private let totalFrames = 48
 
     convenience init() throws {
         try self.init(upscaler: ImageUpscaler())
@@ -40,21 +69,20 @@ final class DynamicDesktopGenerator {
         ])
     }
 
-    func generate(from sourceURL: URL, outputURL: URL, progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
+    func generate(from sourceURL: URL, outputURL: URL, progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }) async throws {
         let sourceImage = try await loadImage(from: sourceURL)
         try await generate(from: sourceImage, outputURL: outputURL, progress: progress)
     }
 
-    func generate(from sourceImage: NSImage, outputURL: URL, progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
-        let masterImage = try await upscaler.upscale(sourceImage)
+    func generate(from sourceImage: NSImage, outputURL: URL, progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }) async throws {
+        progress(ProgressUpdate(fractionCompleted: 0, step: .preparing))
 
-        guard let cgMasterImage = masterImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+        guard let cgSourceImage = sourceImage.cgImage(forProposedRect: nil, context: nil, hints: [NSImageRep.HintKey: Any]()) else {
             throw GeneratorError.cgImageCreationFailed
         }
 
         let colorSpace = CGColorSpace(name: CGColorSpace.displayP3) ?? CGColorSpaceCreateDeviceRGB()
-        let ciMasterImage = CIImage(cgImage: cgMasterImage, options: [.colorSpace: colorSpace])
-        let totalFrames = 48
+        let ciSourceImage = CIImage(cgImage: cgSourceImage, options: [.colorSpace: colorSpace])
 
         guard let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, UTType.heic.identifier as CFString, totalFrames, nil) else {
             throw GeneratorError.destinationCreationFailed
@@ -70,15 +98,51 @@ final class DynamicDesktopGenerator {
             kCGImagePropertyColorModel as String: kCGImagePropertyColorModelRGB,
             kCGImagePropertyProfileName as String: "Display P3"
         ]
+        let totalUnits = (totalFrames * 3) + 1
+        var completedUnits = 0
+
+        func progressFraction(for completedUnits: Int) -> Double {
+            Double(completedUnits) / Double(totalUnits)
+        }
 
         for i in 0..<totalFrames {
             try Task.checkCancellation()
+            let frameNumber = i + 1
 
-            let frameCGImage = try await generateFrame(
-                from: ciMasterImage,
+            progress(
+                ProgressUpdate(
+                    fractionCompleted: progressFraction(for: completedUnits),
+                    step: .generatingFrame(index: frameNumber, total: totalFrames)
+                )
+            )
+
+            let generatedFrame = try await generateFrame(
+                from: ciSourceImage,
                 frameIndex: i,
                 totalFrames: totalFrames,
                 colorSpace: colorSpace
+            )
+            completedUnits += 1
+
+            progress(
+                ProgressUpdate(
+                    fractionCompleted: progressFraction(for: completedUnits),
+                    step: .upscalingFrame(index: frameNumber, total: totalFrames)
+                )
+            )
+
+            let upscaledFrame = try await upscaler.upscale(generatedFrame)
+
+            guard let frameCGImage = upscaledFrame.cgImage(forProposedRect: nil, context: nil, hints: [NSImageRep.HintKey: Any]()) else {
+                throw GeneratorError.cgImageCreationFailed
+            }
+            completedUnits += 1
+
+            progress(
+                ProgressUpdate(
+                    fractionCompleted: progressFraction(for: completedUnits),
+                    step: .encodingFrame(index: frameNumber, total: totalFrames)
+                )
             )
 
             if i == 0 {
@@ -86,13 +150,21 @@ final class DynamicDesktopGenerator {
             } else {
                 CGImageDestinationAddImage(destination, frameCGImage, destinationOptions as CFDictionary)
             }
-
-            progress(Double(i + 1) / Double(totalFrames))
+            completedUnits += 1
         }
+
+        progress(
+            ProgressUpdate(
+                fractionCompleted: progressFraction(for: completedUnits),
+                step: .finalizing
+            )
+        )
 
         if !CGImageDestinationFinalize(destination) {
             throw GeneratorError.destinationCreationFailed
         }
+
+        progress(ProgressUpdate(fractionCompleted: 1, step: .finalizing))
     }
 
     private func loadImage(from sourceURL: URL) async throws -> NSImage {

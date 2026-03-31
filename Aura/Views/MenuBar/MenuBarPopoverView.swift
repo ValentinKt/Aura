@@ -72,11 +72,13 @@ struct MenuBarPopoverView: View {
             Task { await loadBackgroundMedia() }
         }
         .sheet(isPresented: $isShowingCreateMood) {
+            let isDynamicDesktopSubtheme = selectedSubtheme.caseInsensitiveCompare("Dynamic Desktop") == .orderedSame
+            let isImagePlaygroundSubtheme = selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame
             CreateMoodView(
                 appModel: appModel,
-                defaultTheme: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Dynamic" : "Custom",
-                defaultSubtheme: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Personal",
-                initialWallpaperSource: selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .importedMedia
+                defaultTheme: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
+                defaultSubtheme: isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal"),
+                initialWallpaperSource: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia
             )
         }
         .environment(\.colorScheme, .dark)
