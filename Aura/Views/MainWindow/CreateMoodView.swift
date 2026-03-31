@@ -9,6 +9,7 @@ struct CreateMoodView: View {
     @Bindable var appModel: AppModel
     let defaultTheme: String
     let defaultSubtheme: String
+    let initialWallpaperSource: InitialWallpaperSource
 
     @State private var moodName: String = ""
     @State private var selectedFileURL: URL?
@@ -26,6 +27,7 @@ struct CreateMoodView: View {
         self.appModel = appModel
         self.defaultTheme = defaultTheme
         self.defaultSubtheme = defaultSubtheme
+        self.initialWallpaperSource = initialWallpaperSource
     }
 
     var body: some View {
@@ -74,9 +76,9 @@ struct CreateMoodView: View {
 
     private var header: some View {
         VStack(spacing: 4) {
-            Text(defaultSubtheme == "Image Playground" ? "Create Image Playground Mood" : "Create Custom Mood")
+            Text(initialWallpaperSource == .imagePlayground ? "Create Dynamic Desktop Mood" : "Create Custom Mood")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(defaultSubtheme == "Image Playground" ? "Design a wallpaper in Image Playground and pair it with a custom audio mix." : "Combine your favorite wallpaper with a custom audio mix.")
+            Text(initialWallpaperSource == .imagePlayground ? "Design a wallpaper in Image Playground and Aura will generate a Dynamic Desktop wallpaper from it." : "Combine your favorite wallpaper with a custom audio mix.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -119,7 +121,7 @@ struct CreateMoodView: View {
 
     private var mediaPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if defaultSubtheme == "Image Playground" {
+            if initialWallpaperSource == .imagePlayground {
                 imagePlaygroundSection
             } else {
                 importedMediaSection
@@ -365,7 +367,7 @@ struct CreateMoodView: View {
     }
 
     private var shouldUpscaleSelectedWallpaper: Bool {
-        defaultSubtheme == "Image Playground"
+        initialWallpaperSource == .imagePlayground
     }
 
     @MainActor

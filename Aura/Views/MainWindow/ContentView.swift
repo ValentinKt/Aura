@@ -95,11 +95,14 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $isShowingCreateMood) {
+            let isDynamicDesktopSubtheme = ["Dynamic Desktop", "Image Playground"].contains {
+                appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare($0) == .orderedSame
+            }
             CreateMoodView(
                 appModel: appModel,
-                defaultTheme: appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Dynamic" : "Custom",
-                defaultSubtheme: appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Personal",
-                initialWallpaperSource: appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .importedMedia
+                defaultTheme: isDynamicDesktopSubtheme ? "Dynamic" : "Custom",
+                defaultSubtheme: isDynamicDesktopSubtheme ? "Dynamic Desktop" : "Personal",
+                initialWallpaperSource: isDynamicDesktopSubtheme ? .imagePlayground : .importedMedia
             )
         }
         .focusable()
@@ -144,6 +147,8 @@ struct ContentView: View {
         case "flow": return "water.waves"
         case "forest": return "tree.fill"
         case "fractal": return "hurricane"
+        case "aura": return "circle.fill"
+        case "dynamic desktop": return "desktopcomputer"
         case "image playground": return "wand.and.stars"
         case "mindfulness": return "figure.mind.and.body"
         case "rain": return "cloud.rain.fill"

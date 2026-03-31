@@ -110,7 +110,7 @@ struct SoundLayerMixerView: View {
         case .brownnoise: return "waveform.path.ecg"
         case .stream: return "drop.fill"
         case .night: return "moon.stars.fill"
-        case .crickets: return "sparkles"
+        case .crickets: return "ant.fill"
         case .fan: return "fan.fill"
         case .hum: return "cpu"
         case .piano: return "pianokeys"

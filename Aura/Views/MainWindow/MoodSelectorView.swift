@@ -111,7 +111,7 @@ struct SubthemeRow: View {
             CreateMoodView(
                 appModel: appModel,
                 defaultTheme: "Dynamic",
-                defaultSubtheme: "Image Playground",
+                defaultSubtheme: "Dynamic Desktop",
                 initialWallpaperSource: .imagePlayground
             )
         }
@@ -125,7 +125,11 @@ struct SubthemeRow: View {
                 MoodCard(
                     mood: mood,
                     isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
+                    isFavorite: appModel.favoriteSceneIDs.contains(mood.id),
                     selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
+                    onToggleFavorite: {
+                        appModel.toggleFavoriteScene(mood.id)
+                    },
                     onDelete: UUID(uuidString: mood.id) != nil ? {
                         withAnimation {
                             appModel.moodViewModel.removeMood(mood)
@@ -148,7 +152,7 @@ struct SubthemeRow: View {
                 }
             }
 
-            if subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame {
+            if ["Dynamic Desktop", "Image Playground"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
                 CreateImagePlaygroundCard {
                     showingImagePlaygroundDesigner = true
                 }
@@ -279,7 +283,7 @@ struct CreateImagePlaygroundCard: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
 
-                Text("Design with\nImage Playground")
+                Text("Create\nDynamic Desktop")
                     .font(.system(size: 14, weight: .bold))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
@@ -307,7 +311,7 @@ struct CreateImagePlaygroundCard: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
-        .accessibilityLabel("Design a wallpaper with Image Playground")
+        .accessibilityLabel("Create a dynamic desktop wallpaper")
         .accessibilityAddTraits(.isButton)
     }
 }
@@ -315,8 +319,10 @@ struct CreateImagePlaygroundCard: View {
 struct MoodCard: View {
     let mood: Mood
     let isSelected: Bool
+    let isFavorite: Bool
     let selectedWallpaperURL: URL?
-    var onDelete: (() -> Void)? = nil
+    let onToggleFavorite: () -> Void
+    var onDelete: (() -> Void)?
     let action: (Bool) -> Void
 
     @State private var image: NSImage?
@@ -372,6 +378,28 @@ struct MoodCard: View {
             }
             .buttonStyle(.plain)
             .focusable(false)
+
+            if canToggleFavorite {
+                VStack {
+                    HStack {
+                        Button(action: onToggleFavorite) {
+                            Image(systemName: isFavorite ? "star.fill" : "star")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(isFavorite ? Color.yellow : .white.opacity(0.92))
+                                .padding(8)
+                                .background(.black.opacity(0.28), in: Circle())
+                                .shadow(radius: 4)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(10)
+
+                        Spacer()
+                    }
+
+                    Spacer()
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
 
             if let onDelete = onDelete, isHovered {
                 Button(action: onDelete) {
@@ -454,12 +482,10 @@ struct MoodCard: View {
                 }
             }
 
-            // Hover Effect Overlay
             if isHovered && !isSelected {
                 Color.white.opacity(0.1)
             }
 
-            // Small label at the bottom-left as shown in the image
             Text(mood.name)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.white)
@@ -470,7 +496,6 @@ struct MoodCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 .padding(14)
 
-            // Selection indicator
             if isSelected {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.white, lineWidth: 2)
@@ -480,7 +505,6 @@ struct MoodCard: View {
                     )
             }
 
-            // Download Status Overlay
             if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, mood.wallpaper.type != .website, !primaryResource.isEmpty {
                 let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
                 if downloadState == .notDownloaded {
@@ -525,6 +549,18 @@ struct MoodCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
+    private var canToggleFavorite: Bool {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || mood.wallpaper.type == .website {
+            return true
+        }
+
+        guard !primaryResource.isEmpty else {
+            return isFavorite
+        }
+
+        return isFavorite || DownloadManager.shared.downloadStates[primaryResource] == .downloaded
+    }
+
     private func handleAction() {
         if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || mood.wallpaper.type == .website || primaryResource.isEmpty {
             action(false)
@@ -537,7 +573,7 @@ struct MoodCard: View {
         } else {
             // First call action to select the mood immediately and show fallback gradient
             action(false)
-            
+
             Task {
                 await DownloadManager.shared.download(primaryResource)
                 if DownloadManager.shared.isDownloaded(resource: primaryResource) {

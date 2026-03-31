@@ -15,9 +15,9 @@ final class MoodViewModel {
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
     private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Image Playground", "Quotes", "Time", "Zen"]
+    private static let dynamicSubthemes: Set<String> = ["Dynamic Desktop", "Image Playground", "Quotes", "Time", "Zen"]
     private static let miscellaneousSubthemes: Set<String> = ["Website"]
-    private static let pinnedDynamicSubthemes: Set<String> = ["Image Playground"]
+    private static let pinnedDynamicSubthemes: Set<String> = ["Dynamic Desktop"]
     var onMoodSelected: ((Mood) -> Void)?
 
     private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(

@@ -13,6 +13,7 @@ final class MoodEngine {
     private enum ApplyStrategy {
         case standard
         case deferredStartup
+        case wallpaperOnly
     }
 
     private let soundEngine: SoundEngine
@@ -115,6 +116,10 @@ final class MoodEngine {
         await applyMood(mood, strategy: .standard)
     }
 
+    func applyWallpaperOnlyMood(_ mood: Mood) async {
+        await applyMood(mood, strategy: .wallpaperOnly)
+    }
+
     func completeDeferredStartupIfNeeded() async {
         guard let deferredStartupMix, let deferredStartupMoodID else { return }
 
@@ -166,6 +171,13 @@ final class MoodEngine {
                 _ = await wallpaperEngine.applyWallpaper(wallpaperDescriptor)
 
                 if !Task.isCancelled {
+                    state = .idle
+                }
+            case .wallpaperOnly:
+                _ = await wallpaperEngine.applyWallpaper(wallpaperDescriptor)
+
+                if !Task.isCancelled {
+                    settingsEngine.updateLastUsedMood(mood.id)
                     state = .idle
                 }
             }

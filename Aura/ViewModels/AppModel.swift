@@ -16,6 +16,7 @@ final class AppModel {
         static let favoriteSceneIDs = "Aura.favoriteSceneIDs"
         static let recentSceneIDs = "Aura.recentSceneIDs"
         static let lastResumableSceneID = "Aura.lastResumableSceneID"
+        static let initialAuraWallpaperApplied = "Aura.initialAuraWallpaperApplied"
     }
 
     static let shared = AppModel(persistence: PersistenceController.shared)
@@ -117,6 +118,7 @@ final class AppModel {
         isReady = true
         wallpaperEngine.setPresentationSuppressed(false)
         await moodEngine.completeDeferredStartupIfNeeded()
+        await applyInitialAuraWallpaperIfNeeded()
         weatherEngine.start()
         if settings.randomAmbienceInterval > 0 {
             soundEngine.startRandomization(interval: settings.randomAmbienceInterval, validRange: 0.1...0.9)
@@ -157,6 +159,21 @@ final class AppModel {
             group.cancelAll()
             return result
         }
+    }
+
+    private func applyInitialAuraWallpaperIfNeeded() async {
+        guard !UserDefaults.standard.bool(forKey: StorageKey.initialAuraWallpaperApplied) else { return }
+        guard let firstAuraMood = moodViewModel.firstMood(inSubtheme: "Aura") else { return }
+
+        let primaryResource = firstAuraMood.wallpaper.resources.first ?? ""
+        if !primaryResource.isEmpty {
+            let didDownload = await DownloadManager.shared.downloadIfNeeded(primaryResource)
+            guard didDownload else { return }
+        }
+
+        moodViewModel.selectedSubtheme = firstAuraMood.subtheme
+        await moodEngine.applyWallpaperOnlyMood(firstAuraMood)
+        UserDefaults.standard.set(true, forKey: StorageKey.initialAuraWallpaperApplied)
     }
 
     func performShortcut(_ routine: ShortcutRoutine) async throws {
@@ -346,7 +363,7 @@ final class AppModel {
                 if fileManager.fileExists(atPath: videosDir.path) {
                     try? fileManager.removeItem(at: videosDir)
                 }
-                
+
                 let customWallpapersDir = appSupport.appendingPathComponent("Aura/CustomWallpapers", isDirectory: true)
                 if fileManager.fileExists(atPath: customWallpapersDir.path) {
                     try? fileManager.removeItem(at: customWallpapersDir)
