@@ -240,8 +240,8 @@ struct CreateMoodView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Dynamic Desktop output")
                     .font(.system(size: 13, weight: .semibold))
-                Text("Aura generates a single .heic wallpaper from 24 Retina-sized JPEG frames. macOS switches between those images over the course of the day.")
-                    .font(.system(size: 11))
+                Text("Aura generates a unique dynamic HEIC wallpaper from the image you created with “Image Playground.” \n From this image, 24 images are generated to represent the changing hours throughout the day. \n All images are upscaled for display on Retina screens.")
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
