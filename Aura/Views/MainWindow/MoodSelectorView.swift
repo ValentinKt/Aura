@@ -111,7 +111,7 @@ struct SubthemeRow: View {
             CreateMoodView(
                 appModel: appModel,
                 defaultTheme: "Dynamic",
-                defaultSubtheme: "Dynamic Desktop",
+                defaultSubtheme: subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Dynamic Desktop",
                 initialWallpaperSource: .imagePlayground
             )
         }
@@ -156,6 +156,7 @@ struct SubthemeRow: View {
                 CreateImagePlaygroundCard {
                     showingImagePlaygroundDesigner = true
                 }
+                .environment(\.createImagePlaygroundCardStyle, subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .dynamicDesktop)
             }
         }
         .padding(.horizontal, 40)
@@ -270,11 +271,46 @@ struct CreateWebsiteCard: View {
     }
 }
 
+private enum CreateImagePlaygroundCardStyle {
+    case dynamicDesktop
+    case imagePlayground
+
+    var title: String {
+        switch self {
+        case .dynamicDesktop:
+            return "Create\nDynamic Desktop"
+        case .imagePlayground:
+            return "Design with\nImage Playground"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .dynamicDesktop:
+            return "Create a dynamic desktop wallpaper"
+        case .imagePlayground:
+            return "Design a wallpaper with Image Playground"
+        }
+    }
+}
+
+private struct CreateImagePlaygroundCardStyleKey: EnvironmentKey {
+    static let defaultValue: CreateImagePlaygroundCardStyle = .dynamicDesktop
+}
+
+private extension EnvironmentValues {
+    var createImagePlaygroundCardStyle: CreateImagePlaygroundCardStyle {
+        get { self[CreateImagePlaygroundCardStyleKey.self] }
+        set { self[CreateImagePlaygroundCardStyleKey.self] = newValue }
+    }
+}
+
 struct CreateImagePlaygroundCard: View {
     let action: () -> Void
 
     @State private var isHovered = false
     @State private var isPressed = false
+    @Environment(\.createImagePlaygroundCardStyle) private var style
 
     var body: some View {
         Button(action: action) {
@@ -283,7 +319,7 @@ struct CreateImagePlaygroundCard: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.95))
 
-                Text("Create\nDynamic Desktop")
+                Text(style.title)
                     .font(.system(size: 14, weight: .bold))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
@@ -311,7 +347,7 @@ struct CreateImagePlaygroundCard: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
-        .accessibilityLabel("Create a dynamic desktop wallpaper")
+        .accessibilityLabel(style.accessibilityLabel)
         .accessibilityAddTraits(.isButton)
     }
 }

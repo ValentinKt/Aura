@@ -95,14 +95,14 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $isShowingCreateMood) {
-            let isDynamicDesktopSubtheme = ["Dynamic Desktop", "Image Playground"].contains {
-                appModel.moodViewModel.selectedSubtheme?.caseInsensitiveCompare($0) == .orderedSame
-            }
+            let selectedSubtheme = appModel.moodViewModel.selectedSubtheme
+            let isDynamicDesktopSubtheme = selectedSubtheme?.caseInsensitiveCompare("Dynamic Desktop") == .orderedSame
+            let isImagePlaygroundSubtheme = selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame
             CreateMoodView(
                 appModel: appModel,
-                defaultTheme: isDynamicDesktopSubtheme ? "Dynamic" : "Custom",
-                defaultSubtheme: isDynamicDesktopSubtheme ? "Dynamic Desktop" : "Personal",
-                initialWallpaperSource: isDynamicDesktopSubtheme ? .imagePlayground : .importedMedia
+                defaultTheme: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
+                defaultSubtheme: isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal"),
+                initialWallpaperSource: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia
             )
         }
         .focusable()
