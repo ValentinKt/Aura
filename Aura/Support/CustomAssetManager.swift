@@ -56,6 +56,12 @@ enum CustomAssetManager {
         return destination.path
     }
 
+    static func makeCustomWallpaperURL(fileExtension: String) -> URL {
+        let normalizedExtension = fileExtension.lowercased()
+        let filename = "\(UUID().uuidString).\(normalizedExtension)"
+        return customWallpapersDirectory.appendingPathComponent(filename)
+    }
+
     static func saveCustomWallpaper(from image: NSImage, preferredFileExtension: String = "jpg") throws -> String {
         let maxDimension: CGFloat = 3840.0
         var finalImage = image

@@ -34,7 +34,7 @@ actor ImageUpscaler {
     private let modelOutputSize: CGSize
 
     init(
-        modelName: String = "SuperResolution",
+        modelName: String = "realesrgan512",
         bundle: Bundle = .main,
         configuration: MLModelConfiguration = ImageUpscaler.defaultModelConfiguration(),
         cropAndScaleOption: VNImageCropAndScaleOption = .scaleFill

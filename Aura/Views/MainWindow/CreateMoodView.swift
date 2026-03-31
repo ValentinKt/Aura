@@ -399,35 +399,25 @@ struct CreateMoodView: View {
 
     private func saveWallpaper(from url: URL) async throws -> String {
         if shouldUpscaleSelectedWallpaper {
-            do {
-                return try await upscaleImagePlaygroundWallpaper(from: url)
-            } catch ImageUpscaler.UpscalingError.modelNotFound {
-                return try CustomAssetManager.saveCustomWallpaper(from: url)
-            }
+            return try await generateDynamicImagePlaygroundWallpaper(from: url)
         }
 
         return try CustomAssetManager.saveCustomWallpaper(from: url)
     }
 
-    private func upscaleImagePlaygroundWallpaper(from url: URL) async throws -> String {
-        let imageData = try await Task.detached(priority: .userInitiated) { () throws -> Data in
-            let isSecurityScoped = url.startAccessingSecurityScopedResource()
-            defer {
-                if isSecurityScoped {
-                    url.stopAccessingSecurityScopedResource()
-                }
+    private func generateDynamicImagePlaygroundWallpaper(from url: URL) async throws -> String {
+        let destinationURL = CustomAssetManager.makeCustomWallpaperURL(fileExtension: "heic")
+
+        do {
+            let generator = try DynamicDesktopGenerator()
+            try await generator.generate(from: url, outputURL: destinationURL)
+            return destinationURL.path
+        } catch {
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try? FileManager.default.removeItem(at: destinationURL)
             }
-
-            return try Data(contentsOf: url)
-        }.value
-
-        guard let image = NSImage(data: imageData) else {
-            throw ImageUpscaler.UpscalingError.imageConversionFailed
+            throw error
         }
-
-        let upscaler = try ImageUpscaler()
-        let upscaledImage = try await upscaler.upscale(image)
-        return try CustomAssetManager.saveCustomWallpaper(from: upscaledImage, preferredFileExtension: "jpg")
     }
 
 }
