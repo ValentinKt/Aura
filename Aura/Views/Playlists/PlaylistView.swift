@@ -1,5 +1,20 @@
 import SwiftUI
 
+private func playlistDurationLabel(for duration: TimeInterval) -> String {
+    let totalMinutes = max(1, Int(duration / 60))
+    let hours = totalMinutes / 60
+    let minutes = totalMinutes % 60
+
+    switch (hours, minutes) {
+    case (0, let minutes):
+        return "\(minutes)m"
+    case (let hours, 0):
+        return "\(hours)h"
+    default:
+        return "\(hours)h \(minutes)m"
+    }
+}
+
 struct PlaylistView: View {
     @Bindable var appModel: AppModel
     @State private var showEditor: Bool = false
@@ -17,6 +32,7 @@ struct PlaylistView: View {
             playlistList
         }
         .padding(24)
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: appModel.playlistViewModel.state)
         .sheet(isPresented: $showEditor) {
             PlaylistEditorView(appModel: appModel, playlist: selectedPlaylist)
         }
@@ -61,106 +77,69 @@ struct PlaylistView: View {
     }
 
     private func activePlaylistSection(_ playlist: Playlist) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("NOW PLAYING")
-                    .font(.caption.bold())
-                    .tracking(1.2)
-                    .foregroundStyle(Color.accentColor)
-
-                Spacer()
-
-                if isPlaying {
-                    HStack(spacing: 3) {
-                        ForEach(0..<4) { i in
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(Color.accentColor)
-                                .frame(width: 2, height: 12)
-                                .scaleEffect(y: isPlaying ? 1.0 : 0.4)
-                                .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.1), value: isPlaying)
-                        }
-                    }
+        GlassEffectContainer(shape: RoundedRectangle(cornerRadius: 16, style: .continuous)) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 12) {
+                    statusPill
+                    Spacer()
+                    Text("\(currentIndex + 1) of \(playlist.entries.count)")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
-            }
 
-            HStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(playlist.name)
-                        .font(.title2)
-                        .bold()
-
-                    let entry = playlist.entries[currentIndex]
-                    Group {
-                        if entry.customAudioPath != nil {
-                            Text("Current: \(entry.name ?? "Custom Audio")")
-                        } else if let moodID = entry.moodID {
-                            let mood = appModel.moodViewModel.mood(for: moodID)
-                            Text("Current: \(mood?.name ?? "Unknown Mood")")
-                        } else {
-                            Text("Current: Invalid Entry")
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                        .font(.title2.weight(.bold))
+                    Text(currentEntryTitle)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
                 }
 
-                Spacer()
-
-                playbackControls
+                HStack(alignment: .bottom, spacing: 24) {
+                    playbackControls
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(activeEntryDurationLabel)
+                            .font(.headline)
+                        Text("Current segment")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .padding(24)
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.regularMaterial)
-                } else {
-                    Color.clear
-                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-            }
-            .shadow(color: .black.opacity(0.15), radius: 30, y: 15)
+            .liquidGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: false, variant: .regular)
+            .shadow(color: .black.opacity(reduceTransparency ? 0.08 : 0.15), radius: 30, y: 15)
         }
     }
 
     private var playbackControls: some View {
-        HStack(spacing: 16) {
-            Button(action: { appModel.playlistViewModel.previous() }) {
-                Image(systemName: "backward.fill")
-                    .font(.title2)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: {
-                if case .playing = appModel.playlistViewModel.state {
-                    appModel.playlistViewModel.pause()
-                } else {
-                    appModel.playlistViewModel.resume()
+        GlassEffectContainer {
+            HStack(spacing: 10) {
+                controlButton(systemName: "backward.fill", label: "Previous") {
+                    appModel.playlistViewModel.previous()
                 }
-            }) {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 24))
-            }
-            .buttonStyle(.plain)
 
-            Button(action: { appModel.playlistViewModel.skip() }) {
-                Image(systemName: "forward.fill")
-                    .font(.title2)
-            }
-            .buttonStyle(.plain)
+                controlButton(systemName: isPlaying ? "pause.fill" : "play.fill", label: isPlaying ? "Pause Playlist" : "Resume Playlist", emphasized: true) {
+                    if isPlaying {
+                        appModel.playlistViewModel.pause()
+                    } else {
+                        appModel.playlistViewModel.resume()
+                    }
+                }
 
-            Divider().frame(height: 24)
+                controlButton(systemName: "forward.fill", label: "Next") {
+                    appModel.playlistViewModel.skip()
+                }
 
-            Button(action: { appModel.playlistViewModel.toggleShuffle() }) {
-                Image(systemName: "shuffle")
-                    .foregroundStyle(appModel.playlistViewModel.shuffleEnabled ? Color.accentColor : .secondary)
-            }
-            .buttonStyle(.plain)
+                controlButton(systemName: "shuffle", label: "Shuffle", isSelected: appModel.playlistViewModel.shuffleEnabled) {
+                    appModel.playlistViewModel.toggleShuffle()
+                }
 
-            Button(action: { appModel.playlistViewModel.cycleRepeatMode() }) {
-                Image(systemName: repeatIcon)
-                    .foregroundStyle(appModel.playlistViewModel.repeatMode != .off ? Color.accentColor : .secondary)
+                controlButton(systemName: repeatIcon, label: "Repeat", isSelected: appModel.playlistViewModel.repeatMode != .off) {
+                    appModel.playlistViewModel.cycleRepeatMode()
+                }
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -179,6 +158,64 @@ struct PlaylistView: View {
         }
     }
 
+    private var statusPill: some View {
+        HStack(spacing: 8) {
+            if isPlaying {
+                HStack(spacing: 3) {
+                    ForEach(0..<3) { index in
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.accentColor)
+                            .frame(width: 3, height: 12)
+                            .scaleEffect(y: isPlaying ? 1.0 : 0.35)
+                            .animation(.spring(response: 0.45, dampingFraction: 0.72).repeatForever().delay(Double(index) * 0.08), value: isPlaying)
+                    }
+                }
+            } else {
+                Image(systemName: "pause.circle.fill")
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            Text(isPlaying ? "Playing" : "Paused")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .liquidGlass(Capsule(), interactive: false, variant: .regular)
+    }
+
+    private var currentEntryTitle: String {
+        guard let entry = activeEntry else {
+            return "Current segment unavailable"
+        }
+
+        if entry.customAudioPath != nil {
+            return entry.name ?? "Custom Audio"
+        }
+
+        if let moodID = entry.moodID {
+            return appModel.moodViewModel.mood(for: moodID)?.name ?? "Unknown Mood"
+        }
+
+        return "Invalid playlist entry"
+    }
+
+    private var activeEntryDurationLabel: String {
+        guard let entry = activeEntry else {
+            return "—"
+        }
+
+        return entry.duration <= 0 ? "Until skipped" : playlistDurationLabel(for: entry.duration)
+    }
+
+    private var activeEntry: PlaylistEntry? {
+        guard let activePlaylist, activePlaylist.entries.indices.contains(currentIndex) else {
+            return nil
+        }
+
+        return activePlaylist.entries[currentIndex]
+    }
+
     private var playlistList: some View {
         ScrollView {
             GlassEffectContainer {
@@ -187,7 +224,19 @@ struct PlaylistView: View {
                         PlaylistCard(
                             playlist: playlist,
                             isActive: activePlaylist?.id == playlist.id,
+                            isPlaying: activePlaylist?.id == playlist.id && isPlaying,
+                            isPaused: activePlaylist?.id == playlist.id && !isPlaying,
                             onPlay: { appModel.playlistViewModel.play(playlist) },
+                            onPauseResume: {
+                                if activePlaylist?.id == playlist.id {
+                                    if isPlaying {
+                                        appModel.playlistViewModel.pause()
+                                    } else {
+                                        appModel.playlistViewModel.resume()
+                                    }
+                                }
+                            },
+                            onRestart: { appModel.playlistViewModel.play(playlist) },
                             onEdit: {
                                 selectedPlaylist = playlist
                                 showEditor = true
@@ -225,12 +274,41 @@ struct PlaylistView: View {
     private var buttonShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
     }
+
+    @ViewBuilder
+    private func controlButton(
+        systemName: String,
+        label: String,
+        emphasized: Bool = false,
+        isSelected: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(emphasized ? .title3.weight(.bold) : .callout.weight(.semibold))
+                .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                .frame(width: emphasized ? 46 : 40, height: emphasized ? 46 : 40)
+                .background {
+                    if emphasized && reduceTransparency {
+                        Circle().fill(.regularMaterial)
+                    }
+                }
+                .liquidGlass(Circle(), interactive: true, variant: .regular)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
 }
 
 struct PlaylistCard: View {
     let playlist: Playlist
     let isActive: Bool
+    let isPlaying: Bool
+    let isPaused: Bool
     let onPlay: () -> Void
+    let onPauseResume: () -> Void
+    let onRestart: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
@@ -292,7 +370,7 @@ struct PlaylistCard: View {
                     .font(.headline)
                     .lineLimit(1)
 
-                Text("\(playlist.entries.count) segments")
+                Text(playlistMetadata)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -302,12 +380,24 @@ struct PlaylistCard: View {
 
     private var footerActions: some View {
         HStack {
-            Button(action: onPlay) {
+            Button(action: isActive ? onPauseResume : onPlay) {
                 playButtonLabel
             }
             .buttonStyle(.plain)
 
+            if isActive {
+                Button(action: onRestart) {
+                    restartButtonLabel
+                }
+                .buttonStyle(.plain)
+            }
+
             Menu {
+                if isActive {
+                    Button(action: onRestart) {
+                        Label("Restart", systemImage: "arrow.counterclockwise")
+                    }
+                }
                 Button(action: onEdit) {
                     Label("Edit", systemImage: "pencil")
                 }
@@ -343,14 +433,34 @@ struct PlaylistCard: View {
 
     private var playButtonBase: some View {
         HStack {
-            Image(systemName: isActive ? "arrow.counterclockwise" : "play.fill")
-            Text(isActive ? "Restart" : "Play")
+            Image(systemName: playButtonIcon)
+            Text(playButtonTitle)
         }
         .font(.subheadline.bold())
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .foregroundStyle(isActive ? Color.primary : Color.white)
+    }
+
+    @ViewBuilder
+    private var restartButtonLabel: some View {
+        if reduceTransparency {
+            restartButtonBase
+                .background {
+                    buttonShape.fill(.regularMaterial)
+                }
+        } else {
+            restartButtonBase
+                .glassEffect(.regular.interactive(), in: buttonShape)
+        }
+    }
+
+    private var restartButtonBase: some View {
+        Image(systemName: "arrow.counterclockwise")
+            .font(.headline)
+            .frame(width: 42, height: 42)
+            .foregroundStyle(.primary)
     }
 
     @ViewBuilder
@@ -378,5 +488,38 @@ struct PlaylistCard: View {
 
     private var buttonShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
+    }
+
+    private var playButtonIcon: String {
+        if isPlaying {
+            return "pause.fill"
+        }
+
+        if isPaused {
+            return "play.fill"
+        }
+
+        return "play.fill"
+    }
+
+    private var playButtonTitle: String {
+        if isPlaying {
+            return "Pause"
+        }
+
+        if isPaused {
+            return "Resume"
+        }
+
+        return "Play"
+    }
+
+    private var playlistMetadata: String {
+        let totalDuration = playlist.entries.reduce(0) { partialResult, entry in
+            partialResult + max(entry.duration, 0)
+        }
+
+        let durationText = totalDuration > 0 ? playlistDurationLabel(for: totalDuration) : "Flexible"
+        return "\(playlist.entries.count) segments • \(durationText)"
     }
 }

@@ -256,7 +256,7 @@ final class SoundEngine {
 
     func crossfade(to targetMix: [String: Float], duration: TimeInterval) async {
         print("🟢 [SoundEngine] Crossfade started over \(duration)s")
-        if state == .ready {
+        if state == .ready || state == .paused {
             resume()
         }
 

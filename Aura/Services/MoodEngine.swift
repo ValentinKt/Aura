@@ -211,6 +211,15 @@ final class MoodEngine {
         await transitionTask?.value
     }
 
+    func pausePlayback() {
+        transitionTask?.cancel()
+        soundEngine.pause()
+    }
+
+    func resumePlayback() {
+        soundEngine.resume()
+    }
+
     func mood(for id: String) -> Mood? {
         moods.first { $0.id == id }
     }

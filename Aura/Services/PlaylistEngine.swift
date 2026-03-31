@@ -49,6 +49,8 @@ final class PlaylistEngine {
     private let persistence: PersistenceController
     private var playbackTask: Task<Void, Never>?
     private var scheduleTask: Task<Void, Never>?
+    private var playbackStartedAt: Date?
+    private var remainingEntryDuration: TimeInterval?
 
     init(moodEngine: MoodEngine, persistence: PersistenceController) {
         self.moodEngine = moodEngine
@@ -68,7 +70,9 @@ final class PlaylistEngine {
 
     func pause() {
         if case .playing(let playlist, let index) = state {
+            remainingEntryDuration = remainingDuration(for: playlist.entries[index])
             state = .paused(playlist, index)
+            moodEngine.pausePlayback()
             stopPlayback()
         }
     }
@@ -76,7 +80,8 @@ final class PlaylistEngine {
     func resume() {
         if case .paused(let playlist, let index) = state {
             state = .playing(playlist, index)
-            startPlayback()
+            moodEngine.resumePlayback()
+            startPlayback(reapplyEntry: false)
         }
     }
 
@@ -89,6 +94,10 @@ final class PlaylistEngine {
             let newIndex = max(0, index - 1)
             state = .playing(playlist, newIndex)
             startPlayback()
+        } else if case .paused(let playlist, let index) = state {
+            let newIndex = max(0, index - 1)
+            state = .paused(playlist, newIndex)
+            remainingEntryDuration = playlist.entries[newIndex].duration
         }
     }
 
@@ -96,6 +105,9 @@ final class PlaylistEngine {
         if case .playing(let playlist, _) = state {
             state = .playing(playlist, 0)
             startPlayback()
+        } else if case .paused(let playlist, _) = state {
+            state = .paused(playlist, 0)
+            remainingEntryDuration = playlist.entries.first?.duration
         }
     }
 
@@ -154,7 +166,7 @@ final class PlaylistEngine {
         }
     }
 
-    private func startPlayback() {
+    private func startPlayback(reapplyEntry: Bool = true) {
         stopPlayback()
 
         guard case .playing(let playlist, let index) = state else { return }
@@ -164,42 +176,34 @@ final class PlaylistEngine {
 
             let entry = playlist.entries[index]
 
-            if let audioPath = entry.customAudioPath {
-                let url = URL(fileURLWithPath: audioPath)
-                await moodEngine.playCustomAudio(url: url)
-            } else if let moodID = entry.moodID {
-                guard let mood = moodEngine.mood(for: moodID) else {
+            if reapplyEntry {
+                if let audioPath = entry.customAudioPath {
+                    let url = URL(fileURLWithPath: audioPath)
+                    await moodEngine.playCustomAudio(url: url)
+                } else if let moodID = entry.moodID {
+                    guard let mood = moodEngine.mood(for: moodID) else {
+                        await MainActor.run {
+                            self.state = .error(PlaylistError.invalidMood(moodID).localizedDescription)
+                        }
+                        return
+                    }
+                    await moodEngine.applyMood(mood)
+                } else {
                     await MainActor.run {
-                        self.state = .error(PlaylistError.invalidMood(moodID).localizedDescription)
+                        self.state = .error("Invalid playlist entry: no mood or audio.")
                     }
                     return
                 }
-                // Apply mood
-                await moodEngine.applyMood(mood)
-            } else {
-                await MainActor.run {
-                    self.state = .error("Invalid playlist entry: no mood or audio.")
-                }
-                return
             }
 
-            // If duration is 0, we stay on this mood until manual skip
-            if entry.duration <= 0 { return }
-
-            // Wait for duration
-            try? await Task.sleep(nanoseconds: UInt64(entry.duration * 1_000_000_000))
-
-            if !Task.isCancelled {
-                await MainActor.run {
-                    self.advance()
-                }
-            }
+            await self.scheduleAdvance(after: reapplyEntry ? entry.duration : (self.remainingEntryDuration ?? entry.duration))
         }
     }
 
     private func stopPlayback() {
         playbackTask?.cancel()
         playbackTask = nil
+        playbackStartedAt = nil
     }
 
     private func advance() {
@@ -223,6 +227,34 @@ final class PlaylistEngine {
 
         state = .playing(playlist, nextIndex)
         startPlayback()
+    }
+
+    private func scheduleAdvance(after duration: TimeInterval) async {
+        remainingEntryDuration = duration
+
+        guard duration > 0 else {
+            playbackStartedAt = nil
+            return
+        }
+
+        playbackStartedAt = Date()
+        try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+
+        if !Task.isCancelled {
+            await MainActor.run {
+                self.advance()
+            }
+        }
+    }
+
+    private func remainingDuration(for entry: PlaylistEntry) -> TimeInterval {
+        guard entry.duration > 0 else { return 0 }
+        guard let playbackStartedAt, let remainingEntryDuration else {
+            return entry.duration
+        }
+
+        let elapsed = Date().timeIntervalSince(playbackStartedAt)
+        return max(0, remainingEntryDuration - elapsed)
     }
 
     private func loadPlaylists() -> [Playlist] {
