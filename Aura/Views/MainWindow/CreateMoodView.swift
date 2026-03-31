@@ -80,7 +80,7 @@ struct CreateMoodView: View {
         VStack(spacing: 4) {
             Text(initialWallpaperSource == .imagePlayground ? "Create Dynamic Desktop Mood" : "Create Custom Mood")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(initialWallpaperSource == .imagePlayground ? "Design a wallpaper in Image Playground and Aura will build a .heic Dynamic Desktop with 48 upscaled images that change throughout the day." : "Combine your favorite wallpaper with a custom audio mix.")
+            Text(initialWallpaperSource == .imagePlayground ? "Design a wallpaper in Image Playground and Aura will build a .heic Dynamic Desktop from 24 Retina-sized JPEG frames that change throughout the day." : "Combine your favorite wallpaper with a custom audio mix.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -240,7 +240,7 @@ struct CreateMoodView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Dynamic Desktop output")
                     .font(.system(size: 13, weight: .semibold))
-                Text("Aura generates a single .heic wallpaper containing 48 upscaled images. macOS switches between those images over the course of the day.")
+                Text("Aura generates a single .heic wallpaper from 24 Retina-sized JPEG frames. macOS switches between those images over the course of the day.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

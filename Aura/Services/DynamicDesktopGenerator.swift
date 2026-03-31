@@ -5,6 +5,11 @@ import ImageIO
 import UniformTypeIdentifiers
 
 final class DynamicDesktopGenerator {
+    private static let outputFrameCount = 24
+    private static let maximumRetinaLongEdge: CGFloat = 3_840
+    private static let intermediateJPEGCompressionQuality = 0.82
+    private static let heicCompressionQuality = 0.76
+
     enum GeneratorError: LocalizedError, Sendable {
         case sourceImageLoadingFailed
         case metadataEncodingFailed
@@ -46,16 +51,16 @@ final class DynamicDesktopGenerator {
             case .upscalingFrame(let index, let total):
                 return "Upscaling frame \(index) of \(total)…"
             case .encodingFrame(let index, let total):
-                return "Encoding frame \(index) of \(total) into the HEIC…"
+                return "Compressing frame \(index) of \(total) for the HEIC…"
             case .finalizing:
-                return "Finalizing the 48-image HEIC…"
+                return "Finalizing the \(DynamicDesktopGenerator.outputFrameCount)-image HEIC…"
             }
         }
     }
 
     private let upscaler: ImageUpscaler
     private let ciContext: CIContext
-    private let totalFrames = 48
+    private let totalFrames = DynamicDesktopGenerator.outputFrameCount
 
     convenience init() throws {
         try self.init(upscaler: ImageUpscaler())
@@ -94,7 +99,7 @@ final class DynamicDesktopGenerator {
 
         let metadata = try makeMetadata(totalFrames: totalFrames)
         let destinationOptions: [String: Any] = [
-            kCGImageDestinationLossyCompressionQuality as String: 0.88,
+            kCGImageDestinationLossyCompressionQuality as String: Self.heicCompressionQuality,
             kCGImagePropertyColorModel as String: kCGImagePropertyColorModelRGB,
             kCGImagePropertyProfileName as String: "Display P3"
         ]
@@ -144,11 +149,12 @@ final class DynamicDesktopGenerator {
                     step: .encodingFrame(index: frameNumber, total: totalFrames)
                 )
             )
+            let optimizedFrame = try await optimizeFrameForStorage(frameCGImage, colorSpace: colorSpace)
 
             if i == 0 {
-                CGImageDestinationAddImageAndMetadata(destination, frameCGImage, metadata, destinationOptions as CFDictionary)
+                CGImageDestinationAddImageAndMetadata(destination, optimizedFrame, metadata, destinationOptions as CFDictionary)
             } else {
-                CGImageDestinationAddImage(destination, frameCGImage, destinationOptions as CFDictionary)
+                CGImageDestinationAddImage(destination, optimizedFrame, destinationOptions as CFDictionary)
             }
             completedUnits += 1
         }
@@ -165,6 +171,16 @@ final class DynamicDesktopGenerator {
         }
 
         progress(ProgressUpdate(fractionCompleted: 1, step: .finalizing))
+    }
+
+    private func optimizeFrameForStorage(_ image: CGImage, colorSpace: CGColorSpace) async throws -> CGImage {
+        let context = self.ciContext
+        return try await Task.detached(priority: .userInitiated) {
+            try autoreleasepool { () throws -> CGImage in
+                let resizedImage = try Self.resizeForRetinaIfNeeded(image, colorSpace: colorSpace, context: context)
+                return try Self.compressAsJPEG(resizedImage, colorSpace: colorSpace)
+            }
+        }.value
     }
 
     private func loadImage(from sourceURL: URL) async throws -> NSImage {
@@ -265,6 +281,62 @@ final class DynamicDesktopGenerator {
                 return cgImage
             }
         }.value
+    }
+
+    private static func resizeForRetinaIfNeeded(
+        _ image: CGImage,
+        colorSpace: CGColorSpace,
+        context: CIContext
+    ) throws -> CGImage {
+        let longEdge = max(image.width, image.height)
+        guard CGFloat(longEdge) > maximumRetinaLongEdge else {
+            return image
+        }
+
+        let scale = maximumRetinaLongEdge / CGFloat(longEdge)
+        let ciImage = CIImage(cgImage: image, options: [.colorSpace: colorSpace])
+
+        guard let scaleFilter = CIFilter(name: "CILanczosScaleTransform") else {
+            throw GeneratorError.imageProcessingFailed
+        }
+
+        scaleFilter.setValue(ciImage, forKey: kCIInputImageKey)
+        scaleFilter.setValue(scale, forKey: kCIInputScaleKey)
+        scaleFilter.setValue(1.0, forKey: kCIInputAspectRatioKey)
+
+        guard let outputImage = scaleFilter.outputImage,
+              let resizedImage = context.createCGImage(outputImage, from: outputImage.extent.integral, format: .RGBA8, colorSpace: colorSpace) else {
+            throw GeneratorError.cgImageCreationFailed
+        }
+
+        return resizedImage
+    }
+
+    private static func compressAsJPEG(_ image: CGImage, colorSpace: CGColorSpace) throws -> CGImage {
+        let jpegData = NSMutableData()
+
+        guard let destination = CGImageDestinationCreateWithData(jpegData, UTType.jpeg.identifier as CFString, 1, nil) else {
+            throw GeneratorError.destinationCreationFailed
+        }
+
+        let destinationOptions: [String: Any] = [
+            kCGImageDestinationLossyCompressionQuality as String: intermediateJPEGCompressionQuality,
+            kCGImagePropertyColorModel as String: kCGImagePropertyColorModelRGB,
+            kCGImagePropertyProfileName as String: "Display P3"
+        ]
+
+        CGImageDestinationAddImage(destination, image, destinationOptions as CFDictionary)
+
+        guard CGImageDestinationFinalize(destination),
+              let source = CGImageSourceCreateWithData(jpegData, nil),
+              let compressedImage = CGImageSourceCreateImageAtIndex(source, 0, [
+                kCGImageSourceShouldCache: false,
+                kCGImageSourceShouldAllowFloat: false
+              ] as CFDictionary) else {
+            throw GeneratorError.destinationCreationFailed
+        }
+
+        return compressedImage.copy(colorSpace: colorSpace) ?? compressedImage
     }
 
     nonisolated private static func gaussianPeak(at value: Double, center: Double, width: Double) -> Double {

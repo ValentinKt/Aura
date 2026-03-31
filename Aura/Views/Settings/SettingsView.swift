@@ -1007,7 +1007,7 @@ extension WallpaperDescriptor {
         case .current:
             return "Aura keeps your current macOS wallpaper while still applying audio and theme changes."
         case .dynamic:
-            return "A HEIC dynamic wallpaper containing 48 images that shift throughout the day."
+            return "A HEIC dynamic wallpaper built from 24 Retina-sized JPEG frames that shift throughout the day."
         case .time:
             return "A live time wallpaper that uses the current hour as the focal point."
         case .quote:
