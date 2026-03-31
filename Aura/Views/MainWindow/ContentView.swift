@@ -136,7 +136,6 @@ struct ContentView: View {
 
     private func iconForSubtheme(_ subtheme: String) -> String {
         switch subtheme.lowercased() {
-        case "aurora": return "sparkles"
         case "autumn": return "leaf.fill"
         case "coffeeshop": return "cup.and.saucer.fill"
         case "color": return "paintpalette.fill"
@@ -147,7 +146,7 @@ struct ContentView: View {
         case "flow": return "water.waves"
         case "forest": return "tree.fill"
         case "fractal": return "hurricane"
-        case "aura": return "circle.fill"
+        case "aura": return "circle"
         case "dynamic desktop": return "desktopcomputer"
         case "image playground": return "wand.and.stars"
         case "mindfulness": return "figure.mind.and.body"
