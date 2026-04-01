@@ -208,9 +208,10 @@ final class DynamicDesktopGenerator {
         let prefix = "apple_desktop" as CFString
         CGImageMetadataRegisterNamespaceForPrefix(metadata, namespace, prefix, nil)
 
-        let plistData: Data
+        // Time-based cycling metadata
+        let timePlistData: Data
         do {
-            plistData = try PropertyListSerialization.data(
+            timePlistData = try PropertyListSerialization.data(
                 fromPropertyList: generateTimePlist(frames: totalFrames),
                 format: .binary,
                 options: 0
@@ -218,19 +219,44 @@ final class DynamicDesktopGenerator {
         } catch {
             throw GeneratorError.metadataEncodingFailed
         }
-        let encodedPlist = plistData.base64EncodedString()
+        let encodedTimePlist = timePlistData.base64EncodedString()
 
-        guard let tag = CGImageMetadataTagCreate(
+        guard let timeTag = CGImageMetadataTagCreate(
             namespace,
             prefix,
             "aprp" as CFString,
             .string,
-            encodedPlist as CFString
+            encodedTimePlist as CFString
         ) else {
             throw GeneratorError.metadataInjectionFailed
         }
 
-        guard CGImageMetadataSetTagWithPath(metadata, nil, "apple_desktop:aprp" as CFString, tag) else {
+        // Solar-based cycling metadata (often required for better macOS integration)
+        let solarPlistData: Data
+        do {
+            solarPlistData = try PropertyListSerialization.data(
+                fromPropertyList: generateSolarPlist(frames: totalFrames),
+                format: .binary,
+                options: 0
+            )
+        } catch {
+            throw GeneratorError.metadataEncodingFailed
+        }
+        let encodedSolarPlist = solarPlistData.base64EncodedString()
+
+        guard let solarTag = CGImageMetadataTagCreate(
+            namespace,
+            prefix,
+            "apls" as CFString,
+            .string,
+            encodedSolarPlist as CFString
+        ) else {
+            throw GeneratorError.metadataInjectionFailed
+        }
+
+        // Inject both tags
+        guard CGImageMetadataSetTagWithPath(metadata, nil, "apple_desktop:aprp" as CFString, timeTag),
+              CGImageMetadataSetTagWithPath(metadata, nil, "apple_desktop:apls" as CFString, solarTag) else {
             throw GeneratorError.metadataInjectionFailed
         }
 
@@ -358,6 +384,30 @@ final class DynamicDesktopGenerator {
                 "l": frames / 2
             ],
             "ti": tiArray
+        ]
+    }
+
+    private func generateSolarPlist(frames: Int) -> [String: Any] {
+        // Solar-based metadata uses altitude and azimuth
+        // We simulate a 24h cycle
+        let siArray = (0..<frames).map { frameIndex in
+            let progress = Double(frameIndex) / Double(frames)
+            let altitude = 90.0 * sin((progress * 2.0 * .pi) - (.pi / 2.0))
+            let azimuth = progress * 360.0
+
+            return [
+                "i": frameIndex,
+                "a": altitude,
+                "z": azimuth
+            ]
+        }
+
+        return [
+            "ap": [
+                "d": 0,
+                "l": frames / 2
+            ],
+            "si": siArray
         ]
     }
 }
