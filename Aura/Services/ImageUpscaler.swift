@@ -27,7 +27,7 @@ actor ImageUpscaler {
         }
     }
 
-    private let visionModel: VNCoreMLModel
+    private let visionModel: VNCoreMLModel?
     private let ciContext: CIContext
     private let cropAndScaleOption: VNImageCropAndScaleOption
     private let modelInputSize: CGSize
@@ -61,7 +61,20 @@ actor ImageUpscaler {
         self.modelOutputSize = CGSize(width: outputConstraint.pixelsWide, height: outputConstraint.pixelsHigh)
     }
 
+    private init(dummy: Bool) {
+        self.visionModel = nil
+        self.ciContext = CIContext()
+        self.cropAndScaleOption = .scaleFill
+        self.modelInputSize = CGSize(width: 512, height: 512)
+        self.modelOutputSize = CGSize(width: 512, height: 512)
+    }
+
     func upscale(_ image: NSImage) async throws -> NSImage {
+        guard let visionModel = visionModel else {
+            // If dummy, return original image
+            return image
+        }
+
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw UpscalingError.imageConversionFailed
         }
@@ -70,6 +83,11 @@ actor ImageUpscaler {
     }
 
     func upscale(_ image: CGImage) async throws -> NSImage {
+        guard let visionModel = visionModel else {
+            // If dummy, return original image
+            return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        }
+
         try Task.checkCancellation()
 
         let upscaledImage: CGImage
@@ -102,6 +120,10 @@ actor ImageUpscaler {
     }
 
     private func performRequest(on image: CGImage) throws -> CGImage {
+        guard let visionModel = visionModel else {
+            return image
+        }
+
         let request = VNCoreMLRequest(model: visionModel)
         request.imageCropAndScaleOption = cropAndScaleOption
 
@@ -205,9 +227,15 @@ actor ImageUpscaler {
         return cgImage
     }
 
-    private static func defaultModelConfiguration() -> MLModelConfiguration {
-        let configuration = MLModelConfiguration()
-        configuration.computeUnits = .all
-        return configuration
+    static func defaultModelConfiguration() -> MLModelConfiguration {
+        let config = MLModelConfiguration()
+        config.computeUnits = .all
+        return config
+    }
+
+    static func createDummy() -> ImageUpscaler {
+        // This is a dummy upscaler that doesn't actually do anything, but fulfills the type requirement.
+        // It's used when the super-resolution model is missing or cannot be loaded.
+        return ImageUpscaler(dummy: true)
     }
 }

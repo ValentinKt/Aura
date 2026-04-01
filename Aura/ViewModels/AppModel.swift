@@ -29,6 +29,7 @@ final class AppModel {
     let moodEngine: MoodEngine
     let playlistEngine: PlaylistEngine
     let weatherEngine: WeatherEngine
+    let dynamicDesktopGenerator: DynamicDesktopGenerator
     let presetEngine: PresetEngine
     let quoteEngine: QuoteEngine
     let smartDuckingService: SmartDuckingService
@@ -59,6 +60,15 @@ final class AppModel {
         let moodEngine = MoodEngine(soundEngine: soundEngine, wallpaperEngine: wallpaperEngine, themeManager: themeManager, settingsEngine: settingsEngine)
         let playlistEngine = PlaylistEngine(moodEngine: moodEngine, persistence: persistence)
         let weatherEngine = WeatherEngine(moodEngine: moodEngine, settingsEngine: settingsEngine)
+        let dynamicDesktopGenerator: DynamicDesktopGenerator
+        if let generator = try? DynamicDesktopGenerator() {
+            dynamicDesktopGenerator = generator
+        } else {
+            // Fallback to a basic generator if the high-quality upscaler model is missing.
+            // We use a dummy upscaler that just returns the image as-is if model loading fails.
+            let fallbackUpscaler = (try? ImageUpscaler()) ?? ImageUpscaler.createDummy()
+            dynamicDesktopGenerator = DynamicDesktopGenerator(upscaler: fallbackUpscaler)
+        }
         let presetEngine = PresetEngine(persistence: persistence)
         let quoteEngine = QuoteEngine(persistence: persistence)
         let smartDuckingService = SmartDuckingService(soundEngine: soundEngine)
@@ -71,6 +81,7 @@ final class AppModel {
         self.moodEngine = moodEngine
         self.playlistEngine = playlistEngine
         self.weatherEngine = weatherEngine
+        self.dynamicDesktopGenerator = dynamicDesktopGenerator
         self.presetEngine = presetEngine
         self.quoteEngine = quoteEngine
         self.smartDuckingService = smartDuckingService
@@ -79,7 +90,7 @@ final class AppModel {
         self.lastResumableSceneID = UserDefaults.standard.string(forKey: StorageKey.lastResumableSceneID)
 
         let playerViewModel = PlayerViewModel(soundEngine: soundEngine, settingsEngine: settingsEngine, moodEngine: moodEngine)
-        let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, quoteEngine: quoteEngine)
+        let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, quoteEngine: quoteEngine, dynamicDesktopGenerator: dynamicDesktopGenerator)
         self.playerViewModel = playerViewModel
         self.moodViewModel = moodViewModel
         self.playlistViewModel = PlaylistViewModel(playlistEngine: playlistEngine)

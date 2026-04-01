@@ -14,6 +14,7 @@ final class MoodViewModel {
     private let moodEngine: MoodEngine
     private let playerViewModel: PlayerViewModel
     private let quoteEngine: QuoteEngine
+    private let dynamicDesktopGenerator: DynamicDesktopGenerator
     private var quoteRefreshToken = 0
     private static let dynamicSubthemes: Set<String> = ["Dynamic Desktop", "Image Playground", "Quotes", "Time", "Zen"]
     private static let miscellaneousSubthemes: Set<String> = ["Website"]
@@ -40,10 +41,11 @@ final class MoodViewModel {
         moodEngine.currentMood
     }
 
-    init(moodEngine: MoodEngine, playerViewModel: PlayerViewModel, quoteEngine: QuoteEngine) {
+    init(moodEngine: MoodEngine, playerViewModel: PlayerViewModel, quoteEngine: QuoteEngine, dynamicDesktopGenerator: DynamicDesktopGenerator) {
         self.moodEngine = moodEngine
         self.playerViewModel = playerViewModel
         self.quoteEngine = quoteEngine
+        self.dynamicDesktopGenerator = dynamicDesktopGenerator
     }
 
     func selectMood(_ mood: Mood) {
@@ -51,6 +53,29 @@ final class MoodViewModel {
         Task {
             await moodEngine.applyMood(mood)
         }
+    }
+
+    func exportDynamicDesktop(for mood: Mood) async throws -> URL {
+        return try await Self.exportDynamicDesktop(mood: mood)
+    }
+
+    static func exportDynamicDesktop(mood: Mood) async throws -> URL {
+        guard let path = mood.wallpaper.resources.first,
+              path.lowercased().hasSuffix(".heic"),
+              FileManager.default.fileExists(atPath: path) else {
+            throw NSError(domain: "MoodViewModel", code: 404, userInfo: [NSLocalizedDescriptionKey: "No Dynamic Desktop (.heic) found for this mood."])
+        }
+
+        let sourceURL = URL(fileURLWithPath: path)
+        let fileName = "\(mood.name.replacingOccurrences(of: " ", with: "_")).heic"
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+
+        if FileManager.default.fileExists(atPath: tempURL.path) {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        try FileManager.default.copyItem(at: sourceURL, to: tempURL)
+        return tempURL
     }
 
     func addCustomMood(name: String, theme: String = "Custom", subtheme: String = "Personal", wallpaperPath: String, layerMix: [String: Float], type: WallpaperType? = nil) {

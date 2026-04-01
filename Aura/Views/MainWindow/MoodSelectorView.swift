@@ -361,6 +361,9 @@ struct MoodCard: View {
     var onDelete: (() -> Void)?
     let action: (Bool) -> Void
 
+    @State private var isExporting = false
+    @State private var exportError: String?
+    @State private var showExportSuccess = false
     @State private var image: NSImage?
     @State private var isHovered = false
     @State private var isPressed = false
@@ -369,6 +372,10 @@ struct MoodCard: View {
 
     private var primaryResource: String {
         mood.wallpaper.resources.first ?? ""
+    }
+
+    private var isDynamicDesktop: Bool {
+        mood.wallpaper.type == .dynamic || (mood.wallpaper.resources.first?.lowercased().hasSuffix(".heic") ?? false)
     }
 
     var body: some View {
@@ -435,6 +442,34 @@ struct MoodCard: View {
                     Spacer()
                 }
                 .transition(.scale.combined(with: .opacity))
+            }
+
+            if isDynamicDesktop {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        if isExporting {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(10)
+                                .background(.black.opacity(0.4), in: Circle())
+                                .padding(10)
+                        } else {
+                            Button(action: exportHEIC) {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.92))
+                                    .padding(8)
+                                    .background(.black.opacity(0.28), in: Circle())
+                                    .shadow(radius: 4)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(10)
+                            .help("Download .heic Dynamic Desktop")
+                        }
+                    }
+                }
             }
 
             if let onDelete = onDelete, isHovered {
@@ -617,6 +652,42 @@ struct MoodCard: View {
                     action(true) // Force re-apply to trigger wallpaper change
                 }
             }
+        }
+    }
+
+    private func exportHEIC() {
+        guard !isExporting else { return }
+
+        isExporting = true
+        exportError = nil
+
+        Task {
+            do {
+                let tempURL = try await MoodViewModel.exportDynamicDesktop(mood: mood)
+
+                // Show save panel to let user choose where to save
+                let savePanel = NSSavePanel()
+                savePanel.allowedContentTypes = [.heic]
+                savePanel.canCreateDirectories = true
+                savePanel.nameFieldStringValue = "\(mood.name.replacingOccurrences(of: " ", with: "_")).heic"
+                savePanel.title = "Save Dynamic Desktop"
+                savePanel.message = "Choose a location to save your Dynamic Desktop wallpaper."
+
+                if savePanel.runModal() == .OK, let destinationURL = savePanel.url {
+                    if FileManager.default.fileExists(atPath: destinationURL.path) {
+                        try? FileManager.default.removeItem(at: destinationURL)
+                    }
+                    try FileManager.default.copyItem(at: tempURL, to: destinationURL)
+                    showExportSuccess = true
+                }
+
+                // Clean up temp file
+                try? FileManager.default.removeItem(at: tempURL)
+            } catch {
+                print("🟥 [MoodCard] Export failed: \(error.localizedDescription)")
+                exportError = error.localizedDescription
+            }
+            isExporting = false
         }
     }
 

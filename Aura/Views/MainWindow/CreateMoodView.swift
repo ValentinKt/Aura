@@ -1,6 +1,7 @@
 import SwiftUI
 import ImagePlayground
 import UniformTypeIdentifiers
+import AppKit
 
 struct CreateMoodView: View {
     @Environment(\.dismiss) private var dismiss
@@ -30,6 +31,35 @@ struct CreateMoodView: View {
         self.defaultTheme = defaultTheme
         self.defaultSubtheme = defaultSubtheme
         self.initialWallpaperSource = initialWallpaperSource
+    }
+
+    private func exportHEIC(from url: URL) {
+        guard !isExporting else { return }
+
+        isExporting = true
+
+        Task {
+            do {
+                // Show save panel to let user choose where to save
+                let savePanel = NSSavePanel()
+                savePanel.allowedContentTypes = [.heic]
+                savePanel.canCreateDirectories = true
+                savePanel.nameFieldStringValue = url.lastPathComponent
+                savePanel.title = "Save Dynamic Desktop"
+                savePanel.message = "Choose a location to save your Dynamic Desktop wallpaper."
+
+                if savePanel.runModal() == .OK, let destinationURL = savePanel.url {
+                    if FileManager.default.fileExists(atPath: destinationURL.path) {
+                        try? FileManager.default.removeItem(at: destinationURL)
+                    }
+                    try FileManager.default.copyItem(at: url, to: destinationURL)
+                }
+            } catch {
+                print("🟥 [CreateMoodView] Export failed: \(error.localizedDescription)")
+                errorMessage = "Export failed: \(error.localizedDescription)"
+            }
+            isExporting = false
+        }
     }
 
     var body: some View {
@@ -258,6 +288,8 @@ struct CreateMoodView: View {
         }
     }
 
+    @State private var isExporting = false
+
     private func selectedWallpaperPreview(for url: URL) -> some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 12) {
@@ -280,9 +312,28 @@ struct CreateMoodView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
 
-                Text(url.lastPathComponent)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text(url.lastPathComponent)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    if url.pathExtension.lowercased() == "heic" {
+                        Spacer()
+                        if isExporting {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Button {
+                                exportHEIC(from: url)
+                            } label: {
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Download .heic file")
+                        }
+                    }
+                }
             }
 
             Button {
