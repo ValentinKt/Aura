@@ -70,8 +70,7 @@ actor ImageUpscaler {
     }
 
     func upscale(_ image: NSImage) async throws -> NSImage {
-        guard let visionModel = visionModel else {
-            // If dummy, return original image
+        guard visionModel != nil else {
             return image
         }
 
@@ -79,34 +78,40 @@ actor ImageUpscaler {
             throw UpscalingError.imageConversionFailed
         }
 
-        return try await upscale(cgImage)
+        let upscaledImage = try await upscaleCGImage(cgImage)
+        return NSImage(cgImage: upscaledImage, size: NSSize(width: upscaledImage.width, height: upscaledImage.height))
     }
 
     func upscale(_ image: CGImage) async throws -> NSImage {
-        guard let visionModel = visionModel else {
-            // If dummy, return original image
-            return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        let upscaledImage = try await upscaleCGImage(image)
+        return NSImage(cgImage: upscaledImage, size: NSSize(width: upscaledImage.width, height: upscaledImage.height))
+    }
+
+    func upscaleCGImage(_ image: CGImage) async throws -> CGImage {
+        guard visionModel != nil else {
+            return image
+        }
+
+        defer {
+            ciContext.clearCaches()
         }
 
         try Task.checkCancellation()
-
-        let upscaledImage: CGImage
 
         if usesSinglePassInference(for: image) {
-            upscaledImage = try performRequest(on: image)
-        } else if supportsTiledInference(for: image) {
-            upscaledImage = try await performTiledInference(on: image)
-        } else {
-            throw UpscalingError.unsupportedImageDimensions(
-                width: image.width,
-                height: image.height,
-                tileWidth: Int(modelInputSize.width),
-                tileHeight: Int(modelInputSize.height)
-            )
+            return try performRequest(on: image)
         }
 
-        try Task.checkCancellation()
-        return NSImage(cgImage: upscaledImage, size: NSSize(width: upscaledImage.width, height: upscaledImage.height))
+        if supportsTiledInference(for: image) {
+            return try await performTiledInference(on: image)
+        }
+
+        throw UpscalingError.unsupportedImageDimensions(
+            width: image.width,
+            height: image.height,
+            tileWidth: Int(modelInputSize.width),
+            tileHeight: Int(modelInputSize.height)
+        )
     }
 
     private func usesSinglePassInference(for image: CGImage) -> Bool {
@@ -124,14 +129,15 @@ actor ImageUpscaler {
             return image
         }
 
-        let request = VNCoreMLRequest(model: visionModel)
-        request.imageCropAndScaleOption = cropAndScaleOption
-
-        let handler = VNImageRequestHandler(cgImage: image)
-
         do {
-            try handler.perform([request])
-            return try makeCGImage(from: request.results)
+            return try autoreleasepool { () throws -> CGImage in
+                let request = VNCoreMLRequest(model: visionModel)
+                request.imageCropAndScaleOption = cropAndScaleOption
+
+                let handler = VNImageRequestHandler(cgImage: image)
+                try handler.perform([request])
+                return try makeCGImage(from: request.results)
+            }
         } catch let error as UpscalingError {
             throw error
         } catch {
@@ -167,19 +173,21 @@ actor ImageUpscaler {
                         height: tileHeight
                     )
 
-                    let tileImage = inputImage.cropped(to: cropRect)
+                    let translatedTile = try autoreleasepool { () throws -> CIImage in
+                        let tileImage = inputImage.cropped(to: cropRect)
 
-                    guard let tileCGImage = ciContext.createCGImage(tileImage, from: tileImage.extent) else {
-                        throw UpscalingError.imageConversionFailed
-                    }
+                        guard let tileCGImage = ciContext.createCGImage(tileImage, from: tileImage.extent) else {
+                            throw UpscalingError.imageConversionFailed
+                        }
 
-                    let upscaledTile = try performRequest(on: tileCGImage)
-                    let translatedTile = CIImage(cgImage: upscaledTile).transformed(
-                        by: CGAffineTransform(
-                            translationX: CGFloat(column * outputTileWidth),
-                            y: CGFloat(row * outputTileHeight)
+                        let upscaledTile = try performRequest(on: tileCGImage)
+                        return CIImage(cgImage: upscaledTile).transformed(
+                            by: CGAffineTransform(
+                                translationX: CGFloat(column * outputTileWidth),
+                                y: CGFloat(row * outputTileHeight)
+                            )
                         )
-                    )
+                    }
 
                     composedImage = translatedTile.composited(over: composedImage).cropped(to: outputExtent)
                 }

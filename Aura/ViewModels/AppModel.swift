@@ -64,10 +64,8 @@ final class AppModel {
         if let generator = try? DynamicDesktopGenerator() {
             dynamicDesktopGenerator = generator
         } else {
-            // Fallback to a basic generator if the high-quality upscaler model is missing.
-            // We use a dummy upscaler that just returns the image as-is if model loading fails.
-            let fallbackUpscaler = (try? ImageUpscaler()) ?? ImageUpscaler.createDummy()
-            dynamicDesktopGenerator = DynamicDesktopGenerator(upscaler: fallbackUpscaler)
+            let fallbackManager = UpscaleManager(workerFactory: { ImageUpscaler.createDummy() })
+            dynamicDesktopGenerator = DynamicDesktopGenerator(upscaleManager: fallbackManager)
         }
         let presetEngine = PresetEngine(persistence: persistence)
         let quoteEngine = QuoteEngine(persistence: persistence)

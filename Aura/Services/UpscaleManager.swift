@@ -1,0 +1,225 @@
+import AppKit
+import Foundation
+
+actor UpscaleManager {
+    struct ProgressUpdate: Sendable {
+        let completedCount: Int
+        let totalCount: Int
+        let currentIndex: Int?
+
+        var fractionCompleted: Double {
+            guard totalCount > 0 else { return 1 }
+            return Double(completedCount) / Double(totalCount)
+        }
+
+        var statusMessage: String {
+            "\(completedCount)/\(totalCount) images done"
+        }
+    }
+
+    enum UpscaleError: LocalizedError, Sendable {
+        case imageLoadingFailed(url: URL)
+        case cgImageCreationFailed(index: Int)
+        case missingResult(index: Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .imageLoadingFailed(let url):
+                return "Failed to load an image from \(url.lastPathComponent)."
+            case .cgImageCreationFailed(let index):
+                return "Failed to create a CGImage for item \(index + 1)."
+            case .missingResult(let index):
+                return "Upscaling finished without producing a result for item \(index + 1)."
+            }
+        }
+    }
+
+    fileprivate struct WorkItem: Sendable {
+        let index: Int
+        let loadImage: @Sendable () async throws -> CGImage
+    }
+
+    private let maxConcurrentOperations: Int
+    private let workerFactory: @Sendable () throws -> ImageUpscaler
+
+    init(
+        maxConcurrentOperations: Int = 2,
+        workerFactory: @escaping @Sendable () throws -> ImageUpscaler = { try ImageUpscaler() }
+    ) {
+        self.maxConcurrentOperations = max(1, min(3, maxConcurrentOperations))
+        self.workerFactory = workerFactory
+    }
+
+    func upscale(
+        _ images: [NSImage],
+        progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }
+    ) async throws -> [NSImage] {
+        let workItems = images.enumerated().map { index, image in
+            return WorkItem(index: index) {
+                try autoreleasepool { () throws -> CGImage in
+                    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                        throw UpscaleError.cgImageCreationFailed(index: index)
+                    }
+
+                    return cgImage
+                }
+            }
+        }
+
+        let cgImages = try await upscale(workItems, progress: progress)
+        return cgImages.map { image in
+            NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        }
+    }
+
+    func upscale(
+        urls: [URL],
+        progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }
+    ) async throws -> [NSImage] {
+        let workItems = urls.enumerated().map { index, url in
+            WorkItem(index: index) {
+                try await Self.loadCGImage(from: url)
+            }
+        }
+
+        let cgImages = try await upscale(workItems, progress: progress)
+        return cgImages.map { image in
+            NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        }
+    }
+
+    func upscale(
+        _ images: [CGImage],
+        progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }
+    ) async throws -> [CGImage] {
+        let workItems = images.enumerated().map { index, image in
+            WorkItem(index: index) {
+                image
+            }
+        }
+
+        return try await upscale(workItems, progress: progress)
+    }
+
+    private func upscale(
+        _ workItems: [WorkItem],
+        progress: @escaping @Sendable (ProgressUpdate) -> Void
+    ) async throws -> [CGImage] {
+        guard !workItems.isEmpty else {
+            progress(ProgressUpdate(completedCount: 0, totalCount: 0, currentIndex: nil))
+            return []
+        }
+
+        progress(ProgressUpdate(completedCount: 0, totalCount: workItems.count, currentIndex: nil))
+
+        let taskQueue = TaskQueue(items: workItems)
+        let progressTracker = ProgressTracker(totalCount: workItems.count)
+        let resultStore = ResultStore(totalCount: workItems.count)
+        let workerCount = min(maxConcurrentOperations, workItems.count)
+        let workerFactory = self.workerFactory
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0..<workerCount {
+                let worker = try workerFactory()
+
+                group.addTask(priority: .userInitiated) {
+                    while let workItem = await taskQueue.next() {
+                        try Task.checkCancellation()
+                        let sourceImage = try await workItem.loadImage()
+                        let upscaledImage = try await worker.upscaleCGImage(sourceImage)
+                        await resultStore.store(upscaledImage, at: workItem.index)
+                        let update = await progressTracker.recordCompletion(for: workItem.index)
+                        progress(update)
+                    }
+                }
+            }
+
+            try await group.waitForAll()
+        }
+
+        return try await resultStore.makeOrderedResults()
+    }
+
+    private static func loadCGImage(from url: URL) async throws -> CGImage {
+        let data = try await Task.detached(priority: .userInitiated) {
+            let isSecurityScoped = url.startAccessingSecurityScopedResource()
+            defer {
+                if isSecurityScoped {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            return try Data(contentsOf: url)
+        }.value
+
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, [
+                kCGImageSourceShouldCache: false
+              ] as CFDictionary) else {
+            throw UpscaleError.imageLoadingFailed(url: url)
+        }
+
+        return cgImage
+    }
+}
+
+private actor TaskQueue {
+    private let items: [UpscaleManager.WorkItem]
+    private var nextIndex = 0
+
+    init(items: [UpscaleManager.WorkItem]) {
+        self.items = items
+    }
+
+    func next() -> UpscaleManager.WorkItem? {
+        guard nextIndex < items.count else {
+            return nil
+        }
+
+        defer {
+            nextIndex += 1
+        }
+
+        return items[nextIndex]
+    }
+}
+
+private actor ProgressTracker {
+    private let totalCount: Int
+    private var completedCount = 0
+
+    init(totalCount: Int) {
+        self.totalCount = totalCount
+    }
+
+    func recordCompletion(for index: Int) -> UpscaleManager.ProgressUpdate {
+        completedCount += 1
+        return UpscaleManager.ProgressUpdate(
+            completedCount: completedCount,
+            totalCount: totalCount,
+            currentIndex: index + 1
+        )
+    }
+}
+
+private actor ResultStore {
+    private var images: [CGImage?]
+
+    init(totalCount: Int) {
+        self.images = Array(repeating: nil, count: totalCount)
+    }
+
+    func store(_ image: CGImage, at index: Int) {
+        images[index] = image
+    }
+
+    func makeOrderedResults() throws -> [CGImage] {
+        try images.enumerated().map { index, image in
+            guard let image else {
+                throw UpscaleManager.UpscaleError.missingResult(index: index)
+            }
+
+            return image
+        }
+    }
+}

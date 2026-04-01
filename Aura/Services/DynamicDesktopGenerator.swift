@@ -5,10 +5,10 @@ import ImageIO
 import UniformTypeIdentifiers
 
 final class DynamicDesktopGenerator {
-    private static let outputFrameCount = 24
-    private static let maximumRetinaLongEdge: CGFloat = 3_840
-    private static let intermediateJPEGCompressionQuality = 0.82
-    private static let heicCompressionQuality = 0.76
+    nonisolated private static let outputFrameCount = 24
+    nonisolated private static let maximumRetinaLongEdge: CGFloat = 3_840
+    nonisolated private static let intermediateJPEGCompressionQuality = 0.82
+    nonisolated private static let heicCompressionQuality = 0.76
 
     enum GeneratorError: LocalizedError, Sendable {
         case sourceImageLoadingFailed
@@ -33,7 +33,7 @@ final class DynamicDesktopGenerator {
     enum ProgressStep: Sendable {
         case preparing
         case generatingFrame(index: Int, total: Int)
-        case upscalingFrame(index: Int, total: Int)
+        case upscalingFrame(completed: Int, total: Int, currentIndex: Int?)
         case encodingFrame(index: Int, total: Int)
         case finalizing
     }
@@ -48,8 +48,8 @@ final class DynamicDesktopGenerator {
                 return "Preparing Dynamic Desktop frames…"
             case .generatingFrame(let index, let total):
                 return "Generating frame \(index) of \(total)…"
-            case .upscalingFrame(let index, let total):
-                return "Upscaling frame \(index) of \(total)…"
+            case .upscalingFrame(let completed, let total, _):
+                return "Upscaling frames… \(completed)/\(total) images done"
             case .encodingFrame(let index, let total):
                 return "Compressing frame \(index) of \(total) for the HEIC…"
             case .finalizing:
@@ -58,16 +58,16 @@ final class DynamicDesktopGenerator {
         }
     }
 
-    private let upscaler: ImageUpscaler
+    private let upscaleManager: UpscaleManager
     private let ciContext: CIContext
     private let totalFrames = DynamicDesktopGenerator.outputFrameCount
 
     convenience init() throws {
-        try self.init(upscaler: ImageUpscaler())
+        self.init(upscaleManager: UpscaleManager())
     }
 
-    init(upscaler: ImageUpscaler) {
-        self.upscaler = upscaler
+    init(upscaleManager: UpscaleManager) {
+        self.upscaleManager = upscaleManager
         self.ciContext = CIContext(options: [
             .cacheIntermediates: false,
             .priorityRequestLow: false
@@ -81,6 +81,7 @@ final class DynamicDesktopGenerator {
 
     func generate(from sourceImage: NSImage, outputURL: URL, progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }) async throws {
         progress(ProgressUpdate(fractionCompleted: 0, step: .preparing))
+        let totalFrames = self.totalFrames
 
         guard let cgSourceImage = sourceImage.cgImage(forProposedRect: nil, context: nil, hints: [NSImageRep.HintKey: Any]()) else {
             throw GeneratorError.cgImageCreationFailed
@@ -106,9 +107,12 @@ final class DynamicDesktopGenerator {
         let totalUnits = (totalFrames * 3) + 1
         var completedUnits = 0
 
-        func progressFraction(for completedUnits: Int) -> Double {
+        let progressFraction: @Sendable (Int) -> Double = { completedUnits in
             Double(completedUnits) / Double(totalUnits)
         }
+
+        var generatedFrames = [CGImage]()
+        generatedFrames.reserveCapacity(totalFrames)
 
         for i in 0..<totalFrames {
             try Task.checkCancellation()
@@ -116,7 +120,7 @@ final class DynamicDesktopGenerator {
 
             progress(
                 ProgressUpdate(
-                    fractionCompleted: progressFraction(for: completedUnits),
+                    fractionCompleted: progressFraction(completedUnits),
                     step: .generatingFrame(index: frameNumber, total: totalFrames)
                 )
             )
@@ -127,31 +131,37 @@ final class DynamicDesktopGenerator {
                 totalFrames: totalFrames,
                 colorSpace: colorSpace
             )
+            generatedFrames.append(generatedFrame)
             completedUnits += 1
+        }
 
+        let upscaledFrames = try await upscaleManager.upscale(generatedFrames) { update in
             progress(
                 ProgressUpdate(
-                    fractionCompleted: progressFraction(for: completedUnits),
-                    step: .upscalingFrame(index: frameNumber, total: totalFrames)
+                    fractionCompleted: progressFraction(totalFrames + update.completedCount),
+                    step: .upscalingFrame(
+                        completed: update.completedCount,
+                        total: update.totalCount,
+                        currentIndex: update.currentIndex
+                    )
                 )
             )
+        }
 
-            let upscaledFrame = try await upscaler.upscale(generatedFrame)
+        completedUnits += upscaledFrames.count
 
-            guard let frameCGImage = upscaledFrame.cgImage(forProposedRect: nil, context: nil, hints: [NSImageRep.HintKey: Any]()) else {
-                throw GeneratorError.cgImageCreationFailed
-            }
-            completedUnits += 1
-
+        for (index, frameCGImage) in upscaledFrames.enumerated() {
+            let frameNumber = index + 1
+            try Task.checkCancellation()
             progress(
                 ProgressUpdate(
-                    fractionCompleted: progressFraction(for: completedUnits),
+                    fractionCompleted: progressFraction(completedUnits),
                     step: .encodingFrame(index: frameNumber, total: totalFrames)
                 )
             )
             let optimizedFrame = try await optimizeFrameForStorage(frameCGImage, colorSpace: colorSpace)
 
-            if i == 0 {
+            if index == 0 {
                 CGImageDestinationAddImageAndMetadata(destination, optimizedFrame, metadata, destinationOptions as CFDictionary)
             } else {
                 CGImageDestinationAddImage(destination, optimizedFrame, destinationOptions as CFDictionary)
@@ -161,7 +171,7 @@ final class DynamicDesktopGenerator {
 
         progress(
             ProgressUpdate(
-                fractionCompleted: progressFraction(for: completedUnits),
+                fractionCompleted: progressFraction(completedUnits),
                 step: .finalizing
             )
         )
@@ -208,10 +218,9 @@ final class DynamicDesktopGenerator {
         let prefix = "apple_desktop" as CFString
         CGImageMetadataRegisterNamespaceForPrefix(metadata, namespace, prefix, nil)
 
-        // Time-based cycling metadata
-        let timePlistData: Data
+        let hourlyPlistData: Data
         do {
-            timePlistData = try PropertyListSerialization.data(
+            hourlyPlistData = try PropertyListSerialization.data(
                 fromPropertyList: generateTimePlist(frames: totalFrames),
                 format: .binary,
                 options: 0
@@ -219,44 +228,19 @@ final class DynamicDesktopGenerator {
         } catch {
             throw GeneratorError.metadataEncodingFailed
         }
-        let encodedTimePlist = timePlistData.base64EncodedString()
+        let encodedHourlyPlist = hourlyPlistData.base64EncodedString()
 
-        guard let timeTag = CGImageMetadataTagCreate(
+        guard let hourlyTag = CGImageMetadataTagCreate(
             namespace,
             prefix,
-            "aprp" as CFString,
+            "h24" as CFString,
             .string,
-            encodedTimePlist as CFString
+            encodedHourlyPlist as CFString
         ) else {
             throw GeneratorError.metadataInjectionFailed
         }
 
-        // Solar-based cycling metadata (often required for better macOS integration)
-        let solarPlistData: Data
-        do {
-            solarPlistData = try PropertyListSerialization.data(
-                fromPropertyList: generateSolarPlist(frames: totalFrames),
-                format: .binary,
-                options: 0
-            )
-        } catch {
-            throw GeneratorError.metadataEncodingFailed
-        }
-        let encodedSolarPlist = solarPlistData.base64EncodedString()
-
-        guard let solarTag = CGImageMetadataTagCreate(
-            namespace,
-            prefix,
-            "apls" as CFString,
-            .string,
-            encodedSolarPlist as CFString
-        ) else {
-            throw GeneratorError.metadataInjectionFailed
-        }
-
-        // Inject both tags
-        guard CGImageMetadataSetTagWithPath(metadata, nil, "apple_desktop:aprp" as CFString, timeTag),
-              CGImageMetadataSetTagWithPath(metadata, nil, "apple_desktop:apls" as CFString, solarTag) else {
+        guard CGImageMetadataSetTagWithPath(metadata, nil, "apple_desktop:h24" as CFString, hourlyTag) else {
             throw GeneratorError.metadataInjectionFailed
         }
 
@@ -309,7 +293,7 @@ final class DynamicDesktopGenerator {
         }.value
     }
 
-    private static func resizeForRetinaIfNeeded(
+    nonisolated private static func resizeForRetinaIfNeeded(
         _ image: CGImage,
         colorSpace: CGColorSpace,
         context: CIContext
@@ -338,7 +322,7 @@ final class DynamicDesktopGenerator {
         return resizedImage
     }
 
-    private static func compressAsJPEG(_ image: CGImage, colorSpace: CGColorSpace) throws -> CGImage {
+    nonisolated private static func compressAsJPEG(_ image: CGImage, colorSpace: CGColorSpace) throws -> CGImage {
         let jpegData = NSMutableData()
 
         guard let destination = CGImageDestinationCreateWithData(jpegData, UTType.jpeg.identifier as CFString, 1, nil) else {
@@ -387,27 +371,4 @@ final class DynamicDesktopGenerator {
         ]
     }
 
-    private func generateSolarPlist(frames: Int) -> [String: Any] {
-        // Solar-based metadata uses altitude and azimuth
-        // We simulate a 24h cycle
-        let siArray = (0..<frames).map { frameIndex in
-            let progress = Double(frameIndex) / Double(frames)
-            let altitude = 90.0 * sin((progress * 2.0 * .pi) - (.pi / 2.0))
-            let azimuth = progress * 360.0
-
-            return [
-                "i": frameIndex,
-                "a": altitude,
-                "z": azimuth
-            ]
-        }
-
-        return [
-            "ap": [
-                "d": 0,
-                "l": frames / 2
-            ],
-            "si": siArray
-        ]
-    }
 }
