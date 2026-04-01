@@ -110,7 +110,7 @@ struct CreateMoodView: View {
         VStack(spacing: 4) {
             Text(initialWallpaperSource == .imagePlayground ? "Create Dynamic Desktop Mood" : "Create Custom Mood")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(initialWallpaperSource == .imagePlayground ? "Design a wallpaper in Image Playground and Aura will build a .heic Dynamic Desktop from 24 Retina-sized JPEG frames that change throughout the day." : "Combine your favorite wallpaper with a custom audio mix.")
+            Text(initialWallpaperSource == .imagePlayground ? "Aura generates a unique dynamic HEIC wallpaper from the image you created with “Image Playground.” From this image, 24 images are generated to represent the changing hours throughout the day. All images are upscaled for display on Retina screens." : "Combine your favorite wallpaper with a custom audio mix.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
