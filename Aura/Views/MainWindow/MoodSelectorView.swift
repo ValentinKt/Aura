@@ -111,8 +111,8 @@ struct SubthemeRow: View {
             CreateMoodView(
                 appModel: appModel,
                 defaultTheme: "Dynamic",
-                defaultSubtheme: subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Dynamic Desktop",
-                initialWallpaperSource: .imagePlayground
+                defaultSubtheme: subtheme.caseInsensitiveCompare("Create with AI") == .orderedSame ? "Create with AI" : (subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? "Image Playground" : "Dynamic Desktop"),
+                initialWallpaperSource: subtheme.caseInsensitiveCompare("Create with AI") == .orderedSame ? .aiGenerated : .imagePlayground
             )
         }
     }
@@ -152,11 +152,16 @@ struct SubthemeRow: View {
                 }
             }
 
-            if ["Dynamic Desktop", "Image Playground"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
+            if ["Create with AI", "Dynamic Desktop", "Image Playground"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
                 CreateImagePlaygroundCard {
                     showingImagePlaygroundDesigner = true
                 }
-                .environment(\.createImagePlaygroundCardStyle, subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .dynamicDesktop)
+                .environment(
+                    \.createImagePlaygroundCardStyle,
+                    subtheme.caseInsensitiveCompare("Create with AI") == .orderedSame
+                        ? .createWithAI
+                        : (subtheme.caseInsensitiveCompare("Image Playground") == .orderedSame ? .imagePlayground : .dynamicDesktop)
+                )
             }
         }
         .padding(.horizontal, 40)
@@ -272,11 +277,14 @@ struct CreateWebsiteCard: View {
 }
 
 private enum CreateImagePlaygroundCardStyle {
+    case createWithAI
     case dynamicDesktop
     case imagePlayground
 
     var title: String {
         switch self {
+        case .createWithAI:
+            return "Create\nwith AI"
         case .dynamicDesktop:
             return "Create\nDynamic Desktop"
         case .imagePlayground:
@@ -286,6 +294,8 @@ private enum CreateImagePlaygroundCardStyle {
 
     var accessibilityLabel: String {
         switch self {
+        case .createWithAI:
+            return "Create a wallpaper with Stable Diffusion"
         case .dynamicDesktop:
             return "Create a dynamic desktop wallpaper"
         case .imagePlayground:

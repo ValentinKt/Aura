@@ -20,6 +20,7 @@ struct CreateMoodView: View {
     @State private var creationProgress: Double = 0
     @State private var creationStatusMessage: String?
     @State private var errorMessage: String?
+    @State private var aiPrompt = ""
 
     init(
         appModel: AppModel,
@@ -104,13 +105,25 @@ struct CreateMoodView: View {
             },
             onCancellation: nil
         )
+        .task(id: initialWallpaperSource) {
+            if initialWallpaperSource == .aiGenerated {
+                await appModel.aiImageGenerationViewModel.refreshModelAvailability()
+            }
+        }
+        .onDisappear {
+            guard initialWallpaperSource == .aiGenerated else { return }
+            Task {
+                await appModel.aiImageGenerationViewModel.unloadModel()
+                await appModel.aiImageGenerationViewModel.clearGeneratedImage(removeFile: true)
+            }
+        }
     }
 
     private var header: some View {
         VStack(spacing: 4) {
-            Text(initialWallpaperSource == .imagePlayground ? "Create Dynamic Desktop Mood" : "Create Custom Mood")
+            Text(headerTitle)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(initialWallpaperSource == .imagePlayground ? "Aura generates a unique dynamic HEIC wallpaper from the image you created with “Image Playground.” From this image, 24 images are generated to represent the changing hours throughout the day. All images are upscaled for display on Retina screens." : "Combine your favorite wallpaper with a custom audio mix.")
+            Text(headerDescription)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -155,7 +168,9 @@ struct CreateMoodView: View {
 
     private var mediaPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if initialWallpaperSource == .imagePlayground {
+            if initialWallpaperSource == .aiGenerated {
+                aiGeneratedSection
+            } else if initialWallpaperSource == .imagePlayground {
                 imagePlaygroundSection
             } else {
                 importedMediaSection
@@ -260,6 +275,148 @@ struct CreateMoodView: View {
         }
     }
 
+    private var aiGeneratedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            aiInfoCard
+            aiPromptSection
+            aiActionSection
+
+            if let url = selectedFileURL {
+                selectedWallpaperPreview(for: url)
+            }
+        }
+    }
+
+    private var aiInfoCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Stable Diffusion output")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Download the local model once, generate a wallpaper from your prompt, then save it as a new Aura mood with your current sound mix.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background {
+            if reduceTransparency {
+                buttonShape.fill(.regularMaterial)
+            } else {
+                Color.clear
+                    .glassEffect(.regular, in: buttonShape)
+            }
+        }
+    }
+
+    private var aiPromptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Prompt")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .kerning(1)
+
+            TextField("Describe the wallpaper you want to generate…", text: $aiPrompt, axis: .vertical)
+                .lineLimit(3 ... 6)
+                .textFieldStyle(.plain)
+                .padding(14)
+                .background {
+                    if reduceTransparency {
+                        nameFieldShape.fill(.regularMaterial)
+                    } else {
+                        Color.clear
+                            .glassEffect(.regular.interactive(), in: nameFieldShape)
+                    }
+                }
+        }
+    }
+
+    private var aiActionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if aiViewModel.isDownloadingModel || aiViewModel.modelProgress > 0 {
+                statusBlock(
+                    title: aiViewModel.modelStatusMessage,
+                    progress: aiViewModel.modelProgress
+                )
+            }
+
+            if aiViewModel.isGeneratingImage, let message = aiViewModel.generationStatusMessage {
+                statusBlock(
+                    title: message,
+                    progress: aiViewModel.generationProgress
+                )
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    Task {
+                        await aiViewModel.downloadModel()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if aiViewModel.isDownloadingModel {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text(aiViewModel.isModelReady ? "Model Ready" : "Download Model")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background {
+                        (aiViewModel.isModelReady ? Color.green : Color.blue)
+                            .clipShape(buttonShape)
+                    }
+                    .foregroundStyle(.white)
+                    .contentShape(buttonShape)
+                }
+                .buttonStyle(.plain)
+                .disabled(aiViewModel.isDownloadingModel || aiViewModel.isModelReady)
+
+                Button {
+                    Task {
+                        if let generatedURL = await aiViewModel.generateImage(prompt: aiPrompt) {
+                            selectedFileURL = generatedURL
+                            errorMessage = nil
+
+                            if trimmedMoodName.isEmpty {
+                                moodName = suggestedMoodName(from: aiPrompt)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if aiViewModel.isGeneratingImage {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text(selectedFileURL == nil ? "Generate Wallpaper" : "Regenerate Wallpaper")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background {
+                        Color.accentColor
+                            .clipShape(buttonShape)
+                    }
+                    .foregroundStyle(.white)
+                    .contentShape(buttonShape)
+                }
+                .buttonStyle(.plain)
+                .disabled(!aiViewModel.isModelReady || aiViewModel.isGeneratingImage || trimmedAIPrompt.isEmpty)
+            }
+        }
+    }
+
     private var dynamicDesktopInfoCard: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles.rectangle.stack")
@@ -337,7 +494,13 @@ struct CreateMoodView: View {
             }
 
             Button {
+                let shouldRemoveGeneratedPreview = initialWallpaperSource == .aiGenerated
                 selectedFileURL = nil
+                if shouldRemoveGeneratedPreview {
+                    Task {
+                        await aiViewModel.clearGeneratedImage(removeFile: true)
+                    }
+                }
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.white.opacity(0.6))
@@ -368,7 +531,7 @@ struct CreateMoodView: View {
 
     private var footer: some View {
         VStack(spacing: 12) {
-            if let error = errorMessage {
+            if let error = activeErrorMessage {
                 Text(error)
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
@@ -415,7 +578,11 @@ struct CreateMoodView: View {
                 .buttonStyle(.plain)
                 .disabled(isCreatingMood)
 
-                let isFormValid = !trimmedMoodName.isEmpty && selectedFileURL != nil && !isCreatingMood
+                let isFormValid = !trimmedMoodName.isEmpty
+                    && selectedFileURL != nil
+                    && !isCreatingMood
+                    && !aiViewModel.isGeneratingImage
+                    && !aiViewModel.isDownloadingModel
 
                 Button {
                     Task {
@@ -471,6 +638,40 @@ struct CreateMoodView: View {
 
     private var trimmedMoodName: String {
         moodName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedAIPrompt: String {
+        aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var aiViewModel: AIImageGenerationViewModel {
+        appModel.aiImageGenerationViewModel
+    }
+
+    private var activeErrorMessage: String? {
+        errorMessage ?? aiViewModel.errorMessage
+    }
+
+    private var headerTitle: String {
+        switch initialWallpaperSource {
+        case .aiGenerated:
+            return "Create Mood With AI"
+        case .imagePlayground:
+            return "Create Dynamic Desktop Mood"
+        case .importedMedia:
+            return "Create Custom Mood"
+        }
+    }
+
+    private var headerDescription: String {
+        switch initialWallpaperSource {
+        case .aiGenerated:
+            return "Generate a wallpaper locally with Stable Diffusion, then pair it with a custom Aura sound mix."
+        case .imagePlayground:
+            return "Aura generates a unique dynamic HEIC wallpaper from the image you created with “Image Playground.” From this image, 24 images are generated to represent the changing hours throughout the day. All images are upscaled for display on Retina screens."
+        case .importedMedia:
+            return "Combine your favorite wallpaper with a custom audio mix."
+        }
     }
 
     private var shouldUpscaleSelectedWallpaper: Bool {
@@ -545,11 +746,49 @@ struct CreateMoodView: View {
         }
     }
 
+    @ViewBuilder
+    private func statusBlock(title: String, progress: Double) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Spacer()
+
+                Text(progress.formatted(.percent.precision(.fractionLength(0))))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: progress)
+                .controlSize(.small)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 2)
+    }
+
+    private func suggestedMoodName(from prompt: String) -> String {
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPrompt.isEmpty else {
+            return "AI Mood"
+        }
+
+        let words = trimmedPrompt
+            .split(whereSeparator: \.isWhitespace)
+            .prefix(4)
+            .map(String.init)
+
+        return words.joined(separator: " ")
+    }
+
 }
 
 extension CreateMoodView {
     enum InitialWallpaperSource {
         case importedMedia
         case imagePlayground
+        case aiGenerated
     }
 }

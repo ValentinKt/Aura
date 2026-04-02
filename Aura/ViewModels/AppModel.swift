@@ -33,6 +33,7 @@ final class AppModel {
     let presetEngine: PresetEngine
     let quoteEngine: QuoteEngine
     let smartDuckingService: SmartDuckingService
+    let aiImageGenerationViewModel: AIImageGenerationViewModel
 
     var moodViewModel: MoodViewModel
     var playerViewModel: PlayerViewModel
@@ -70,6 +71,7 @@ final class AppModel {
         let presetEngine = PresetEngine(persistence: persistence)
         let quoteEngine = QuoteEngine(persistence: persistence)
         let smartDuckingService = SmartDuckingService(soundEngine: soundEngine)
+        let aiImageGenerationViewModel = AIImageGenerationViewModel()
 
         self.persistence = persistence
         self.themeManager = themeManager
@@ -83,6 +85,7 @@ final class AppModel {
         self.presetEngine = presetEngine
         self.quoteEngine = quoteEngine
         self.smartDuckingService = smartDuckingService
+        self.aiImageGenerationViewModel = aiImageGenerationViewModel
         self.favoriteSceneIDs = UserDefaults.standard.stringArray(forKey: StorageKey.favoriteSceneIDs) ?? []
         self.recentSceneIDs = UserDefaults.standard.stringArray(forKey: StorageKey.recentSceneIDs) ?? []
         self.lastResumableSceneID = UserDefaults.standard.string(forKey: StorageKey.lastResumableSceneID)
