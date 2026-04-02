@@ -1,4 +1,37 @@
 import Foundation
+import QuartzCore
+import CoreVideo
+
+@MainActor
+final class GatedDisplayLink {
+    private var displayLink: CVDisplayLink?
+    private var isRunning = false
+    var onFrame: (() -> Void)?
+
+    func start() {
+        guard !isRunning else { return }
+        CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
+        guard let dl = displayLink else { return }
+
+        let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
+            guard let ctx = ctx else { return kCVReturnError }
+            let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx).takeUnretainedValue()
+            DispatchQueue.main.async { self_.onFrame?() }
+            return kCVReturnSuccess
+        }
+        CVDisplayLinkSetOutputCallback(dl, callback, Unmanaged.passUnretained(self).toOpaque())
+        CVDisplayLinkStart(dl)
+        isRunning = true
+    }
+
+    func stop() {
+        guard isRunning, let dl = displayLink else { return }
+        CVDisplayLinkStop(dl)
+        isRunning = false
+    }
+
+    deinit { if let dl = displayLink { CVDisplayLinkStop(dl) } }
+}
 
 struct WallpaperSchedule: Hashable, Codable {
     var id: UUID
@@ -14,26 +47,34 @@ struct WallpaperSchedule: Hashable, Codable {
     }
 }
 
+@MainActor
 final class WallpaperScheduler {
     private var schedules: [WallpaperSchedule] = []
-    private var timer: Timer?
+    private var displayLink: GatedDisplayLink?
+    private var lastTick: TimeInterval = 0
 
     func updateSchedules(_ schedules: [WallpaperSchedule]) {
         self.schedules = schedules
     }
 
     func start(handler: @escaping (WallpaperDescriptor) -> Void) {
-        timer?.invalidate()
-        let timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            self?.tick(handler: handler)
+        stop()
+        let link = GatedDisplayLink()
+        link.onFrame = { [weak self] in
+            guard let self = self else { return }
+            let now = CACurrentMediaTime()
+            if now - self.lastTick >= 60 {
+                self.lastTick = now
+                self.tick(handler: handler)
+            }
         }
-        timer.tolerance = 15 // Increase tolerance to 15s for better energy efficiency
-        self.timer = timer
+        link.start()
+        self.displayLink = link
     }
 
     func stop() {
-        timer?.invalidate()
-        timer = nil
+        displayLink?.stop()
+        displayLink = nil
     }
 
     private func tick(handler: (WallpaperDescriptor) -> Void) {

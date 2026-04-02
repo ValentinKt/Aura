@@ -444,8 +444,15 @@ final class DownloadManager {
     var downloadStates: [String: DownloadState] = [:]
 
     private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.1/"
+    
+    // Network Throttling: Max 2 concurrent downloads to prevent network controller overheating
+    private let urlSession: URLSession
 
-    private init() {}
+    private init() {
+        let config = URLSessionConfiguration.default
+        config.httpMaximumConnectionsPerHost = 2
+        self.urlSession = URLSession(configuration: config)
+    }
 
     func isDownloaded(resource: String) -> Bool {
         if downloadStates[resource] == nil {
@@ -528,7 +535,7 @@ final class DownloadManager {
             print("⬇️ [DownloadManager] Starting download for wallpaper from: \(url.absoluteString)")
 
             do {
-                let wrapper = DownloadTaskWrapper()
+                let wrapper = DownloadTaskWrapper(session: self.urlSession)
                 let tempURL = try await wrapper.download(url: url) { progress in
                     Task { @MainActor in
                         if case .downloading = self.downloadStates[resource] {
@@ -617,10 +624,16 @@ private struct RemoteDownloadCandidate {
 
 class DownloadTaskWrapper: NSObject {
     private var observation: NSKeyValueObservation?
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        super.init()
+    }
 
     func download(url: URL, progressHandler: @escaping (Double) -> Void) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            let task = URLSession.shared.downloadTask(with: url) { localURL, response, error in
+            let task = session.downloadTask(with: url) { localURL, response, error in
                 self.observation?.invalidate()
                 self.observation = nil
 

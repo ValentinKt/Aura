@@ -10,6 +10,38 @@ struct WallpaperApplyResult: Hashable {
     var permissionDenied: Bool
 }
 
+final class MemoryAssetLoader: NSObject, AVAssetResourceLoaderDelegate {
+    private let data: Data
+    private let contentType: String
+
+    init?(url: URL) {
+        // Read into memory to prevent SSD reads during loop
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        self.data = data
+        self.contentType = url.pathExtension.lowercased() == "mp4" ? "public.mpeg-4" : "com.apple.quicktime-movie"
+    }
+
+    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
+        if let contentInfo = loadingRequest.contentInformationRequest {
+            contentInfo.contentType = contentType
+            contentInfo.contentLength = Int64(data.count)
+            contentInfo.isByteRangeAccessSupported = true
+        }
+        
+        if let dataRequest = loadingRequest.dataRequest {
+            let start = Int(dataRequest.requestedOffset)
+            let length = dataRequest.requestedLength
+            let end = min(start + length, data.count)
+            
+            if start < data.count {
+                dataRequest.respond(with: data.subdata(in: start..<end))
+            }
+            loadingRequest.finishLoading()
+        }
+        return true
+    }
+}
+
 struct FallbackGradientView: View {
     let stops: [ColorComponents]
     var body: some View {
@@ -59,13 +91,42 @@ struct WallpaperDisplayPreview: Identifiable, Hashable {
 }
 
 @MainActor
+final class DisplayLinkTimer {
+    private let displayLink = GatedDisplayLink()
+    private let interval: TimeInterval
+    private var lastFireTime: TimeInterval = 0
+    var onFire: (() -> Void)?
+
+    init(interval: TimeInterval) {
+        self.interval = interval
+        displayLink.onFrame = { [weak self] in
+            guard let self = self else { return }
+            let now = CACurrentMediaTime()
+            if now - self.lastFireTime >= self.interval {
+                self.lastFireTime = now
+                self.onFire?()
+            }
+        }
+    }
+
+    func start() {
+        lastFireTime = CACurrentMediaTime()
+        displayLink.start()
+    }
+
+    func invalidate() {
+        displayLink.stop()
+    }
+}
+
+@MainActor
 @Observable
 final class WallpaperEngine {
     private let fileManager = FileManager.default
-    private var animationTimers: [String: Timer] = [:]
+    private var animationTimers: [String: DisplayLinkTimer] = [:]
     private let themeManager: ThemeManager
     private let wallpaperDirectory: URL
-    private let renderQueue = DispatchQueue(label: "com.Aura.wallpaper.render", qos: .userInitiated)
+    private let renderQueue = DispatchQueue(label: "com.Aura.wallpaper.render", qos: .utility)
     private let imageProcessingContext = CIContext()
     private var isRendering = false
     private var isPresentationSuppressed = false
@@ -301,7 +362,8 @@ final class WallpaperEngine {
         let stops = descriptor.gradientStops
         var index = 0
 
-        let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / fps, repeats: true) { [weak self] _ in
+        let timer = DisplayLinkTimer(interval: 1.0 / fps)
+        timer.onFire = { [weak self] in
             guard let self else { return }
 
             let currentIndex = index
@@ -328,8 +390,7 @@ final class WallpaperEngine {
                 self.isRendering = false
             }
         }
-        timer.tolerance = 0.1
-        RunLoop.main.add(timer, forMode: .common)
+        timer.start()
         animationTimers["animated"] = timer
     }
 
@@ -370,7 +431,8 @@ final class WallpaperEngine {
 
     private func startParticle(_ descriptor: WallpaperDescriptor) {
         var index = 0
-        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        let timer = DisplayLinkTimer(interval: 2.0)
+        timer.onFire = { [weak self] in
             guard let self else { return }
             let currentIndex = index
             index += 1
@@ -382,8 +444,7 @@ final class WallpaperEngine {
                 }
             }
         }
-        timer.tolerance = 0.5
-        RunLoop.main.add(timer, forMode: .common)
+        timer.start()
         animationTimers["particle"] = timer
     }
 
@@ -883,37 +944,7 @@ private struct SeededRandomNumberGenerator: RandomNumberGenerator {
     }
 }
 
-final class MemoryAssetLoader: NSObject, AVAssetResourceLoaderDelegate {
-    private let data: Data
-    private let contentType: String
 
-    init?(url: URL) {
-        // Read into memory to prevent SSD reads during loop
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        self.data = data
-        self.contentType = url.pathExtension.lowercased() == "mp4" ? "public.mpeg-4" : "com.apple.quicktime-movie"
-    }
-
-    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
-        if let contentInfo = loadingRequest.contentInformationRequest {
-            contentInfo.contentType = contentType
-            contentInfo.contentLength = Int64(data.count)
-            contentInfo.isByteRangeAccessSupported = true
-        }
-        
-        if let dataRequest = loadingRequest.dataRequest {
-            let start = Int(dataRequest.requestedOffset)
-            let length = dataRequest.requestedLength
-            let end = min(start + length, data.count)
-            
-            if start < data.count {
-                dataRequest.respond(with: data.subdata(in: start..<end))
-            }
-            loadingRequest.finishLoading()
-        }
-        return true
-    }
-}
 
 final class WallpaperWindowController: NSObject {
     private var window: NSWindow?
@@ -929,7 +960,7 @@ final class WallpaperWindowController: NSObject {
     private var currentWebsiteURL: URL?
     private var isWebsiteInteractive = false
     private var isWebsiteSuspended = false
-    private var websiteHoverProbeTimer: Timer?
+    private var websiteHoverProbeTimer: DisplayLinkTimer?
     private var websiteHoverProbeSequence: Int = 0
     private var websiteShouldReceiveMouseEvents = true
 
@@ -1386,11 +1417,11 @@ final class WallpaperWindowController: NSObject {
     private func startWebsiteHoverProbing() {
         guard websiteHoverProbeTimer == nil else { return }
 
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        let timer = DisplayLinkTimer(interval: 0.5)
+        timer.onFire = { [weak self] in
             self?.probeWebsiteHoverState()
         }
-        timer.tolerance = 0.1
-        RunLoop.main.add(timer, forMode: .common)
+        timer.start()
         websiteHoverProbeTimer = timer
         probeWebsiteHoverState()
     }

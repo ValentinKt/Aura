@@ -136,7 +136,7 @@ private class VideoLoopView: NSView {
             
             self.memoryAssetLoader = loader
             asset = AVURLAsset(url: memoryURL)
-            asset.resourceLoader.setDelegate(loader, queue: .global(qos: .userInitiated))
+            asset.resourceLoader.setDelegate(loader, queue: .global(qos: .utility))
         } else {
             self.memoryAssetLoader = nil
             asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
@@ -147,9 +147,17 @@ private class VideoLoopView: NSView {
         // Visual Throttling: Cap video at 30 FPS to save massive GPU energy
         Task {
             _ = try? await asset.load(.tracks)
-            if let composition = try? AVMutableVideoComposition(propertiesOf: asset) {
-                composition.frameDuration = CMTime(value: 1, timescale: 30)
-                item.videoComposition = composition
+            if #available(macOS 15.0, *) {
+                if let composition = try? await AVVideoComposition.videoComposition(withPropertiesOf: asset) {
+                    let mutableComp = composition.mutableCopy() as! AVMutableVideoComposition
+                    mutableComp.frameDuration = CMTime(value: 1, timescale: 30)
+                    item.videoComposition = mutableComp
+                }
+            } else {
+                if let composition = try? AVMutableVideoComposition(propertiesOf: asset) {
+                    composition.frameDuration = CMTime(value: 1, timescale: 30)
+                    item.videoComposition = composition
+                }
             }
         }
 

@@ -6,8 +6,8 @@ struct ImmersiveModeView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var showControls = true
     @State private var lastActivityTime = Date()
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var isHoveringControls = false
+    @State private var displayLinkTimer: DisplayLinkTimer?
 
     var body: some View {
         ZStack {
@@ -22,14 +22,23 @@ struct ImmersiveModeView: View {
                 }
             }
         }
-        .onReceive(timer) { _ in
-            if showControls && !isHoveringControls {
-                if Date().timeIntervalSince(lastActivityTime) > 5 {
-                    withAnimation(.easeInOut(duration: 1.5)) {
-                        showControls = false
+        .onAppear {
+            let timer = DisplayLinkTimer(interval: 1.0)
+            timer.onFire = {
+                if showControls && !isHoveringControls {
+                    if Date().timeIntervalSince(lastActivityTime) > 5 {
+                        withAnimation(.easeInOut(duration: 1.5)) {
+                            showControls = false
+                        }
                     }
                 }
             }
+            timer.start()
+            self.displayLinkTimer = timer
+        }
+        .onDisappear {
+            displayLinkTimer?.invalidate()
+            displayLinkTimer = nil
         }
     }
 
