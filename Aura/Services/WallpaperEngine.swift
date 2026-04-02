@@ -1369,24 +1369,6 @@ final class WallpaperWindowController: NSObject {
         window.level = isWebsiteInteractive ? Self.interactiveWallpaperLevel : Self.passiveWallpaperLevel
     }
 
-    private func startWebsiteHoverProbing() {
-        guard websiteHoverProbeTimer == nil else { return }
-
-        let timer = DisplayLinkTimer(interval: 0.5)
-        timer.onFire = { [weak self] in
-            self?.probeWebsiteHoverState()
-        }
-        timer.start()
-        websiteHoverProbeTimer = timer
-        probeWebsiteHoverState()
-    }
-
-    private func stopWebsiteHoverProbing() {
-        websiteHoverProbeTimer?.invalidate()
-        websiteHoverProbeTimer = nil
-        websiteHoverProbeSequence += 1
-    }
-
     private func probeWebsiteHoverState() {
         guard isWebsiteInteractive,
               !isWebsiteSuspended,
