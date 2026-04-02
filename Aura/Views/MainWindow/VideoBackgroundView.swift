@@ -28,6 +28,7 @@ private class VideoLoopView: NSView {
     private var imageLayer: CALayer?
     private var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
+    private var memoryAssetLoader: MemoryAssetLoader?
     private var currentURL: URL?
     private var isSecurityScoped: Bool = false
     private var windowObservation: NSKeyValueObservation?
@@ -123,7 +124,24 @@ private class VideoLoopView: NSView {
         }
 
         // --- STEP 2: CONFIGURE ASSET (VIDEO) ---
-        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        // SSD Hygiene: memory-backed buffer for small loopable assets
+        var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        urlComponents?.scheme = "memory"
+        
+        let asset: AVURLAsset
+        if let memoryURL = urlComponents?.url,
+           let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+           size < 50_000_000,
+           let loader = MemoryAssetLoader(url: url) {
+            
+            self.memoryAssetLoader = loader
+            asset = AVURLAsset(url: memoryURL)
+            asset.resourceLoader.setDelegate(loader, queue: .global(qos: .userInitiated))
+        } else {
+            self.memoryAssetLoader = nil
+            asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        }
+
         let item = AVPlayerItem(asset: asset)
 
         // Visual Throttling: Cap video at 30 FPS to save massive GPU energy
@@ -135,7 +153,13 @@ private class VideoLoopView: NSView {
             }
         }
 
-        item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
+        // Dynamic Scaling: Set preferred maximum resolution to display's native resolution
+        if let screen = self.window?.screen ?? NSScreen.main {
+            let scale = screen.backingScaleFactor
+            item.preferredMaximumResolution = CGSize(width: screen.frame.width * scale, height: screen.frame.height * scale)
+        } else {
+            item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
+        }
         item.preferredPeakBitRate = 5_000_000
         item.preferredForwardBufferDuration = 2.0
 

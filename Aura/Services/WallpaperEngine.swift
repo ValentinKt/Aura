@@ -883,12 +883,45 @@ private struct SeededRandomNumberGenerator: RandomNumberGenerator {
     }
 }
 
+final class MemoryAssetLoader: NSObject, AVAssetResourceLoaderDelegate {
+    private let data: Data
+    private let contentType: String
+
+    init?(url: URL) {
+        // Read into memory to prevent SSD reads during loop
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        self.data = data
+        self.contentType = url.pathExtension.lowercased() == "mp4" ? "public.mpeg-4" : "com.apple.quicktime-movie"
+    }
+
+    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
+        if let contentInfo = loadingRequest.contentInformationRequest {
+            contentInfo.contentType = contentType
+            contentInfo.contentLength = Int64(data.count)
+            contentInfo.isByteRangeAccessSupported = true
+        }
+        
+        if let dataRequest = loadingRequest.dataRequest {
+            let start = Int(dataRequest.requestedOffset)
+            let length = dataRequest.requestedLength
+            let end = min(start + length, data.count)
+            
+            if start < data.count {
+                dataRequest.respond(with: data.subdata(in: start..<end))
+            }
+            loadingRequest.finishLoading()
+        }
+        return true
+    }
+}
+
 final class WallpaperWindowController: NSObject {
     private var window: NSWindow?
     private var playerView: NSView?
     private var playerLayer: AVPlayerLayer?
     private var playerQueue: AVQueuePlayer?
     private var playerLooper: AVPlayerLooper?
+    private var memoryAssetLoader: MemoryAssetLoader?
     private var endObserver: NSObjectProtocol?
     private var websiteContainerView: NSView?
     private var websiteSnapshotView: NSImageView?
@@ -1047,8 +1080,25 @@ final class WallpaperWindowController: NSObject {
         self.currentURL = finalURL
         self.isSecurityScoped = isScoped
 
-        // CONFIGURATION SILENCIEUSE (Fix bootstrap_look_up)
-        let asset = AVURLAsset(url: finalURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        // SSD Hygiene: memory-backed buffer for small loopable assets
+        // Use a custom scheme so AVAsset triggers the resource loader delegate
+        var urlComponents = URLComponents(url: finalURL, resolvingAgainstBaseURL: false)
+        urlComponents?.scheme = "memory"
+        
+        let asset: AVURLAsset
+        if let memoryURL = urlComponents?.url,
+           let size = try? finalURL.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+           size < 50_000_000, // Only cache into memory if less than 50MB
+           let loader = MemoryAssetLoader(url: finalURL) {
+            
+            self.memoryAssetLoader = loader
+            asset = AVURLAsset(url: memoryURL)
+            asset.resourceLoader.setDelegate(loader, queue: .global(qos: .userInitiated))
+        } else {
+            self.memoryAssetLoader = nil
+            asset = AVURLAsset(url: finalURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        }
+
         let item = AVPlayerItem(asset: asset)
         
         // 1. Visual Throttling: Cap video at 30 FPS to save massive GPU energy
@@ -1064,6 +1114,14 @@ final class WallpaperWindowController: NSObject {
         item.audioTimePitchAlgorithm = .varispeed
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
         item.preferredForwardBufferDuration = 2.0
+
+        // Dynamic Scaling: Set preferred maximum resolution to display's native resolution
+        if let screen = self.window?.screen ?? NSScreen.main {
+            let scale = screen.backingScaleFactor
+            item.preferredMaximumResolution = CGSize(width: screen.frame.width * scale, height: screen.frame.height * scale)
+        } else {
+            item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
+        }
 
         let newPlayer = AVQueuePlayer(playerItem: item)
         newPlayer.isMuted = true
