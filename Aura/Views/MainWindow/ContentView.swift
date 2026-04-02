@@ -274,7 +274,7 @@ struct ContentView: View {
                                             items: atmosphereMenuItems,
                                             selectedID: selectedAtmosphereID
                                         )
-                                        .frame(height: min(CGFloat(atmosphereMenuItems.count) * 48, 440))
+                                        .frame(height: AtmospheresWheelMenu.viewportHeight)
                                     }
                                 }
 
@@ -685,20 +685,24 @@ private struct AtmosphereCarouselCenterPreferenceKey: PreferenceKey {
 }
 
 private struct AtmospheresWheelMenu: View {
+    static let visibleItemCount = 5
+    static let rowHeight: CGFloat = 40
+    static let rowSpacing: CGFloat = 8
+    static let viewportHeight: CGFloat =
+        (CGFloat(visibleItemCount) * rowHeight) + (CGFloat(visibleItemCount - 1) * rowSpacing)
+
     let items: [AtmosphereCarouselMenuItem]
     @Binding var selectedID: String?
 
-    private let rowHeight: CGFloat = 44
-    private let rowSpacing: CGFloat = 10
     private let coordinateSpaceName = "atmospheres-wheel"
 
     var body: some View {
         GeometryReader { geometry in
             let containerCenterY = geometry.size.height / 2
-            let verticalInset = max(0, containerCenterY - (rowHeight / 2))
+            let verticalInset = max(0, containerCenterY - (Self.rowHeight / 2))
 
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: rowSpacing) {
+                LazyVStack(spacing: Self.rowSpacing) {
                     ForEach(items) { item in
                         carouselRow(item, containerCenterY: containerCenterY)
                             .id(item.id)
@@ -768,14 +772,14 @@ private struct AtmospheresWheelMenu: View {
                     value: [item.id: itemGeometry.frame(in: .named(coordinateSpaceName)).midY]
                 )
             }
-            .frame(height: rowHeight)
+            .frame(height: Self.rowHeight)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
     }
 
     private func itemAppearance(for distance: CGFloat) -> AtmosphereCarouselItemAppearance {
-        let falloffDistance = (rowHeight + rowSpacing) * 2.2
+        let falloffDistance = (Self.rowHeight + Self.rowSpacing) * 2.2
         let normalizedDistance = min(distance / falloffDistance, 1)
         let scale = max(0.74, 1 - (normalizedDistance * 0.26))
         let opacity = max(0.24, 1 - (normalizedDistance * 0.76))
