@@ -22,6 +22,7 @@ struct ContentView: View {
     }
 
     var body: some View {
+        let _ = Self._printChanges()
         @Bindable var appModel = appModel
         mainContent(appModel: appModel)
     }
@@ -69,6 +70,7 @@ struct ContentView: View {
             .opacity(appModel.showImmersive ? 0 : 1)
             .animation(.easeInOut(duration: 0.5), value: appModel.showImmersive)
         }
+        .drawingGroup()
         .frame(minWidth: 950, minHeight: 800)
         .overlay {
             if appModel.showCommandPalette {

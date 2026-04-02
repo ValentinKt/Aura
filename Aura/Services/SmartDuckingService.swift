@@ -54,10 +54,10 @@ final class SmartDuckingService {
 
     func startMonitoring() {
         monitoringTask?.cancel()
-        monitoringTask = Task { @AuraBackgroundActor [weak self] in
+        monitoringTask = Task(priority: .utility) { [weak self] in
             while !Task.isCancelled {
                 guard let self = self, await self.isEnabled else {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await AuraBackgroundActor.sleep(for: .seconds(2))
                     continue
                 }
 
@@ -77,8 +77,7 @@ final class SmartDuckingService {
                     await self.soundEngine.fadeDucking(to: 1.0, duration: 2.0)
                 }
 
-                // Check every 2 seconds
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                await AuraBackgroundActor.sleep(for: .seconds(2))
             }
         }
     }

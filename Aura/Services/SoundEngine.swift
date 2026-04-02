@@ -294,7 +294,7 @@ final class SoundEngine {
         randomizationTask = Task { @MainActor [weak self] in
             guard let self else { return }
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                await AuraBackgroundActor.sleep(for: .seconds(interval))
                 for id in SoundLayerID.allCases.map(\.rawValue) {
                     let random = Float.random(in: validRange)
                     self.setLayer(id, volume: random)

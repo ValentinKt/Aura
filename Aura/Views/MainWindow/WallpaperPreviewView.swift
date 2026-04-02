@@ -10,6 +10,7 @@ struct WallpaperPreviewView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
+        let _ = Self._printChanges()
         ZStack(alignment: .bottomLeading) {
             Group {
                 if appModel.settingsViewModel.settings.keepCurrentWallpaper {
@@ -97,7 +98,7 @@ struct WallpaperPreviewView: View {
                             cachedPlaceholderImage = nil
                             return
                         }
-                        cachedPlaceholderImage = await Task.detached(priority: .utility) {
+                        cachedPlaceholderImage = await Task(priority: .utility) {
                             NSImage(contentsOf: bgURL)
                         }.value
                     }
@@ -152,6 +153,7 @@ struct WallpaperPreviewView: View {
                         ], startPoint: .topLeading, endPoint: .bottomTrailing))
                 }
             }
+            .drawingGroup()
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             // Subtle border around the wallpaper
@@ -188,7 +190,7 @@ struct WallpaperPreviewView: View {
             return await MediaUtils.videoPosterImage(from: url)
         }
 
-        return await Task.detached(priority: .userInitiated) {
+        return await Task(priority: .userInitiated) {
             if let image = NSImage(contentsOf: url) {
                 return image
             }

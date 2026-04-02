@@ -64,18 +64,24 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
 
     private func scheduleRefresh() {
         refreshTask?.cancel()
-        refreshTask = Task { [weak self] in
+        refreshTask = Task(priority: .utility) { [weak self] in
             while !Task.isCancelled {
                 guard let self else { break }
                 // Wait for 30 minutes between refreshes normally,
                 // but shorter if we're retrying after a failure
-                let currentRetry = self.retryCount
+                let currentRetry = await MainActor.run { self.retryCount }
                 let waitSeconds: UInt64 = (currentRetry > 0) ? UInt64(pow(2.0, Double(currentRetry)) * 30) : 1800
 
-                try? await Task.sleep(nanoseconds: waitSeconds * 1_000_000_000)
+                await AuraBackgroundActor.sleep(for: .seconds(waitSeconds))
 
-                if self.settingsEngine.loadSettings().weatherSyncEnabled {
-                    self.locationManager.requestLocation()
+                let isEnabled = await MainActor.run {
+                    self.settingsEngine.loadSettings().weatherSyncEnabled
+                }
+
+                if isEnabled {
+                    await MainActor.run {
+                        self.locationManager.requestLocation()
+                    }
                 } else {
                     break
                 }

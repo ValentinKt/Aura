@@ -28,7 +28,8 @@ struct MoodSelectorView: View {
             .padding(.vertical, 24)
             .onChange(of: appModel.moodViewModel.selectedSubtheme) { _, newSubtheme in
                 if let subtheme = newSubtheme {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
+                        await Task.yield()
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             proxy.scrollTo(subtheme, anchor: .top)
                         }
@@ -37,7 +38,8 @@ struct MoodSelectorView: View {
             }
             .onAppear {
                 if let subtheme = appModel.moodViewModel.selectedSubtheme {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
+                        await Task.yield()
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             proxy.scrollTo(subtheme, anchor: .top)
                         }
@@ -71,7 +73,8 @@ struct SubthemeRow: View {
                     moodList
                         .onChange(of: appModel.moodViewModel.currentMood) { _, newMood in
                             if let mood = newMood, mood.subtheme == subtheme {
-                                DispatchQueue.main.async {
+                                Task { @MainActor in
+                                    await Task.yield()
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                         horizontalProxy.scrollTo(mood.id, anchor: .center)
                                     }
@@ -83,7 +86,8 @@ struct SubthemeRow: View {
                             // scroll to the first mood of this subtheme.
                             if appModel.moodViewModel.selectedSubtheme == subtheme {
                                 if let firstMood = appModel.moodViewModel.moodsBySubtheme[subtheme]?.first {
-                                    DispatchQueue.main.async {
+                                    Task { @MainActor in
+                                        await Task.yield()
                                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                             horizontalProxy.scrollTo(firstMood.id, anchor: .center)
                                         }
@@ -91,7 +95,8 @@ struct SubthemeRow: View {
                                 }
                             } else if let currentMood = appModel.moodViewModel.currentMood, currentMood.subtheme == subtheme {
                                 // If we are playing a mood from this subtheme, scroll to it.
-                                DispatchQueue.main.async {
+                                Task { @MainActor in
+                                    await Task.yield()
                                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                         horizontalProxy.scrollTo(currentMood.id, anchor: .center)
                                     }

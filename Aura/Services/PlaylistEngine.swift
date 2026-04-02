@@ -278,7 +278,7 @@ final class PlaylistEngine {
 
     private func startScheduling() {
         scheduleTask?.cancel()
-        scheduleTask = Task { @AuraBackgroundActor [weak self] in
+        scheduleTask = Task(priority: .utility) { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
 
@@ -312,8 +312,7 @@ final class PlaylistEngine {
                     }
                 }
 
-                // Sleep for 30 seconds before next check
-                try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                await AuraBackgroundActor.sleep(for: .seconds(30))
             }
         }
     }

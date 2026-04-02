@@ -303,7 +303,7 @@ final class AppModel {
         sleepTimerEndDate = endDate
         sleepTimerTick = .now
 
-        sleepTimerTask = Task { [weak self] in
+        sleepTimerTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
             while !Task.isCancelled {
@@ -320,7 +320,7 @@ final class AppModel {
                     return
                 }
 
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await AuraBackgroundActor.sleep(for: .seconds(1))
             }
         }
     }

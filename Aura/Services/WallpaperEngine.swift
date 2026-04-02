@@ -82,7 +82,6 @@ final class WallpaperEngine {
     private let fileManager = FileManager.default
     private let themeManager: ThemeManager
     private let wallpaperDirectory: URL
-    private let renderQueue = DispatchQueue(label: "com.Aura.wallpaper.render", qos: .utility)
     private let imageProcessingContext = CIContext()
     private var isRendering = false
     private var isPresentationSuppressed = false
@@ -523,7 +522,7 @@ final class WallpaperEngine {
     private func renderGradientImageAsync(stops: [ColorComponents]) async -> NSImage? {
         let size = NSScreen.main?.frame.size ?? CGSize(width: 1920, height: 1080)
         return await withCheckedContinuation { continuation in
-            renderQueue.async {
+            Task(priority: .utility) {
                 let colorSpace = CGColorSpaceCreateDeviceRGB()
                 guard let context = CGContext(data: nil,
                                               width: Int(size.width),
@@ -580,7 +579,7 @@ final class WallpaperEngine {
     private func renderParticleImageAsync(seed: Int) async -> NSImage? {
         let size = NSScreen.main?.frame.size ?? CGSize(width: 1920, height: 1080)
         return await withCheckedContinuation { continuation in
-            renderQueue.async {
+            Task(priority: .utility) {
                 let colorSpace = CGColorSpaceCreateDeviceRGB()
                 guard let context = CGContext(data: nil,
                                               width: Int(size.width),
@@ -627,7 +626,7 @@ final class WallpaperEngine {
 
     private func writeImageAsync(_ image: NSImage) async -> URL? {
         await withCheckedContinuation { continuation in
-            renderQueue.async {
+            Task(priority: .utility) {
                 guard let tiff = image.tiffRepresentation,
                       let bitmap = NSBitmapImageRep(data: tiff),
                       let jpeg = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else {
@@ -638,7 +637,7 @@ final class WallpaperEngine {
                 let url = self.wallpaperDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
                 do {
                     try jpeg.write(to: url, options: [.atomic])
-                    DispatchQueue.main.async {
+                    await MainActor.run {
                         self.cleanupOldWallpapers(except: url)
                     }
                     continuation.resume(returning: url)
@@ -652,7 +651,7 @@ final class WallpaperEngine {
 
     private func writeWallpaperImagesAsync(_ images: [NSImage]) async -> [URL]? {
         await withCheckedContinuation { continuation in
-            renderQueue.async {
+            Task(priority: .utility) {
                 var urls: [URL] = []
 
                 for image in images {
@@ -675,7 +674,7 @@ final class WallpaperEngine {
                     }
                 }
 
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self.cleanupOldWallpapers(except: Set(urls))
                 }
                 continuation.resume(returning: urls)
@@ -737,7 +736,7 @@ final class WallpaperEngine {
     private func renderSecondaryWallpaperVariantURL(from url: URL) async -> URL? {
         let baseURL = await preparedBackdropURL(from: url) ?? url
 
-        return await Task.detached(priority: .userInitiated) { [wallpaperDirectory, imageProcessingContext] in
+        return await Task(priority: .userInitiated) { [wallpaperDirectory, imageProcessingContext] in
             guard let imageSource = CIImage(contentsOf: baseURL) else {
                 return nil
             }
@@ -854,6 +853,8 @@ final class WallpaperWindowController: NSObject {
     private var playerLayer: AVPlayerLayer?
     private var playerQueue: AVQueuePlayer?
     private var playerLooper: AVPlayerLooper?
+    private var videoAssetLoadTask: Task<Void, Never>?
+    private var renderStateTask: Task<Void, Never>?
     private var endObserver: NSObjectProtocol?
     private var websiteContainerView: NSView?
     private var websiteSnapshotView: NSImageView?
@@ -873,9 +874,10 @@ final class WallpaperWindowController: NSObject {
     private func startWebsiteHoverProbing() {
         guard websiteHoverProbeTask == nil else { return }
 
-        websiteHoverProbeTask = Task.detached { [weak self] in
+        websiteHoverProbeTask = Task(priority: .utility) { [weak self] in
             while !Task.isCancelled {
                 guard let controller = self else { return }
+                try? await AuraBackgroundActor.throwIfRenderingSuspended()
                 await MainActor.run {
                     controller.probeWebsiteHoverState()
                 }
@@ -1040,7 +1042,8 @@ final class WallpaperWindowController: NSObject {
 
         // 1. Visual Throttling: Let the hardware decoder handle pacing. Avoid AVVideoComposition
         // which forces software decode and high CPU usage.
-        Task {
+        videoAssetLoadTask?.cancel()
+        videoAssetLoadTask = Task(priority: .utility) {
             _ = try? await asset.load(.tracks)
         }
 
@@ -1126,6 +1129,9 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func stopAndCleanup() {
+        videoAssetLoadTask?.cancel()
+        videoAssetLoadTask = nil
+
         // 1. Arrêt immédiat de la lecture
         playerQueue?.pause()
         playerQueue?.isMuted = true
@@ -1234,6 +1240,11 @@ final class WallpaperWindowController: NSObject {
     private func updatePerformanceState() {
         let isOccluded = window?.occlusionState.contains(.visible) == false
         let shouldSuspend = window?.isVisible != true || isOccluded || isFullscreenApplicationActive()
+
+        renderStateTask?.cancel()
+        renderStateTask = Task(priority: .utility) {
+            await AuraBackgroundActor.setRenderingSuspended(shouldSuspend)
+        }
 
         // Handle Website
         if currentWebsiteURL != nil {

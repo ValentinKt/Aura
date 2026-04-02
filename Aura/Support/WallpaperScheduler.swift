@@ -15,7 +15,9 @@ final class GatedDisplayLink {
 
         let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
             let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx!).takeUnretainedValue()
-            DispatchQueue.main.async { self_.onFrame?() }
+            Task { @MainActor in
+                self_.onFrame?()
+            }
             return kCVReturnSuccess
         }
         CVDisplayLinkSetOutputCallback(dl, callback, Unmanaged.passUnretained(self).toOpaque())
@@ -65,11 +67,13 @@ final class WallpaperScheduler {
 
     func start(handler: @escaping (WallpaperDescriptor) -> Void) {
         stop()
-        schedulerTask = Task { @MainActor [weak self] in
+        schedulerTask = Task(priority: .utility) { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
-                guard let self = self else { break }
-                self.tick(handler: handler)
+                await AuraBackgroundActor.sleep(for: .seconds(60))
+                guard let self = self else { return }
+                await MainActor.run {
+                    self.tick(handler: handler)
+                }
             }
         }
     }
