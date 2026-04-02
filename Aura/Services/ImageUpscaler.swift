@@ -35,15 +35,10 @@ actor ImageUpscaler {
     private let modelOutputSize: CGSize
 
     init(
-        modelName: String = "realesrgan512",
-        bundle: Bundle = .main,
+        modelURL: URL,
         configuration: MLModelConfiguration = ImageUpscaler.defaultModelConfiguration(),
         cropAndScaleOption: VNImageCropAndScaleOption = .scaleFill
     ) throws {
-        guard let modelURL = bundle.url(forResource: modelName, withExtension: "mlmodelc") else {
-            throw UpscalingError.modelNotFound(name: modelName)
-        }
-
         let mlModel = try MLModel(contentsOf: modelURL, configuration: configuration)
         self.visionModel = try VNCoreMLModel(for: mlModel)
         self.mtlDevice = MTLCreateSystemDefaultDevice()
