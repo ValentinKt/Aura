@@ -13,7 +13,6 @@ struct ContentView: View {
     @State private var selectedTab: Tab? = .moods
     @State private var isMoodsExpanded = false
     @State private var isPlaylistsExpanded = false
-    @State private var expandedSubthemeSections: Set<String> = []
     @State private var selectedPlaylistID: UUID?
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -96,13 +95,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $isShowingCreateMood) {
             let selectedSubtheme = appModel.moodViewModel.selectedSubtheme
+            let isCreateWithAISubtheme = selectedSubtheme?.caseInsensitiveCompare("Create with AI") == .orderedSame
             let isDynamicDesktopSubtheme = selectedSubtheme?.caseInsensitiveCompare("Dynamic Desktop") == .orderedSame
             let isImagePlaygroundSubtheme = selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame
             CreateMoodView(
                 appModel: appModel,
-                defaultTheme: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
-                defaultSubtheme: isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal"),
-                initialWallpaperSource: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia
+                defaultTheme: isCreateWithAISubtheme || isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
+                defaultSubtheme: isCreateWithAISubtheme ? "Create with AI" : (isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal")),
+                initialWallpaperSource: isCreateWithAISubtheme ? .aiGenerated : (isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia)
             )
         }
         .focusable()
@@ -147,6 +147,7 @@ struct ContentView: View {
         case "forest": return "tree.fill"
         case "fractal": return "hurricane"
         case "aura": return "circle"
+        case "create with ai": return "sparkles"
         case "dynamic desktop": return "desktopcomputer"
         case "image playground": return "wand.and.stars"
         case "mindfulness": return "figure.mind.and.body"
@@ -163,6 +164,49 @@ struct ContentView: View {
         case "websites": return "globe"
         default: return "circle.fill"
         }
+    }
+
+    private var atmosphereSection: MoodSubthemeSection? {
+        appModel.moodViewModel.subthemeSections.first { $0.title == "Atmospheres" }
+    }
+
+    private var secondaryMoodSections: [MoodSubthemeSection] {
+        appModel.moodViewModel.subthemeSections.filter { $0.title != "Atmospheres" }
+    }
+
+    private var atmosphereMenuItems: [AtmosphereCarouselMenuItem] {
+        (atmosphereSection?.subthemes ?? []).map { subtheme in
+            AtmosphereCarouselMenuItem(
+                id: subtheme,
+                title: subtheme,
+                systemImage: iconForSubtheme(subtheme)
+            )
+        }
+    }
+
+    private var selectedAtmosphereID: Binding<String?> {
+        Binding(
+            get: {
+                let selectedSubtheme = appModel.moodViewModel.selectedSubtheme
+                if let selectedSubtheme,
+                   atmosphereMenuItems.contains(where: { $0.id == selectedSubtheme }) {
+                    return selectedSubtheme
+                }
+
+                return atmosphereMenuItems.first?.id
+            },
+            set: { newValue in
+                guard let newValue,
+                      appModel.moodViewModel.selectedSubtheme != newValue else {
+                    return
+                }
+
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    selectedTab = .moods
+                }
+                appModel.moodViewModel.selectedSubtheme = newValue
+            }
+        )
     }
 
     private var sidebarContent: some View {
@@ -217,55 +261,42 @@ struct ContentView: View {
                         .buttonStyle(.plain)
 
                         if isMoodsExpanded {
-                            let subthemeSections = appModel.moodViewModel.subthemeSections
-                            LazyVStack(alignment: .leading, spacing: 12) {
-                                ForEach(subthemeSections) { section in
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        if subthemeSections.count > 1 {
-                                            Button {
-                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                                    if expandedSubthemeSections.contains(section.id) {
-                                                        expandedSubthemeSections.remove(section.id)
-                                                    } else {
-                                                        expandedSubthemeSections.insert(section.id)
+                            LazyVStack(alignment: .leading, spacing: 18) {
+                                if !atmosphereMenuItems.isEmpty {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Text("ATMOSPHERES")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(.white.opacity(0.55))
+                                            .kerning(1.2)
+                                            .padding(.horizontal, 16)
+
+                                        AtmospheresWheelMenu(
+                                            items: atmosphereMenuItems,
+                                            selectedID: selectedAtmosphereID
+                                        )
+                                        .frame(height: min(CGFloat(atmosphereMenuItems.count) * 48, 440))
+                                    }
+                                }
+
+                                ForEach(secondaryMoodSections) { section in
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text(section.title.uppercased())
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(.white.opacity(0.45))
+                                            .padding(.horizontal, 16)
+
+                                        ForEach(section.subthemes, id: \.self) { subtheme in
+                                            SidebarItem(
+                                                title: subtheme,
+                                                isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
+                                                systemImage: iconForSubtheme(subtheme),
+                                                action: {
+                                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                        selectedTab = .moods
                                                     }
+                                                    appModel.moodViewModel.selectedSubtheme = subtheme
                                                 }
-                                            } label: {
-                                                HStack {
-                                                    Text(section.title.uppercased())
-                                                        .font(.system(size: 10, weight: .bold))
-                                                        .foregroundStyle(.white.opacity(0.45))
-
-                                                    Spacer(minLength: 0)
-
-                                                    Image(systemName: "chevron.right")
-                                                        .font(.system(size: 8, weight: .bold))
-                                                        .foregroundStyle(.white.opacity(0.35))
-                                                        .rotationEffect(.degrees(expandedSubthemeSections.contains(section.id) ? 90 : 0))
-                                                }
-                                                .padding(.horizontal, 16)
-                                                .padding(.top, 4)
-                                                .padding(.bottom, 2)
-                                                .contentShape(Rectangle())
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-
-                                        if subthemeSections.count <= 1 || expandedSubthemeSections.contains(section.id) {
-                                            ForEach(section.subthemes, id: \.self) { subtheme in
-                                                SidebarItem(
-                                                    title: subtheme,
-                                                    isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
-                                                    systemImage: iconForSubtheme(subtheme),
-                                                    action: {
-                                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                            selectedTab = .moods
-                                                        }
-                                                        appModel.moodViewModel.selectedSubtheme = subtheme
-                                                    }
-                                                )
-                                            }
-                                            .padding(.leading, subthemeSections.count > 1 ? 8 : 0)
+                                            )
                                         }
                                     }
                                 }
@@ -631,6 +662,125 @@ struct SidebarItem: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         .onHover { isHovering = $0 }
+    }
+}
+
+private struct AtmosphereCarouselMenuItem: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let systemImage: String
+}
+
+private struct AtmosphereCarouselItemAppearance {
+    let scale: CGFloat
+    let opacity: Double
+}
+
+private struct AtmosphereCarouselCenterPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGFloat] = [:]
+
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
+private struct AtmospheresWheelMenu: View {
+    let items: [AtmosphereCarouselMenuItem]
+    @Binding var selectedID: String?
+
+    private let rowHeight: CGFloat = 44
+    private let rowSpacing: CGFloat = 10
+    private let coordinateSpaceName = "atmospheres-wheel"
+
+    var body: some View {
+        GeometryReader { geometry in
+            let containerCenterY = geometry.size.height / 2
+            let verticalInset = max(0, containerCenterY - (rowHeight / 2))
+
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVStack(spacing: rowSpacing) {
+                    ForEach(items) { item in
+                        carouselRow(item, containerCenterY: containerCenterY)
+                            .id(item.id)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .contentMargins(.vertical, verticalInset, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $selectedID, anchor: .center)
+            .coordinateSpace(name: coordinateSpaceName)
+            .onPreferenceChange(AtmosphereCarouselCenterPreferenceKey.self) { itemCenters in
+                guard let closestID = itemCenters.min(
+                    by: { abs($0.value - containerCenterY) < abs($1.value - containerCenterY) }
+                )?.key,
+                    closestID != selectedID else {
+                    return
+                }
+
+                selectedID = closestID
+            }
+            .onAppear {
+                if selectedID == nil {
+                    selectedID = items.first?.id
+                }
+            }
+        }
+    }
+
+    private func carouselRow(_ item: AtmosphereCarouselMenuItem, containerCenterY: CGFloat) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                selectedID = item.id
+            }
+        } label: {
+            GeometryReader { itemGeometry in
+                let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
+                let appearance = itemAppearance(for: distance)
+                let isSelected = selectedID == item.id
+
+                HStack(spacing: 14) {
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
+                        .frame(width: 20)
+
+                    Text(item.title)
+                        .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                        .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .scaleEffect(appearance.scale, anchor: .leading)
+                .opacity(appearance.opacity)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.white.opacity(0.05))
+                    }
+                }
+                .contentShape(Rectangle())
+                .preference(
+                    key: AtmosphereCarouselCenterPreferenceKey.self,
+                    value: [item.id: itemGeometry.frame(in: .named(coordinateSpaceName)).midY]
+                )
+            }
+            .frame(height: rowHeight)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+    }
+
+    private func itemAppearance(for distance: CGFloat) -> AtmosphereCarouselItemAppearance {
+        let falloffDistance = (rowHeight + rowSpacing) * 2.2
+        let normalizedDistance = min(distance / falloffDistance, 1)
+        let scale = max(0.74, 1 - (normalizedDistance * 0.26))
+        let opacity = max(0.24, 1 - (normalizedDistance * 0.76))
+
+        return AtmosphereCarouselItemAppearance(scale: scale, opacity: opacity)
     }
 }
 
