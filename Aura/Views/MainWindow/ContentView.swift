@@ -185,6 +185,8 @@ struct ContentView: View {
         }
     }
 
+    @State private var lastSelectedAtmosphereID: String?
+
     private var selectedAtmosphereID: Binding<String?> {
         Binding(
             get: {
@@ -194,11 +196,25 @@ struct ContentView: View {
                     return selectedSubtheme
                 }
 
+                if let last = lastSelectedAtmosphereID {
+                    return last
+                }
+
+                if let currentSubtheme = appModel.moodViewModel.currentMood?.subtheme,
+                   atmosphereMenuItems.contains(where: { $0.id == currentSubtheme }) {
+                    return currentSubtheme
+                }
+
                 return atmosphereMenuItems.first?.id
             },
             set: { newValue in
-                guard let newValue,
-                      appModel.moodViewModel.selectedSubtheme != newValue else {
+                guard let newValue else { return }
+                
+                if atmosphereMenuItems.contains(where: { $0.id == newValue }) {
+                    lastSelectedAtmosphereID = newValue
+                }
+
+                guard appModel.moodViewModel.selectedSubtheme != newValue else {
                     return
                 }
 
@@ -427,6 +443,9 @@ struct ContentView: View {
                 }
                 .onChange(of: appModel.moodViewModel.selectedSubtheme) { _, newValue in
                     if let subtheme = newValue {
+                        if atmosphereMenuItems.contains(where: { $0.id == subtheme }) {
+                            lastSelectedAtmosphereID = subtheme
+                        }
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                             proxy.scrollTo(subtheme, anchor: .top)
                         }
