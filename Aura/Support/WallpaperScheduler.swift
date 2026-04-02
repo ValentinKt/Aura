@@ -1,5 +1,4 @@
 import Foundation
-import QuartzCore
 import CoreVideo
 
 @MainActor
@@ -14,8 +13,7 @@ final class GatedDisplayLink {
         guard let dl = displayLink else { return }
 
         let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
-            guard let ctx = ctx else { return kCVReturnError }
-            let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx).takeUnretainedValue()
+            let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx!).takeUnretainedValue()
             DispatchQueue.main.async { self_.onFrame?() }
             return kCVReturnSuccess
         }
@@ -30,7 +28,9 @@ final class GatedDisplayLink {
         isRunning = false
     }
 
-    deinit { if let dl = displayLink { CVDisplayLinkStop(dl) } }
+    deinit { 
+        if let dl = displayLink { CVDisplayLinkStop(dl) }
+    }
 }
 
 struct WallpaperSchedule: Hashable, Codable {

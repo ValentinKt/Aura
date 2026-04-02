@@ -126,6 +126,49 @@ actor ImageUpscaler {
         (image.width > Int(modelInputSize.width) || image.height > Int(modelInputSize.height))
     }
 
+    private func cgImageToIOSurfacePixelBuffer(_ cgImage: CGImage) throws -> CVPixelBuffer {
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        let attributes: [String: Any] = [
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:] // Zero-copy GPU backing
+        ]
+        
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_32BGRA,
+            attributes as CFDictionary,
+            &pixelBuffer
+        )
+        
+        guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+            throw UpscalingError.imageConversionFailed
+        }
+        
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        
+        guard let context = CGContext(
+            data: CVPixelBufferGetBaseAddress(buffer),
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else {
+            throw UpscalingError.imageConversionFailed
+        }
+        
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return buffer
+    }
+
     private func performRequest(on image: CGImage) throws -> CGImage {
         guard let visionModel = visionModel else {
             return image
@@ -139,8 +182,8 @@ actor ImageUpscaler {
                 request.imageCropAndScaleOption = cropAndScaleOption
 
                 // Implement Zero-Copy pipeline using IOSurface
-                let options: [VNImageOption: Any] = [:]
-                let handler = VNImageRequestHandler(cgImage: image, options: options)
+                let pixelBuffer = try cgImageToIOSurfacePixelBuffer(image)
+                let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
                 try handler.perform([request])
                 return try makeCGImage(from: request.results)
             }
@@ -242,9 +285,9 @@ actor ImageUpscaler {
     }
 
     static func defaultModelConfiguration() -> MLModelConfiguration {
-        let config = MLModelConfiguration()
-        config.computeUnits = .all
-        return config
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = .all
+        return configuration
     }
 
     static func createDummy() -> ImageUpscaler {

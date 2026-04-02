@@ -786,27 +786,12 @@ private struct AtmospheresWheelMenu: View {
                     }
                 }
                 .scrollTargetLayout()
+                .drawingGroup()
             }
             .contentMargins(.vertical, verticalInset, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $scrollPositionID, anchor: .center)
             .coordinateSpace(name: coordinateSpaceName)
-            .onPreferenceChange(AtmosphereCarouselCenterPreferenceKey.self) { itemCenters in
-                guard let closestID = itemCenters.min(
-                    by: { abs($0.value - containerCenterY) < abs($1.value - containerCenterY) }
-                )?.key,
-                      let closestItem = repeatedItems.first(where: { $0.id == closestID }) else {
-                    return
-                }
-
-                normalizeScrollPositionIfNeeded(for: closestItem)
-
-                guard closestItem.item.id != selectedID else {
-                    return
-                }
-
-                selectedID = closestItem.item.id
-            }
             .onAppear {
                 let initialID = selectedID ?? items.first?.id
                 guard let initialID else { return }
@@ -838,6 +823,11 @@ private struct AtmospheresWheelMenu: View {
                 }
 
                 normalizeScrollPositionIfNeeded(for: repeatedItem)
+                
+                guard repeatedItem.item.id != selectedID else {
+                    return
+                }
+                selectedID = repeatedItem.item.id
             }
         }
     }
@@ -879,10 +869,6 @@ private struct AtmospheresWheelMenu: View {
                     }
                 }
                 .contentShape(Rectangle())
-                .preference(
-                    key: AtmosphereCarouselCenterPreferenceKey.self,
-                    value: [repeatedItem.id: itemGeometry.frame(in: .named(coordinateSpaceName)).midY]
-                )
             }
             .frame(height: Self.rowHeight)
         }

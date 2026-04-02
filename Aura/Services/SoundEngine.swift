@@ -69,7 +69,7 @@ final class SoundEngine {
             return
         }
 
-        duckingTask = Task { [weak self] in
+        duckingTask = Task { @AuraBackgroundActor [weak self] in
             for step in 1...steps {
                 if Task.isCancelled { return }
                 let progress = Float(step) / Float(steps)
@@ -294,13 +294,13 @@ final class SoundEngine {
     func startRandomization(interval: TimeInterval, validRange: ClosedRange<Float>) {
         randomizationTask?.cancel()
         guard interval > 0 else { return }
-        randomizationTask = Task { [weak self] in
+        randomizationTask = Task { @AuraBackgroundActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
                 guard let self else { continue }
                 for id in SoundLayerID.allCases.map(\.rawValue) {
                     let random = Float.random(in: validRange)
-                    setLayer(id, volume: random)
+                    await MainActor.run { self.setLayer(id, volume: random) }
                 }
             }
         }

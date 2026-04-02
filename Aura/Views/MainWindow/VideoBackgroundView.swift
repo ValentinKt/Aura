@@ -124,23 +124,9 @@ private class VideoLoopView: NSView {
         }
 
         // --- STEP 2: CONFIGURE ASSET (VIDEO) ---
-        // SSD Hygiene: memory-backed buffer for small loopable assets
-        var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        urlComponents?.scheme = "memory"
-        
-        let asset: AVURLAsset
-        if let memoryURL = urlComponents?.url,
-           let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-           size < 50_000_000,
-           let loader = MemoryAssetLoader(url: url) {
-            
-            self.memoryAssetLoader = loader
-            asset = AVURLAsset(url: memoryURL)
-            asset.resourceLoader.setDelegate(loader, queue: .global(qos: .utility))
-        } else {
-            self.memoryAssetLoader = nil
-            asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
-        }
+        // Direct disk streaming to Media Engine (bypassing CPU RAM)
+        self.memoryAssetLoader = nil
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
 
         let item = AVPlayerItem(asset: asset)
 
@@ -180,6 +166,7 @@ private class VideoLoopView: NSView {
         let newLayer = AVPlayerLayer(player: newPlayer)
         newLayer.videoGravity = .resizeAspectFill
         newLayer.frame = self.bounds
+        newLayer.drawsAsynchronously = true // Ensures asynchronous display
         self.layer?.addSublayer(newLayer)
         self.playerLayer = newLayer
 

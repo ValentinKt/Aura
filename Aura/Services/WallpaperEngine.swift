@@ -1069,24 +1069,9 @@ final class WallpaperWindowController: NSObject {
         self.currentURL = finalURL
         self.isSecurityScoped = isScoped
 
-        // SSD Hygiene: memory-backed buffer for small loopable assets
-        // Use a custom scheme so AVAsset triggers the resource loader delegate
-        var urlComponents = URLComponents(url: finalURL, resolvingAgainstBaseURL: false)
-        urlComponents?.scheme = "memory"
-        
-        let asset: AVURLAsset
-        if let memoryURL = urlComponents?.url,
-           let size = try? finalURL.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-           size < 50_000_000, // Only cache into memory if less than 50MB
-           let loader = MemoryAssetLoader(url: finalURL) {
-            
-            self.memoryAssetLoader = loader
-            asset = AVURLAsset(url: memoryURL)
-            asset.resourceLoader.setDelegate(loader, queue: .global(qos: .userInitiated))
-        } else {
-            self.memoryAssetLoader = nil
-            asset = AVURLAsset(url: finalURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
-        }
+        // Direct disk streaming to Media Engine (bypassing CPU RAM)
+        self.memoryAssetLoader = nil
+        let asset = AVURLAsset(url: finalURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
 
         let item = AVPlayerItem(asset: asset)
         
@@ -1121,6 +1106,7 @@ final class WallpaperWindowController: NSObject {
         let newLayer = AVPlayerLayer(player: newPlayer)
         newLayer.videoGravity = .resizeAspectFill
         newLayer.isOpaque = true
+        newLayer.drawsAsynchronously = true // Ensures asynchronous display
 
         // Utilisation de CATransaction pour éviter les flashs noirs et assurer un rendu propre
         CATransaction.begin()

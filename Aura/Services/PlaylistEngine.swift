@@ -278,12 +278,12 @@ final class PlaylistEngine {
 
     private func startScheduling() {
         scheduleTask?.cancel()
-        scheduleTask = Task { [weak self] in
+        scheduleTask = Task { @AuraBackgroundActor [weak self] in
             while !Task.isCancelled {
-                guard let self else { break }
+                guard let self else { return }
 
-                // Check if any playlist is scheduled for now
                 let now = Date()
+
                 let playlistToStart = await MainActor.run { () -> Playlist? in
                     self.playlists.first { p in
                         guard let schedule = p.scheduleTime else { return false }
@@ -295,8 +295,6 @@ final class PlaylistEngine {
                             return false
                         }
 
-                        // Within 1 minute of schedule time
-                        // We use hour and minute matching for daily scheduling
                         let calendar = Calendar.current
                         let nowComponents = calendar.dateComponents([.hour, .minute], from: now)
                         let scheduleComponents = calendar.dateComponents([.hour, .minute], from: schedule)

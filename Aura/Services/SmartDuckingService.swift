@@ -54,26 +54,27 @@ final class SmartDuckingService {
 
     func startMonitoring() {
         monitoringTask?.cancel()
-        monitoringTask = Task { [weak self] in
+        monitoringTask = Task { @AuraBackgroundActor [weak self] in
             while !Task.isCancelled {
-                guard let self = self, self.isEnabled else {
+                guard let self = self, await self.isEnabled else {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     continue
                 }
 
-                let micActive = self.isMicActive()
+                let micActive = await self.isMicActive()
                 let mediaPlaying = await self.isMediaPlaying()
 
                 let shouldDuck = micActive || mediaPlaying
 
-                if shouldDuck && !self.isDuckingActive {
-                    self.isDuckingActive = true
+                let duckingActive = await self.isDuckingActive
+                if shouldDuck && !duckingActive {
+                    await MainActor.run { self.isDuckingActive = true }
                     print("🟢 [SmartDucking] Activity detected, fading out...")
-                    self.soundEngine.fadeDucking(to: 0.1, duration: 1.5)
-                } else if !shouldDuck && self.isDuckingActive {
-                    self.isDuckingActive = false
+                    await self.soundEngine.fadeDucking(to: 0.1, duration: 1.5)
+                } else if !shouldDuck && duckingActive {
+                    await MainActor.run { self.isDuckingActive = false }
                     print("🟢 [SmartDucking] Activity ended, fading in...")
-                    self.soundEngine.fadeDucking(to: 1.0, duration: 2.0)
+                    await self.soundEngine.fadeDucking(to: 1.0, duration: 2.0)
                 }
 
                 // Check every 2 seconds
