@@ -153,7 +153,6 @@ struct WallpaperPreviewView: View {
                         ], startPoint: .topLeading, endPoint: .bottomTrailing))
                 }
             }
-            .drawingGroup()
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             // Subtle border around the wallpaper
