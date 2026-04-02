@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var isMoodsExpanded = false
     @State private var isPlaylistsExpanded = false
     @State private var selectedPlaylistID: UUID?
+    @State private var moodScrollRequest: MoodScrollRequest?
 
     enum Tab: String, CaseIterable, Identifiable {
         case moods, playlists, settings
@@ -201,12 +202,25 @@ struct ContentView: View {
                     return
                 }
 
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                    selectedTab = .moods
-                }
-                appModel.moodViewModel.selectedSubtheme = newValue
+                selectMoodSubtheme(newValue)
             }
         )
+    }
+
+    private func selectMoodSubtheme(_ subtheme: String, shouldRequestScroll: Bool = false) {
+        let didChangeSelection = appModel.moodViewModel.selectedSubtheme != subtheme
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            selectedTab = .moods
+        }
+
+        if didChangeSelection {
+            appModel.moodViewModel.selectedSubtheme = subtheme
+        }
+
+        if shouldRequestScroll || didChangeSelection {
+            moodScrollRequest = MoodScrollRequest(subtheme: subtheme)
+        }
     }
 
     private var sidebarContent: some View {
@@ -272,7 +286,10 @@ struct ContentView: View {
 
                                         AtmospheresWheelMenu(
                                             items: atmosphereMenuItems,
-                                            selectedID: selectedAtmosphereID
+                                            selectedID: selectedAtmosphereID,
+                                            onItemActivated: { subtheme in
+                                                selectMoodSubtheme(subtheme, shouldRequestScroll: true)
+                                            }
                                         )
                                         .frame(height: AtmospheresWheelMenu.viewportHeight)
                                     }
@@ -291,10 +308,7 @@ struct ContentView: View {
                                                 isSelected: selectedTab == .moods && appModel.moodViewModel.selectedSubtheme == subtheme,
                                                 systemImage: iconForSubtheme(subtheme),
                                                 action: {
-                                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                        selectedTab = .moods
-                                                    }
-                                                    appModel.moodViewModel.selectedSubtheme = subtheme
+                                                    selectMoodSubtheme(subtheme, shouldRequestScroll: true)
                                                 }
                                             )
                                         }
@@ -394,7 +408,20 @@ struct ContentView: View {
                 .frame(height: moodListHeight)
                 .clipped()
                 .onAppear {
-                    if let subtheme = appModel.moodViewModel.currentMood?.subtheme {
+                    if let requestedSubtheme = moodScrollRequest?.subtheme {
+                        proxy.scrollTo(requestedSubtheme, anchor: .top)
+                    } else if let selectedSubtheme = appModel.moodViewModel.selectedSubtheme {
+                        proxy.scrollTo(selectedSubtheme, anchor: .top)
+                    } else if let subtheme = appModel.moodViewModel.currentMood?.subtheme {
+                        proxy.scrollTo(subtheme, anchor: .top)
+                    }
+                }
+                .onChange(of: moodScrollRequest) { _, newValue in
+                    guard let subtheme = newValue?.subtheme else {
+                        return
+                    }
+
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                         proxy.scrollTo(subtheme, anchor: .top)
                     }
                 }
@@ -676,6 +703,11 @@ private struct AtmosphereCarouselItemAppearance {
     let opacity: Double
 }
 
+private struct MoodScrollRequest: Equatable {
+    let id = UUID()
+    let subtheme: String
+}
+
 private struct RepeatedAtmosphereCarouselItem: Identifiable, Hashable {
     let item: AtmosphereCarouselMenuItem
     let cycle: Int
@@ -703,6 +735,7 @@ private struct AtmospheresWheelMenu: View {
 
     let items: [AtmosphereCarouselMenuItem]
     @Binding var selectedID: String?
+    let onItemActivated: (String) -> Void
     @State private var scrollPositionID: String?
 
     private let coordinateSpaceName = "atmospheres-wheel"
@@ -796,6 +829,7 @@ private struct AtmospheresWheelMenu: View {
                 selectedID = repeatedItem.item.id
                 scrollPositionID = repeatedItem.id
             }
+            onItemActivated(repeatedItem.item.id)
         } label: {
             GeometryReader { itemGeometry in
                 let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
@@ -835,6 +869,7 @@ private struct AtmospheresWheelMenu: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .frame(maxWidth: .infinity)
     }
 
     private func repeatedID(for itemID: String, cycle: Int) -> String? {
