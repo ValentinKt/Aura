@@ -54,6 +54,12 @@ actor UpscaleManager {
         _ images: [NSImage],
         progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }
     ) async throws -> [NSImage] {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            // Pause/skip high-res upscaling when on battery (Low Power Mode)
+            progress(ProgressUpdate(completedCount: images.count, totalCount: images.count, currentIndex: nil))
+            return images
+        }
+
         let workItems = images.enumerated().map { index, image in
             return WorkItem(index: index) {
                 try autoreleasepool { () throws -> CGImage in
@@ -76,6 +82,22 @@ actor UpscaleManager {
         urls: [URL],
         progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }
     ) async throws -> [NSImage] {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            // Load original images without upscaling if in Low Power Mode
+            let workItems = urls.enumerated().map { index, url in
+                WorkItem(index: index) {
+                    try await Self.loadCGImage(from: url)
+                }
+            }
+            var resultImages: [NSImage] = []
+            for item in workItems {
+                let cgImage = try await item.loadImage()
+                resultImages.append(NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height)))
+                progress(ProgressUpdate(completedCount: resultImages.count, totalCount: urls.count, currentIndex: resultImages.count))
+            }
+            return resultImages
+        }
+
         let workItems = urls.enumerated().map { index, url in
             WorkItem(index: index) {
                 try await Self.loadCGImage(from: url)
@@ -92,6 +114,11 @@ actor UpscaleManager {
         _ images: [CGImage],
         progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }
     ) async throws -> [CGImage] {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            progress(ProgressUpdate(completedCount: images.count, totalCount: images.count, currentIndex: nil))
+            return images
+        }
+
         let workItems = images.enumerated().map { index, image in
             WorkItem(index: index) {
                 image

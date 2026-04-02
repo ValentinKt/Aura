@@ -256,7 +256,9 @@ final class WallpaperEngine {
     }
 
     private func startAnimated(_ descriptor: WallpaperDescriptor) {
-        let fps = min(5, max(0.1, descriptor.fps)) // Limit FPS to reasonable background range
+        let isLowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        let fps = isLowPower ? min(5, max(0.1, descriptor.fps)) / 2 : min(5, max(0.1, descriptor.fps))
+        
         if let resource = descriptor.resources.first {
             if let resolvedURL = resolveResourceURL(resource) {
                 let ext = resolvedURL.pathExtension.lowercased()
@@ -1048,6 +1050,15 @@ final class WallpaperWindowController: NSObject {
         // CONFIGURATION SILENCIEUSE (Fix bootstrap_look_up)
         let asset = AVURLAsset(url: finalURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
+        
+        // 1. Visual Throttling: Cap video at 30 FPS to save massive GPU energy
+        Task {
+            _ = try? await asset.load(.tracks)
+            if let composition = try? AVMutableVideoComposition(propertiesOf: asset) {
+                composition.frameDuration = CMTime(value: 1, timescale: 30)
+                item.videoComposition = composition
+            }
+        }
 
         // Désactiver le moteur audio au niveau de l'item (Fix AddInstanceForFactory)
         item.audioTimePitchAlgorithm = .varispeed
@@ -1267,7 +1278,9 @@ final class WallpaperWindowController: NSObject {
 
         if suspended {
             playerQueue?.pause()
+            playerLayer?.isHidden = true
         } else {
+            playerLayer?.isHidden = false
             playerQueue?.play()
         }
     }

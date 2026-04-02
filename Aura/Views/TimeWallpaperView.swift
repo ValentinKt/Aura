@@ -66,6 +66,7 @@ struct TimeWallpaperView: View {
                     MinimalTimeView(date: currentTime, color: accentColor)
                 }
             }
+            .drawingGroup()
         }
         .task(id: backgroundTaskKey) {
             await loadBackgroundImage()

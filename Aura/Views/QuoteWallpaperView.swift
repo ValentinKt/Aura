@@ -107,6 +107,7 @@ struct QuoteWallpaperView: View {
                     .multilineTextAlignment(.center)
                     .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
                     .shadow(color: accentColor.opacity(0.3), radius: 40, x: 0, y: 20)
+                    .drawingGroup()
                     .padding(.horizontal, 80)
                     .minimumScaleFactor(0.3)
                     .opacity(textOpacity)

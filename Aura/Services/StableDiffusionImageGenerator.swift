@@ -88,7 +88,7 @@ actor StableDiffusionImageGenerator {
 
     init(session: URLSession = .shared) {
         self.session = session
-        self.modelDirectory = CustomAssetManager.appSupportDirectory
+        self.modelDirectory = Self.appSupportDirectory()
             .appendingPathComponent("AIModels", isDirectory: true)
             .appendingPathComponent("StableDiffusion-2-1-Base", isDirectory: true)
         self.previewDirectory = fileManager.temporaryDirectory
@@ -310,6 +310,16 @@ actor StableDiffusionImageGenerator {
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
 
         return String((candidate.isEmpty ? "AI-Wallpaper" : candidate).prefix(40))
+    }
+
+    private static func appSupportDirectory() -> URL {
+        if let appSupport = try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true) {
+            let bundleID = Bundle.main.bundleIdentifier ?? "Aura"
+            let dir = appSupport.appendingPathComponent(bundleID, isDirectory: true)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir
+        }
+        return FileManager.default.temporaryDirectory
     }
 
     private static func makeModelConfiguration() -> MLModelConfiguration {

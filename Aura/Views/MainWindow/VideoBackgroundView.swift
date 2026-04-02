@@ -46,21 +46,35 @@ private class VideoLoopView: NSView {
         super.viewDidMoveToWindow()
         windowObservation?.invalidate()
         windowObservation = nil
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
 
         if let window = self.window {
             windowObservation = window.observe(\.isVisible, options: [.initial, .new]) { [weak self] window, _ in
-                self?.updatePlaybackState(isVisible: window.isVisible)
+                self?.updatePlaybackState()
             }
+            NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didChangeOcclusionStateNotification, object: window)
         } else {
-            updatePlaybackState(isVisible: false)
+            updatePlaybackState()
         }
     }
 
-    private func updatePlaybackState(isVisible: Bool) {
-        if isVisible {
+    @objc private func windowOcclusionDidChange() {
+        updatePlaybackState()
+    }
+
+    private func updatePlaybackState() {
+        guard let window = self.window else {
+            player?.pause()
+            playerLayer?.isHidden = true
+            return
+        }
+        let isOccluded = !window.occlusionState.contains(.visible)
+        if window.isVisible && !isOccluded {
+            playerLayer?.isHidden = false
             player?.play()
         } else {
             player?.pause()
+            playerLayer?.isHidden = true
         }
     }
 
@@ -109,8 +123,17 @@ private class VideoLoopView: NSView {
         }
 
         // --- STEP 2: CONFIGURE ASSET (VIDEO) ---
-        let asset = AVURLAsset(url: url)
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
+
+        // Visual Throttling: Cap video at 30 FPS to save massive GPU energy
+        Task {
+            _ = try? await asset.load(.tracks)
+            if let composition = try? AVMutableVideoComposition(propertiesOf: asset) {
+                composition.frameDuration = CMTime(value: 1, timescale: 30)
+                item.videoComposition = composition
+            }
+        }
 
         item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
         item.preferredPeakBitRate = 5_000_000

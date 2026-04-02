@@ -66,6 +66,7 @@ struct ZenWallpaperView: View {
                 BreathingZenView(primaryColor: primaryColor, accentColor: accentColor)
             }
         }
+        .drawingGroup()
         .task(id: backgroundTaskKey) {
             await loadBackgroundImage()
         }
