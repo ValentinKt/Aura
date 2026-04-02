@@ -22,12 +22,12 @@ struct FallbackGradientView: View {
 struct FallbackImageView: View {
     let url: URL?
     let image: NSImage?
-    
+
     init(url: URL) {
         self.url = url
         self.image = nil
     }
-    
+
     init(image: NSImage) {
         self.url = nil
         self.image = image
@@ -344,7 +344,7 @@ final class WallpaperEngine {
             if fileManager.fileExists(atPath: videoURL.path) {
                 return videoURL
             }
-            
+
             let customDir = appSupport.appendingPathComponent("Aura/CustomWallpapers", isDirectory: true)
             let customURL = customDir.appendingPathComponent(resource)
             if fileManager.fileExists(atPath: customURL.path) {
@@ -1142,13 +1142,13 @@ final class WallpaperWindowController: NSObject {
         playerLayer = nil
 
         playerQueue = nil
-        
+
         // 6. Force VRAM cleanup gracefully
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         CATransaction.flush()
         CATransaction.commit()
-        
+
         print("🟢 [WallpaperEngine] Hardware Decoder Released")
     }
 
