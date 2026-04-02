@@ -7,7 +7,7 @@ struct ImmersiveModeView: View {
     @State private var showControls = true
     @State private var lastActivityTime = Date()
     @State private var isHoveringControls = false
-    @State private var displayLinkTimer: DisplayLinkTimer?
+    @State private var timerTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -23,22 +23,22 @@ struct ImmersiveModeView: View {
             }
         }
         .onAppear {
-            let timer = DisplayLinkTimer(interval: 1.0)
-            timer.onFire = {
-                if showControls && !isHoveringControls {
-                    if Date().timeIntervalSince(lastActivityTime) > 5 {
-                        withAnimation(.easeInOut(duration: 1.5)) {
-                            showControls = false
+            timerTask = Task { @MainActor in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(1))
+                    if showControls && !isHoveringControls {
+                        if Date().timeIntervalSince(lastActivityTime) > 5 {
+                            withAnimation(.easeInOut(duration: 1.5)) {
+                                showControls = false
+                            }
                         }
                     }
                 }
             }
-            timer.start()
-            self.displayLinkTimer = timer
         }
         .onDisappear {
-            displayLinkTimer?.invalidate()
-            displayLinkTimer = nil
+            timerTask?.cancel()
+            timerTask = nil
         }
     }
 

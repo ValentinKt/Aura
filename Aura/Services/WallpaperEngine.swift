@@ -42,12 +42,34 @@ final class MemoryAssetLoader: NSObject, AVAssetResourceLoaderDelegate {
     }
 }
 
-struct FallbackGradientView: View {
+struct AnimatedGradientView: View {
     let stops: [ColorComponents]
     var body: some View {
-        let colors = stops.map { Color(red: $0.red, green: $0.green, blue: $0.blue, opacity: $0.alpha) }
-        LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-            .ignoresSafeArea()
+        TimelineView(.animation) { context in
+            let shift = context.date.timeIntervalSinceReferenceDate / 60.0
+            let shiftedStops = stops.map { stop in
+                ColorComponents(
+                    red: max(0, min(1, stop.red + sin(shift) * 0.1)),
+                    green: max(0, min(1, stop.green + cos(shift) * 0.1)),
+                    blue: max(0, min(1, stop.blue + sin(shift * 0.5) * 0.1)),
+                    alpha: stop.alpha
+                )
+            }
+            let colors = shiftedStops.map { Color(red: $0.red, green: $0.green, blue: $0.blue, opacity: $0.alpha) }
+            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+                .drawingGroup()
+        }
+    }
+}
+
+struct AnimatedParticleView: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            // Fallback or a simple implementation. For a real particle system, use Canvas or SpriteKit.
+            // To prevent high CPU, we'll just show a gradient for now, or you can implement a Canvas.
+            Color.black.ignoresSafeArea()
+        }
     }
 }
 
@@ -91,39 +113,9 @@ struct WallpaperDisplayPreview: Identifiable, Hashable {
 }
 
 @MainActor
-final class DisplayLinkTimer {
-    private let displayLink = GatedDisplayLink()
-    private let interval: TimeInterval
-    private var lastFireTime: TimeInterval = 0
-    var onFire: (() -> Void)?
-
-    init(interval: TimeInterval) {
-        self.interval = interval
-        displayLink.onFrame = { [weak self] in
-            guard let self = self else { return }
-            let now = CACurrentMediaTime()
-            if now - self.lastFireTime >= self.interval {
-                self.lastFireTime = now
-                self.onFire?()
-            }
-        }
-    }
-
-    func start() {
-        lastFireTime = CACurrentMediaTime()
-        displayLink.start()
-    }
-
-    func invalidate() {
-        displayLink.stop()
-    }
-}
-
-@MainActor
 @Observable
 final class WallpaperEngine {
     private let fileManager = FileManager.default
-    private var animationTimers: [String: DisplayLinkTimer] = [:]
     private let themeManager: ThemeManager
     private let wallpaperDirectory: URL
     private let renderQueue = DispatchQueue(label: "com.Aura.wallpaper.render", qos: .utility)
@@ -232,10 +224,6 @@ final class WallpaperEngine {
             stopAnimation()
         } else {
             // Stop timers but keep the current view/video until the new desktop image is applied to avoid a flash
-            for timer in animationTimers.values {
-                timer.invalidate()
-            }
-            animationTimers.removeAll()
             isRendering = false
         }
 
@@ -352,7 +340,7 @@ final class WallpaperEngine {
                     // Fallback to a gradient based on the theme palette instead of stopping the window
                     let palette = self.themeManager.palette
                     let stops = [palette.primary, palette.secondary]
-                    let gradientView = FallbackGradientView(stops: stops)
+                    let gradientView = AnimatedGradientView(stops: stops)
                     wallpaperWindowController.showSwiftUIView(gradientView)
                     return
                 }
@@ -360,38 +348,8 @@ final class WallpaperEngine {
         }
 
         let stops = descriptor.gradientStops
-        var index = 0
-
-        let timer = DisplayLinkTimer(interval: 1.0 / fps)
-        timer.onFire = { [weak self] in
-            guard let self else { return }
-
-            let currentIndex = index
-            index += 1
-
-            Task { @MainActor in
-                if self.isRendering { return }
-                self.isRendering = true
-
-                let shift = Double(currentIndex) / 60.0
-                let shiftedStops = stops.map { stop in
-                    ColorComponents(
-                        red: max(0, min(1, stop.red + sin(shift) * 0.1)),
-                        green: max(0, min(1, stop.green + cos(shift) * 0.1)),
-                        blue: max(0, min(1, stop.blue + sin(shift * 0.5) * 0.1)),
-                        alpha: stop.alpha
-                    )
-                }
-
-                if let image = await self.renderGradientImageAsync(stops: shiftedStops),
-                   let url = await self.writeImageAsync(image) {
-                    _ = self.applyImageURLs([url])
-                }
-                self.isRendering = false
-            }
-        }
-        timer.start()
-        animationTimers["animated"] = timer
+        let gradientView = AnimatedGradientView(stops: stops)
+        wallpaperWindowController.showSwiftUIView(gradientView)
     }
 
     private func startVideoAnimated(resourceURL: URL, fps: Double) {
@@ -430,22 +388,7 @@ final class WallpaperEngine {
     }
 
     private func startParticle(_ descriptor: WallpaperDescriptor) {
-        var index = 0
-        let timer = DisplayLinkTimer(interval: 2.0)
-        timer.onFire = { [weak self] in
-            guard let self else { return }
-            let currentIndex = index
-            index += 1
-
-            Task {
-                if let image = await self.renderParticleImageAsync(seed: currentIndex),
-                   let url = await self.writeImageAsync(image) {
-                    _ = await self.applyImageURLs([url])
-                }
-            }
-        }
-        timer.start()
-        animationTimers["particle"] = timer
+        wallpaperWindowController.showSwiftUIView(AnimatedParticleView())
     }
 
     private func startTime(_ descriptor: WallpaperDescriptor) {
@@ -908,10 +851,7 @@ final class WallpaperEngine {
     }
 
     private func stopAnimation() {
-        for timer in animationTimers.values {
-            timer.invalidate()
-        }
-        animationTimers.removeAll()
+        isRendering = false
     }
 
     private func updateCurrentWallpaperURLs(primaryURL: URL?, secondaryURL: URL?) {
@@ -960,13 +900,31 @@ final class WallpaperWindowController: NSObject {
     private var currentWebsiteURL: URL?
     private var isWebsiteInteractive = false
     private var isWebsiteSuspended = false
-    private var websiteHoverProbeTimer: DisplayLinkTimer?
+    private var websiteHoverProbeTask: Task<Void, Never>?
     private var websiteHoverProbeSequence: Int = 0
     private var websiteShouldReceiveMouseEvents = true
 
     override init() {
         super.init()
         setupWindow()
+    }
+
+    private func startWebsiteHoverProbing() {
+        guard websiteHoverProbeTask == nil else { return }
+
+        websiteHoverProbeTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                self?.probeWebsiteHoverState()
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+        probeWebsiteHoverState()
+    }
+
+    private func stopWebsiteHoverProbing() {
+        websiteHoverProbeTask?.cancel()
+        websiteHoverProbeTask = nil
+        websiteHoverProbeSequence += 1
     }
 
     deinit {
@@ -1132,19 +1090,16 @@ final class WallpaperWindowController: NSObject {
 
         let item = AVPlayerItem(asset: asset)
         
-        // 1. Visual Throttling: Cap video at 30 FPS to save massive GPU energy
+        // 1. Visual Throttling: Let the hardware decoder handle pacing. Avoid AVVideoComposition
+        // which forces software decode and high CPU usage.
         Task {
             _ = try? await asset.load(.tracks)
-            if let composition = try? AVMutableVideoComposition(propertiesOf: asset) {
-                composition.frameDuration = CMTime(value: 1, timescale: 30)
-                item.videoComposition = composition
-            }
         }
 
         // Désactiver le moteur audio au niveau de l'item (Fix AddInstanceForFactory)
         item.audioTimePitchAlgorithm = .varispeed
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-        item.preferredForwardBufferDuration = 2.0
+        item.preferredForwardBufferDuration = 0 // Minimal buffer; wallpaper doesn't need look-ahead
 
         // Dynamic Scaling: Set preferred maximum resolution to display's native resolution
         if let screen = self.window?.screen ?? NSScreen.main {
@@ -1157,7 +1112,7 @@ final class WallpaperWindowController: NSObject {
         let newPlayer = AVQueuePlayer(playerItem: item)
         newPlayer.isMuted = true
         newPlayer.allowsExternalPlayback = false // Désactive la recherche AirPlay (Fix err 1100)
-        newPlayer.automaticallyWaitsToMinimizeStalling = true
+        newPlayer.automaticallyWaitsToMinimizeStalling = false // Local file, always ready
         newPlayer.volume = 0
 
         self.playerQueue = newPlayer

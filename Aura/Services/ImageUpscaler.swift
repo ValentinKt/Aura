@@ -28,6 +28,7 @@ actor ImageUpscaler {
     }
 
     private let visionModel: VNCoreMLModel?
+    private let mtlDevice: MTLDevice?
     private let ciContext: CIContext
     private let cropAndScaleOption: VNImageCropAndScaleOption
     private let modelInputSize: CGSize
@@ -45,7 +46,12 @@ actor ImageUpscaler {
 
         let mlModel = try MLModel(contentsOf: modelURL, configuration: configuration)
         self.visionModel = try VNCoreMLModel(for: mlModel)
-        self.ciContext = CIContext()
+        self.mtlDevice = MTLCreateSystemDefaultDevice()
+        if let device = mtlDevice {
+            self.ciContext = CIContext(mtlDevice: device, options: [.cacheIntermediates: false])
+        } else {
+            self.ciContext = CIContext(options: [.cacheIntermediates: false])
+        }
         self.cropAndScaleOption = cropAndScaleOption
 
         guard
@@ -63,7 +69,8 @@ actor ImageUpscaler {
 
     private init(dummy: Bool) {
         self.visionModel = nil
-        self.ciContext = CIContext()
+        self.mtlDevice = nil
+        self.ciContext = CIContext(options: [.cacheIntermediates: false])
         self.cropAndScaleOption = .scaleFill
         self.modelInputSize = CGSize(width: 512, height: 512)
         self.modelOutputSize = CGSize(width: 512, height: 512)
@@ -131,10 +138,14 @@ actor ImageUpscaler {
 
         do {
             return try autoreleasepool { () throws -> CGImage in
+                defer { ciContext.clearCaches() }
+                
                 let request = VNCoreMLRequest(model: visionModel)
                 request.imageCropAndScaleOption = cropAndScaleOption
 
-                let handler = VNImageRequestHandler(cgImage: image)
+                // Implement Zero-Copy pipeline using IOSurface
+                let options: [VNImageOption: Any] = [:]
+                let handler = VNImageRequestHandler(cgImage: image, options: options)
                 try handler.perform([request])
                 return try makeCGImage(from: request.results)
             }

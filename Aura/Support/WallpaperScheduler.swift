@@ -50,7 +50,7 @@ struct WallpaperSchedule: Hashable, Codable {
 @MainActor
 final class WallpaperScheduler {
     private var schedules: [WallpaperSchedule] = []
-    private var displayLink: GatedDisplayLink?
+    private var schedulerTask: Task<Void, Never>?
     private var lastTick: TimeInterval = 0
 
     func updateSchedules(_ schedules: [WallpaperSchedule]) {
@@ -59,22 +59,18 @@ final class WallpaperScheduler {
 
     func start(handler: @escaping (WallpaperDescriptor) -> Void) {
         stop()
-        let link = GatedDisplayLink()
-        link.onFrame = { [weak self] in
-            guard let self = self else { return }
-            let now = CACurrentMediaTime()
-            if now - self.lastTick >= 60 {
-                self.lastTick = now
+        schedulerTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self = self else { break }
                 self.tick(handler: handler)
             }
         }
-        link.start()
-        self.displayLink = link
     }
 
     func stop() {
-        displayLink?.stop()
-        displayLink = nil
+        schedulerTask?.cancel()
+        schedulerTask = nil
     }
 
     private func tick(handler: (WallpaperDescriptor) -> Void) {

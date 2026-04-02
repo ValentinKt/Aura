@@ -144,21 +144,10 @@ private class VideoLoopView: NSView {
 
         let item = AVPlayerItem(asset: asset)
 
-        // Visual Throttling: Cap video at 30 FPS to save massive GPU energy
+        // Visual Throttling: Let the hardware decoder handle pacing. Avoid AVVideoComposition
+        // which forces software decode and high CPU usage.
         Task {
             _ = try? await asset.load(.tracks)
-            if #available(macOS 15.0, *) {
-                if let composition = try? await AVVideoComposition.videoComposition(withPropertiesOf: asset) {
-                    let mutableComp = composition.mutableCopy() as! AVMutableVideoComposition
-                    mutableComp.frameDuration = CMTime(value: 1, timescale: 30)
-                    item.videoComposition = mutableComp
-                }
-            } else {
-                if let composition = try? AVMutableVideoComposition(propertiesOf: asset) {
-                    composition.frameDuration = CMTime(value: 1, timescale: 30)
-                    item.videoComposition = composition
-                }
-            }
         }
 
         // Dynamic Scaling: Set preferred maximum resolution to display's native resolution
@@ -169,7 +158,7 @@ private class VideoLoopView: NSView {
             item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
         }
         item.preferredPeakBitRate = 5_000_000
-        item.preferredForwardBufferDuration = 2.0
+        item.preferredForwardBufferDuration = 0 // Minimal buffer; wallpaper doesn't need look-ahead
 
         // Fix for HALC / SoundEngine overload: Disable audio processing
         item.audioTimePitchAlgorithm = .varispeed
@@ -177,7 +166,7 @@ private class VideoLoopView: NSView {
 
         // --- STEP 3: INITIALIZE PLAYER ---
         let newPlayer = AVQueuePlayer(playerItem: item)
-        newPlayer.automaticallyWaitsToMinimizeStalling = true
+        newPlayer.automaticallyWaitsToMinimizeStalling = false // Local file, always ready
         newPlayer.allowsExternalPlayback = false
         newPlayer.isMuted = true // Critical: Prevents FigAirPlay_Route errors
         newPlayer.volume = 0
