@@ -1,6 +1,8 @@
 import AppKit
 import CoreImage
 import CoreML
+import CoreVideo
+import Metal
 import Vision
 
 actor ImageUpscaler {
@@ -29,7 +31,9 @@ actor ImageUpscaler {
 
     private let visionModel: VNCoreMLModel?
     private let mtlDevice: MTLDevice?
+    private let textureCache: CVMetalTextureCache?
     private let ciContext: CIContext
+    private let inputPixelBufferPool: CVPixelBufferPool?
     private let cropAndScaleOption: VNImageCropAndScaleOption
     private let modelInputSize: CGSize
     private let modelOutputSize: CGSize
@@ -42,6 +46,13 @@ actor ImageUpscaler {
         let mlModel = try MLModel(contentsOf: modelURL, configuration: configuration)
         self.visionModel = try VNCoreMLModel(for: mlModel)
         self.mtlDevice = MTLCreateSystemDefaultDevice()
+        if let device = mtlDevice {
+            var cache: CVMetalTextureCache?
+            CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cache)
+            self.textureCache = cache
+        } else {
+            self.textureCache = nil
+        }
         if let device = mtlDevice {
             self.ciContext = CIContext(mtlDevice: device, options: [.cacheIntermediates: false])
         } else {
@@ -60,12 +71,18 @@ actor ImageUpscaler {
 
         self.modelInputSize = CGSize(width: inputConstraint.pixelsWide, height: inputConstraint.pixelsHigh)
         self.modelOutputSize = CGSize(width: outputConstraint.pixelsWide, height: outputConstraint.pixelsHigh)
+        self.inputPixelBufferPool = ImageUpscaler.makePixelBufferPool(
+            width: inputConstraint.pixelsWide,
+            height: inputConstraint.pixelsHigh
+        )
     }
 
     private init(dummy: Bool) {
         self.visionModel = nil
         self.mtlDevice = nil
+        self.textureCache = nil
         self.ciContext = CIContext(options: [.cacheIntermediates: false])
+        self.inputPixelBufferPool = nil
         self.cropAndScaleOption = .scaleFill
         self.modelInputSize = CGSize(width: 512, height: 512)
         self.modelOutputSize = CGSize(width: 512, height: 512)
@@ -126,16 +143,8 @@ actor ImageUpscaler {
         (image.width > Int(modelInputSize.width) || image.height > Int(modelInputSize.height))
     }
 
-    private func cgImageToIOSurfacePixelBuffer(_ cgImage: CGImage) throws -> CVPixelBuffer {
-        let width = cgImage.width
-        let height = cgImage.height
-        
-        let attributes: [String: Any] = [
-            kCVPixelBufferCGImageCompatibilityKey as String: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [:] // Zero-copy GPU backing
-        ]
-        
+    private func makeIOSurfacePixelBuffer(width: Int, height: Int) throws -> CVPixelBuffer {
+        let attributes = Self.pixelBufferAttributes(width: width, height: height)
         var pixelBuffer: CVPixelBuffer?
         let status = CVPixelBufferCreate(
             kCFAllocatorDefault,
@@ -145,27 +154,24 @@ actor ImageUpscaler {
             attributes as CFDictionary,
             &pixelBuffer
         )
-        
+
         guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
             throw UpscalingError.imageConversionFailed
         }
-        
+
+        return buffer
+    }
+
+    private func makeInputPixelBuffer(from ciImage: CIImage) throws -> CVPixelBuffer {
+        let extent = ciImage.extent.integral
+        let width = Int(extent.width)
+        let height = Int(extent.height)
+        let buffer = try makePooledPixelBuffer(width: width, height: height)
+
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        
-        guard let context = CGContext(
-            data: CVPixelBufferGetBaseAddress(buffer),
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        ) else {
-            throw UpscalingError.imageConversionFailed
-        }
-        
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        ciContext.render(ciImage, to: buffer, bounds: extent, colorSpace: CGColorSpaceCreateDeviceRGB())
+        primeTextureCache(for: buffer)
         return buffer
     }
 
@@ -177,15 +183,11 @@ actor ImageUpscaler {
         do {
             return try autoreleasepool { () throws -> CGImage in
                 defer { ciContext.clearCaches() }
-                
-                let request = VNCoreMLRequest(model: visionModel)
-                request.imageCropAndScaleOption = cropAndScaleOption
 
-                // Implement Zero-Copy pipeline using IOSurface
-                let pixelBuffer = try cgImageToIOSurfacePixelBuffer(image)
-                let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
-                try handler.perform([request])
-                return try makeCGImage(from: request.results)
+                let inputImage = CIImage(cgImage: image)
+                let pixelBuffer = try makeInputPixelBuffer(from: inputImage)
+                let outputImage = try performRequest(on: pixelBuffer, model: visionModel)
+                return try makeCGImage(from: outputImage)
             }
         } catch let error as UpscalingError {
             throw error
@@ -224,13 +226,9 @@ actor ImageUpscaler {
 
                     let translatedTile = try autoreleasepool { () throws -> CIImage in
                         let tileImage = inputImage.cropped(to: cropRect)
-
-                        guard let tileCGImage = ciContext.createCGImage(tileImage, from: tileImage.extent) else {
-                            throw UpscalingError.imageConversionFailed
-                        }
-
-                        let upscaledTile = try performRequest(on: tileCGImage)
-                        return CIImage(cgImage: upscaledTile).transformed(
+                        let pixelBuffer = try makeInputPixelBuffer(from: tileImage)
+                        let upscaledTile = try performRequest(on: pixelBuffer)
+                        return upscaledTile.transformed(
                             by: CGAffineTransform(
                                 translationX: CGFloat(column * outputTileWidth),
                                 y: CGFloat(row * outputTileHeight)
@@ -257,20 +255,50 @@ actor ImageUpscaler {
     }
 
     private func makeCGImage(from results: [Any]?) throws -> CGImage {
+        try makeCGImage(from: makeCIImage(from: results))
+    }
+
+    private func performRequest(on pixelBuffer: CVPixelBuffer) throws -> CIImage {
+        guard let visionModel = visionModel else {
+            throw UpscalingError.unsupportedModelOutput
+        }
+
+        return try performRequest(on: pixelBuffer, model: visionModel)
+    }
+
+    private func performRequest(on pixelBuffer: CVPixelBuffer, model visionModel: VNCoreMLModel) throws -> CIImage {
+        let request = VNCoreMLRequest(model: visionModel)
+        request.imageCropAndScaleOption = cropAndScaleOption
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        try handler.perform([request])
+        return try makeCIImage(from: request.results)
+    }
+
+    private func makeCIImage(from results: [Any]?) throws -> CIImage {
         guard let results else {
             throw UpscalingError.unsupportedModelOutput
         }
 
         if let observation = results.compactMap({ $0 as? VNPixelBufferObservation }).first {
-            return try makeCGImage(from: observation.pixelBuffer)
+            return CIImage(cvPixelBuffer: observation.pixelBuffer)
         }
 
         if let observation = results.compactMap({ $0 as? VNCoreMLFeatureValueObservation }).first,
            let pixelBuffer = observation.featureValue.imageBufferValue {
-            return try makeCGImage(from: pixelBuffer)
+            return CIImage(cvPixelBuffer: pixelBuffer)
         }
 
         throw UpscalingError.unsupportedModelOutput
+    }
+
+    private func makeCGImage(from image: CIImage) throws -> CGImage {
+        let extent = image.extent.integral
+
+        guard let cgImage = ciContext.createCGImage(image, from: extent) else {
+            throw UpscalingError.imageConversionFailed
+        }
+
+        return cgImage
     }
 
     private func makeCGImage(from pixelBuffer: CVPixelBuffer) throws -> CGImage {
@@ -282,6 +310,66 @@ actor ImageUpscaler {
         }
 
         return cgImage
+    }
+
+    private func makePooledPixelBuffer(width: Int, height: Int) throws -> CVPixelBuffer {
+        if width == Int(modelInputSize.width),
+           height == Int(modelInputSize.height),
+           let pool = inputPixelBufferPool {
+            var pixelBuffer: CVPixelBuffer?
+            let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
+            if status == kCVReturnSuccess, let pixelBuffer {
+                return pixelBuffer
+            }
+        }
+
+        return try makeIOSurfacePixelBuffer(width: width, height: height)
+    }
+
+    private func primeTextureCache(for pixelBuffer: CVPixelBuffer) {
+        guard let textureCache, let device = mtlDevice else { return }
+
+        let pixelFormat: MTLPixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8 ? .r8Unorm : .bgra8Unorm
+        var texture: CVMetalTexture?
+        CVMetalTextureCacheCreateTextureFromImage(
+            kCFAllocatorDefault,
+            textureCache,
+            pixelBuffer,
+            nil,
+            pixelFormat,
+            CVPixelBufferGetWidth(pixelBuffer),
+            CVPixelBufferGetHeight(pixelBuffer),
+            0,
+            &texture
+        )
+        _ = device
+        _ = texture
+    }
+
+    private static func pixelBufferAttributes(width: Int, height: Int) -> CFDictionary {
+        [
+            kCVPixelBufferWidthKey as String: width,
+            kCVPixelBufferHeightKey as String: height,
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+        ] as CFDictionary
+    }
+
+    private static func makePixelBufferPool(width: Int, height: Int) -> CVPixelBufferPool? {
+        let poolAttributes: [String: Any] = [
+            kCVPixelBufferPoolMinimumBufferCountKey as String: 3
+        ]
+        var pool: CVPixelBufferPool?
+        CVPixelBufferPoolCreate(
+            kCFAllocatorDefault,
+            poolAttributes as CFDictionary,
+            pixelBufferAttributes(width: width, height: height),
+            &pool
+        )
+        return pool
     }
 
     static func defaultModelConfiguration() -> MLModelConfiguration {
