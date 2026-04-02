@@ -10,42 +10,10 @@ struct WallpaperApplyResult: Hashable {
     var permissionDenied: Bool
 }
 
-final class MemoryAssetLoader: NSObject, AVAssetResourceLoaderDelegate {
-    private let data: Data
-    private let contentType: String
-
-    init?(url: URL) {
-        // Read into memory to prevent SSD reads during loop
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        self.data = data
-        self.contentType = url.pathExtension.lowercased() == "mp4" ? "public.mpeg-4" : "com.apple.quicktime-movie"
-    }
-
-    func resourceLoader(_ resourceLoader: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest) -> Bool {
-        if let contentInfo = loadingRequest.contentInformationRequest {
-            contentInfo.contentType = contentType
-            contentInfo.contentLength = Int64(data.count)
-            contentInfo.isByteRangeAccessSupported = true
-        }
-        
-        if let dataRequest = loadingRequest.dataRequest {
-            let start = Int(dataRequest.requestedOffset)
-            let length = dataRequest.requestedLength
-            let end = min(start + length, data.count)
-            
-            if start < data.count {
-                dataRequest.respond(with: data.subdata(in: start..<end))
-            }
-            loadingRequest.finishLoading()
-        }
-        return true
-    }
-}
-
 struct AnimatedGradientView: View {
     let stops: [ColorComponents]
     var body: some View {
-        TimelineView(.animation) { context in
+        TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
             let shift = context.date.timeIntervalSinceReferenceDate / 60.0
             let shiftedStops = stops.map { stop in
                 ColorComponents(
@@ -65,11 +33,7 @@ struct AnimatedGradientView: View {
 
 struct AnimatedParticleView: View {
     var body: some View {
-        TimelineView(.animation) { context in
-            // Fallback or a simple implementation. For a real particle system, use Canvas or SpriteKit.
-            // To prevent high CPU, we'll just show a gradient for now, or you can implement a Canvas.
-            Color.black.ignoresSafeArea()
-        }
+        Color.black.ignoresSafeArea()
     }
 }
 
@@ -307,7 +271,7 @@ final class WallpaperEngine {
     private func startAnimated(_ descriptor: WallpaperDescriptor) {
         let isLowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         let fps = isLowPower ? min(5, max(0.1, descriptor.fps)) / 2 : min(5, max(0.1, descriptor.fps))
-        
+
         if let resource = descriptor.resources.first {
             if let resolvedURL = resolveResourceURL(resource) {
                 let ext = resolvedURL.pathExtension.lowercased()
@@ -884,15 +848,12 @@ private struct SeededRandomNumberGenerator: RandomNumberGenerator {
     }
 }
 
-
-
 final class WallpaperWindowController: NSObject {
     private var window: NSWindow?
     private var playerView: NSView?
     private var playerLayer: AVPlayerLayer?
     private var playerQueue: AVQueuePlayer?
     private var playerLooper: AVPlayerLooper?
-    private var memoryAssetLoader: MemoryAssetLoader?
     private var endObserver: NSObjectProtocol?
     private var websiteContainerView: NSView?
     private var websiteSnapshotView: NSImageView?
@@ -912,10 +873,13 @@ final class WallpaperWindowController: NSObject {
     private func startWebsiteHoverProbing() {
         guard websiteHoverProbeTask == nil else { return }
 
-        websiteHoverProbeTask = Task { @MainActor [weak self] in
+        websiteHoverProbeTask = Task.detached { [weak self] in
             while !Task.isCancelled {
-                self?.probeWebsiteHoverState()
-                try? await Task.sleep(for: .milliseconds(500))
+                guard let controller = self else { return }
+                await MainActor.run {
+                    controller.probeWebsiteHoverState()
+                }
+                await AuraBackgroundActor.sleep(for: .milliseconds(500))
             }
         }
         probeWebsiteHoverState()
@@ -1070,11 +1034,10 @@ final class WallpaperWindowController: NSObject {
         self.isSecurityScoped = isScoped
 
         // Direct disk streaming to Media Engine (bypassing CPU RAM)
-        self.memoryAssetLoader = nil
         let asset = AVURLAsset(url: finalURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
 
         let item = AVPlayerItem(asset: asset)
-        
+
         // 1. Visual Throttling: Let the hardware decoder handle pacing. Avoid AVVideoComposition
         // which forces software decode and high CPU usage.
         Task {
@@ -1245,7 +1208,9 @@ final class WallpaperWindowController: NSObject {
         if isWebsiteInteractive {
             websiteShouldReceiveMouseEvents = true
             window?.ignoresMouseEvents = false
-            startWebsiteHoverProbing()
+            if !isWebsiteSuspended {
+                startWebsiteHoverProbing()
+            }
             if let websiteWebView {
                 window?.makeFirstResponder(websiteWebView)
             }
@@ -1322,6 +1287,7 @@ final class WallpaperWindowController: NSObject {
         isWebsiteSuspended = suspended
 
         if suspended {
+            stopWebsiteHoverProbing()
             captureWebsiteSnapshot()
             evaluateWebsiteJavaScript(Self.pauseWebsiteScript)
             webView.isHidden = true
@@ -1329,6 +1295,9 @@ final class WallpaperWindowController: NSObject {
             websiteSnapshotView?.isHidden = true
             webView.isHidden = false
             evaluateWebsiteJavaScript(Self.resumeWebsiteScript)
+            if isWebsiteInteractive {
+                startWebsiteHoverProbing()
+            }
         }
     }
 

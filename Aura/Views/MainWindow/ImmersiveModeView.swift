@@ -1,4 +1,3 @@
-import Combine
 import SwiftUI
 
 struct ImmersiveModeView: View {
@@ -7,7 +6,7 @@ struct ImmersiveModeView: View {
     @State private var showControls = true
     @State private var lastActivityTime = Date()
     @State private var isHoveringControls = false
-    @State private var timerTask: Task<Void, Never>?
+    @State private var autoHideTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -15,30 +14,20 @@ struct ImmersiveModeView: View {
             contentLayer
         }
         .onContinuousHover { _ in
-            lastActivityTime = Date()
-            if !showControls {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showControls = true
-                }
-            }
+            registerActivity()
         }
         .onAppear {
-            timerTask = Task { @MainActor in
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(1))
-                    if showControls && !isHoveringControls {
-                        if Date().timeIntervalSince(lastActivityTime) > 5 {
-                            withAnimation(.easeInOut(duration: 1.5)) {
-                                showControls = false
-                            }
-                        }
-                    }
-                }
-            }
+            scheduleAutoHide()
         }
         .onDisappear {
-            timerTask?.cancel()
-            timerTask = nil
+            cancelAutoHide()
+        }
+        .onChange(of: isHoveringControls) { _, isHovering in
+            if isHovering {
+                cancelAutoHide()
+            } else {
+                scheduleAutoHide()
+            }
         }
     }
 
@@ -220,6 +209,42 @@ struct ImmersiveModeView: View {
         case .tropicalbeach: return "sun.max.fill"
         case .heavyrain: return "cloud.heavyrain.fill"
         }
+    }
+
+    private func registerActivity() {
+        lastActivityTime = Date()
+        if !showControls {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showControls = true
+            }
+        }
+        scheduleAutoHide()
+    }
+
+    private func scheduleAutoHide() {
+        cancelAutoHide()
+        guard showControls, !isHoveringControls else { return }
+
+        let activityTime = lastActivityTime
+        autoHideTask = Task {
+            await AuraBackgroundActor.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard showControls,
+                      !isHoveringControls,
+                      lastActivityTime == activityTime else { return }
+
+                withAnimation(.easeInOut(duration: 1.5)) {
+                    showControls = false
+                }
+            }
+        }
+    }
+
+    private func cancelAutoHide() {
+        autoHideTask?.cancel()
+        autoHideTask = nil
     }
 }
 

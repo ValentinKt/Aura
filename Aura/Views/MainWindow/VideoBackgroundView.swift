@@ -28,7 +28,6 @@ private class VideoLoopView: NSView {
     private var imageLayer: CALayer?
     private var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
-    private var memoryAssetLoader: MemoryAssetLoader?
     private var currentURL: URL?
     private var isSecurityScoped: Bool = false
     private var windowObservation: NSKeyValueObservation?
@@ -50,7 +49,7 @@ private class VideoLoopView: NSView {
         NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
 
         if let window = self.window {
-            windowObservation = window.observe(\.isVisible, options: [.initial, .new]) { [weak self] window, _ in
+            windowObservation = window.observe(\.isVisible, options: [.initial, .new]) { [weak self] _, _ in
                 self?.updatePlaybackState()
             }
             NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didChangeOcclusionStateNotification, object: window)
@@ -125,7 +124,6 @@ private class VideoLoopView: NSView {
 
         // --- STEP 2: CONFIGURE ASSET (VIDEO) ---
         // Direct disk streaming to Media Engine (bypassing CPU RAM)
-        self.memoryAssetLoader = nil
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
 
         let item = AVPlayerItem(asset: asset)
