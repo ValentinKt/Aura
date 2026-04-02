@@ -676,6 +676,15 @@ private struct AtmosphereCarouselItemAppearance {
     let opacity: Double
 }
 
+private struct RepeatedAtmosphereCarouselItem: Identifiable, Hashable {
+    let item: AtmosphereCarouselMenuItem
+    let cycle: Int
+
+    var id: String {
+        "\(cycle)-\(item.id)"
+    }
+}
+
 private struct AtmosphereCarouselCenterPreferenceKey: PreferenceKey {
     static var defaultValue: [String: CGFloat] = [:]
 
@@ -688,13 +697,29 @@ private struct AtmospheresWheelMenu: View {
     static let visibleItemCount = 5
     static let rowHeight: CGFloat = 40
     static let rowSpacing: CGFloat = 8
+    static let repetitionCount = 9
     static let viewportHeight: CGFloat =
         (CGFloat(visibleItemCount) * rowHeight) + (CGFloat(visibleItemCount - 1) * rowSpacing)
 
     let items: [AtmosphereCarouselMenuItem]
     @Binding var selectedID: String?
+    @State private var scrollPositionID: String?
 
     private let coordinateSpaceName = "atmospheres-wheel"
+
+    private var repeatedItems: [RepeatedAtmosphereCarouselItem] {
+        guard !items.isEmpty else { return [] }
+
+        return (0..<Self.repetitionCount).flatMap { cycle in
+            items.map { item in
+                RepeatedAtmosphereCarouselItem(item: item, cycle: cycle)
+            }
+        }
+    }
+
+    private var middleCycle: Int {
+        Self.repetitionCount / 2
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -703,53 +728,87 @@ private struct AtmospheresWheelMenu: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: Self.rowSpacing) {
-                    ForEach(items) { item in
-                        carouselRow(item, containerCenterY: containerCenterY)
-                            .id(item.id)
+                    ForEach(repeatedItems) { repeatedItem in
+                        carouselRow(repeatedItem, containerCenterY: containerCenterY)
+                            .id(repeatedItem.id)
                     }
                 }
                 .scrollTargetLayout()
             }
             .contentMargins(.vertical, verticalInset, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $selectedID, anchor: .center)
+            .scrollPosition(id: $scrollPositionID, anchor: .center)
             .coordinateSpace(name: coordinateSpaceName)
             .onPreferenceChange(AtmosphereCarouselCenterPreferenceKey.self) { itemCenters in
                 guard let closestID = itemCenters.min(
                     by: { abs($0.value - containerCenterY) < abs($1.value - containerCenterY) }
                 )?.key,
-                    closestID != selectedID else {
+                      let closestItem = repeatedItems.first(where: { $0.id == closestID }) else {
                     return
                 }
 
-                selectedID = closestID
+                normalizeScrollPositionIfNeeded(for: closestItem)
+
+                guard closestItem.item.id != selectedID else {
+                    return
+                }
+
+                selectedID = closestItem.item.id
             }
             .onAppear {
-                if selectedID == nil {
-                    selectedID = items.first?.id
+                let initialID = selectedID ?? items.first?.id
+                guard let initialID else { return }
+                selectedID = initialID
+                scrollPositionID = repeatedID(for: initialID, cycle: middleCycle)
+            }
+            .onChange(of: selectedID) { _, newValue in
+                guard let newValue else {
+                    return
                 }
+
+                if let scrollPositionID,
+                   let currentItem = repeatedItems.first(where: { $0.id == scrollPositionID }),
+                   currentItem.item.id == newValue {
+                    return
+                }
+
+                guard let normalizedID = repeatedID(for: newValue, cycle: middleCycle),
+                      scrollPositionID != normalizedID else {
+                    return
+                }
+
+                scrollPositionID = normalizedID
+            }
+            .onChange(of: scrollPositionID) { _, newValue in
+                guard let newValue,
+                      let repeatedItem = repeatedItems.first(where: { $0.id == newValue }) else {
+                    return
+                }
+
+                normalizeScrollPositionIfNeeded(for: repeatedItem)
             }
         }
     }
 
-    private func carouselRow(_ item: AtmosphereCarouselMenuItem, containerCenterY: CGFloat) -> some View {
+    private func carouselRow(_ repeatedItem: RepeatedAtmosphereCarouselItem, containerCenterY: CGFloat) -> some View {
         Button {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                selectedID = item.id
+                selectedID = repeatedItem.item.id
+                scrollPositionID = repeatedItem.id
             }
         } label: {
             GeometryReader { itemGeometry in
                 let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
                 let appearance = itemAppearance(for: distance)
-                let isSelected = selectedID == item.id
+                let isSelected = selectedID == repeatedItem.item.id
 
                 HStack(spacing: 14) {
-                    Image(systemName: item.systemImage)
+                    Image(systemName: repeatedItem.item.systemImage)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
                         .frame(width: 20)
 
-                    Text(item.title)
+                    Text(repeatedItem.item.title)
                         .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
                         .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
                         .lineLimit(1)
@@ -769,13 +828,33 @@ private struct AtmospheresWheelMenu: View {
                 .contentShape(Rectangle())
                 .preference(
                     key: AtmosphereCarouselCenterPreferenceKey.self,
-                    value: [item.id: itemGeometry.frame(in: .named(coordinateSpaceName)).midY]
+                    value: [repeatedItem.id: itemGeometry.frame(in: .named(coordinateSpaceName)).midY]
                 )
             }
             .frame(height: Self.rowHeight)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+    }
+
+    private func repeatedID(for itemID: String, cycle: Int) -> String? {
+        repeatedItems.first {
+            $0.item.id == itemID && $0.cycle == cycle
+        }?.id
+    }
+
+    private func normalizeScrollPositionIfNeeded(for repeatedItem: RepeatedAtmosphereCarouselItem) {
+        let thresholdCycle = 1
+        let needsNormalization =
+            repeatedItem.cycle <= thresholdCycle || repeatedItem.cycle >= (Self.repetitionCount - thresholdCycle - 1)
+
+        guard needsNormalization,
+              let normalizedID = repeatedID(for: repeatedItem.item.id, cycle: middleCycle),
+              normalizedID != scrollPositionID else {
+            return
+        }
+
+        scrollPositionID = normalizedID
     }
 
     private func itemAppearance(for distance: CGFloat) -> AtmosphereCarouselItemAppearance {
