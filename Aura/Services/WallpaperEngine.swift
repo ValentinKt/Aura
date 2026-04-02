@@ -1051,16 +1051,21 @@ final class WallpaperWindowController: NSObject {
 
         // Désactiver le moteur audio au niveau de l'item (Fix AddInstanceForFactory)
         item.audioTimePitchAlgorithm = .varispeed
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
+        item.preferredForwardBufferDuration = 2.0
 
         let newPlayer = AVQueuePlayer(playerItem: item)
         newPlayer.isMuted = true
         newPlayer.allowsExternalPlayback = false // Désactive la recherche AirPlay (Fix err 1100)
+        newPlayer.automaticallyWaitsToMinimizeStalling = true
+        newPlayer.volume = 0
 
         self.playerQueue = newPlayer
         self.playerLooper = AVPlayerLooper(player: newPlayer, templateItem: item)
 
         let newLayer = AVPlayerLayer(player: newPlayer)
         newLayer.videoGravity = .resizeAspectFill
+        newLayer.isOpaque = true
 
         // Utilisation de CATransaction pour éviter les flashs noirs et assurer un rendu propre
         CATransaction.begin()
@@ -1137,6 +1142,13 @@ final class WallpaperWindowController: NSObject {
         playerLayer = nil
 
         playerQueue = nil
+        
+        // 6. Force VRAM cleanup gracefully
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        CATransaction.flush()
+        CATransaction.commit()
+        
         print("🟢 [WallpaperEngine] Hardware Decoder Released")
     }
 
@@ -1214,7 +1226,8 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func updatePerformanceState() {
-        let shouldSuspend = window?.isVisible != true || isFullscreenApplicationActive()
+        let isOccluded = window?.occlusionState.contains(.visible) == false
+        let shouldSuspend = window?.isVisible != true || isOccluded || isFullscreenApplicationActive()
 
         // Handle Website
         if currentWebsiteURL != nil {
