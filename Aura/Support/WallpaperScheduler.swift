@@ -1,35 +1,60 @@
 import Foundation
 import CoreVideo
+import AppKit
 
 @MainActor
 final class GatedDisplayLink {
-    private var displayLink: CVDisplayLink?
+    @available(macOS 15.0, *)
+    private var nsDisplayLink: NSDisplayLink?
+    private var legacyDisplayLink: CVDisplayLink?
     private var isRunning = false
     var onFrame: (() -> Void)?
 
+    @objc private func handleDisplayLink(_ sender: Any) {
+        onFrame?()
+    }
+
     func start() {
         guard !isRunning else { return }
-        CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-        guard let dl = displayLink else { return }
+        if #available(macOS 15.0, *) {
+            guard let screen = NSScreen.main else { return }
+            nsDisplayLink = screen.displayLink(target: self, selector: #selector(handleDisplayLink(_:)))
+            if let link = nsDisplayLink {
+                link.add(to: .current, forMode: .common)
+                isRunning = true
+            }
+        } else {
+            CVDisplayLinkCreateWithActiveCGDisplays(&legacyDisplayLink)
+            guard let dl = legacyDisplayLink else { return }
 
-        let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
-            let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx!).takeUnretainedValue()
-            DispatchQueue.main.async { self_.onFrame?() }
-            return kCVReturnSuccess
+            let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
+                let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx!).takeUnretainedValue()
+                DispatchQueue.main.async { self_.onFrame?() }
+                return kCVReturnSuccess
+            }
+            CVDisplayLinkSetOutputCallback(dl, callback, Unmanaged.passUnretained(self).toOpaque())
+            CVDisplayLinkStart(dl)
+            isRunning = true
         }
-        CVDisplayLinkSetOutputCallback(dl, callback, Unmanaged.passUnretained(self).toOpaque())
-        CVDisplayLinkStart(dl)
-        isRunning = true
     }
 
     func stop() {
-        guard isRunning, let dl = displayLink else { return }
-        CVDisplayLinkStop(dl)
-        isRunning = false
+        guard isRunning else { return }
+        if #available(macOS 15.0, *) {
+            nsDisplayLink?.invalidate()
+            nsDisplayLink = nil
+            isRunning = false
+        } else {
+            if let dl = legacyDisplayLink {
+                CVDisplayLinkStop(dl)
+            }
+            legacyDisplayLink = nil
+            isRunning = false
+        }
     }
 
-    deinit { 
-        if let dl = displayLink { CVDisplayLinkStop(dl) }
+    deinit {
+        stop()
     }
 }
 

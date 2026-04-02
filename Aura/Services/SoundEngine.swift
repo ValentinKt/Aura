@@ -69,20 +69,17 @@ final class SoundEngine {
             return
         }
 
-        duckingTask = Task { @AuraBackgroundActor [weak self] in
+        duckingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
             for step in 1...steps {
                 if Task.isCancelled { return }
                 let progress = Float(step) / Float(steps)
                 let value = start + (target - start) * progress
-                await MainActor.run {
-                    self?.duckingMultiplier = value
-                }
+                self.duckingMultiplier = value
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
             }
             if !Task.isCancelled {
-                await MainActor.run {
-                    self?.duckingMultiplier = target
-                }
+                self.duckingMultiplier = target
             }
         }
     }
@@ -294,13 +291,13 @@ final class SoundEngine {
     func startRandomization(interval: TimeInterval, validRange: ClosedRange<Float>) {
         randomizationTask?.cancel()
         guard interval > 0 else { return }
-        randomizationTask = Task { @AuraBackgroundActor [weak self] in
+        randomizationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-                guard let self else { continue }
                 for id in SoundLayerID.allCases.map(\.rawValue) {
                     let random = Float.random(in: validRange)
-                    await MainActor.run { self.setLayer(id, volume: random) }
+                    self.setLayer(id, volume: random)
                 }
             }
         }
@@ -320,10 +317,11 @@ final class SoundEngine {
     }
 
     private func preloadBuffers() async throws {
+        let assetManager = self.assetManager
         await withTaskGroup(of: (String, AVAudioPCMBuffer?).self) { group in
             for id in SoundLayerID.allCases.map(\.rawValue) {
                 group.addTask {
-                    let buffer = await self.assetManager.loadAudioBuffer(named: id)
+                    let buffer = await assetManager.loadAudioBuffer(named: id)
                     return (id, buffer)
                 }
             }

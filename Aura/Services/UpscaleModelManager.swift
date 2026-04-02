@@ -66,7 +66,7 @@ actor UpscaleModelManager {
             if !FileManager.default.fileExists(atPath: url.path) {
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             }
-            return try url.appendingPathComponent("\(modelName).mlmodelc")
+            return url.appendingPathComponent("\(modelName).mlmodelc")
         }
     }
 
