@@ -174,15 +174,6 @@ struct AuraShortcuts: AppShortcutsProvider {
             shortTitle: "Switch to Wind Down",
             systemImageName: "moon.zzz.fill"
         )
-        AppShortcut(
-            intent: SetZenBreathModeIntent(),
-            phrases: [
-                "Set Zen Breath Mode in \(.applicationName)",
-                "Start Zen Breath Mode in \(.applicationName)"
-            ],
-            shortTitle: "Zen Breath Mode",
-            systemImageName: "wind"
-        )
     }
 }
 
@@ -260,17 +251,5 @@ struct SwitchToWindDownIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         try await AppModel.shared.performShortcut(.windDown)
         return .result(dialog: "Aura switched to Wind Down.")
-    }
-}
-
-struct SetZenBreathModeIntent: AppIntent {
-    static let title: LocalizedStringResource = "Set Zen Breath Mode"
-    static let description = IntentDescription("Sets Aura to the breathing-based Zen mode and opens immersive mode.")
-    static let openAppWhenRun = true
-
-    @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        try await AppModel.shared.performShortcut(.zenBreathMode)
-        return .result(dialog: "Aura is now in Zen Breath Mode.")
     }
 }

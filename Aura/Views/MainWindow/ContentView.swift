@@ -159,8 +159,6 @@ struct ContentView: View {
         case "time": return "clock.fill"
         case "waterfall": return "drop.fill"
         case "wild": return "pawprint.fill"
-        case "zen": return "circle.hexagongrid.fill"
-        case "quotes": return "quote.bubble.fill"
         case "website": return "globe"
         case "websites": return "globe"
         default: return "circle.fill"

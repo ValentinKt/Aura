@@ -158,7 +158,7 @@ final class WallpaperEngine {
     }
 
     /// The last resolved image/video URL from a static or animated wallpaper.
-    /// Quote/Zen/Time views use this to render the Image Playground (or other) wallpaper as their background.
+    /// Time views use this to render the Image Playground (or other) wallpaper as their background.
     var backgroundImageURL: URL?
     var currentPrimaryWallpaperURL: URL?
     var currentSecondaryWallpaperURL: URL?
@@ -235,7 +235,7 @@ final class WallpaperEngine {
         }
 
         // Update backgroundImageURL whenever we apply a concrete image/video wallpaper,
-        // so dynamic views (Quote, Zen, Time) can use it as their background even after switching.
+        // so dynamic views (Time) can use it as their background even after switching.
         if storesConcreteWallpaper {
             if let resource = descriptor.resources.first {
                 backgroundImageURL = resolveResourceURL(resource)
@@ -280,12 +280,6 @@ final class WallpaperEngine {
             if isStatic { wallpaperWindowController.stopAll() }
         case .time:
             startTime(descriptor)
-            result = WallpaperApplyResult(success: true, permissionDenied: false)
-        case .quote:
-            startQuote(descriptor)
-            result = WallpaperApplyResult(success: true, permissionDenied: false)
-        case .zen:
-            startZen(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
         case .website:
             // Handle website wallpaper
@@ -427,27 +421,6 @@ final class WallpaperEngine {
         let palette = themeManager.palette
         let timeView = TimeWallpaperView(style: style, palette: palette, selectedWallpaperURL: backgroundImageURL)
         wallpaperWindowController.showSwiftUIView(timeView)
-    }
-
-    private func startQuote(_ descriptor: WallpaperDescriptor) {
-        Task {
-            await applyOverlayBackdrops()
-        }
-        let style = descriptor.resources.first ?? "motivational"
-        let palette = themeManager.palette
-        let quoteID = descriptor.resources.count > 1 ? UUID(uuidString: descriptor.resources[1]) : nil
-        let quoteView = QuoteWallpaperView(style: style, palette: palette, quoteID: quoteID, selectedWallpaperURL: backgroundImageURL)
-        wallpaperWindowController.showSwiftUIView(quoteView)
-    }
-
-    private func startZen(_ descriptor: WallpaperDescriptor) {
-        Task {
-            await applyOverlayBackdrops()
-        }
-        let style = descriptor.resources.first ?? "breathing"
-        let palette = themeManager.palette
-        let zenView = ZenWallpaperView(style: style, palette: palette, selectedWallpaperURL: backgroundImageURL)
-        wallpaperWindowController.showSwiftUIView(zenView)
     }
 
     private func startWebsite(_ descriptor: WallpaperDescriptor) {

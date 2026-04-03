@@ -388,8 +388,6 @@ struct MenuBarPopoverView: View {
     private func loadBackgroundMedia() async {
         guard let mood = appModel.moodViewModel.currentMood,
               mood.wallpaper.type != .time,
-              mood.wallpaper.type != .zen,
-              mood.wallpaper.type != .quote,
               let resource = mood.wallpaper.resources.first else {
             withAnimation(.easeInOut(duration: 0.4)) {
                 backgroundImage = nil
@@ -537,7 +535,7 @@ private struct MoodCarouselCard: View {
                 }
                 .overlay {
                     // Download Status Overlay
-                    if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, !primaryResource.isEmpty {
+                    if mood.wallpaper.type != .time, !primaryResource.isEmpty {
                         let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
                         if downloadState == .notDownloaded {
                             VStack {
@@ -613,7 +611,7 @@ private struct MoodCarouselCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || primaryResource.isEmpty {
             action(false)
             return
         }
@@ -638,17 +636,6 @@ private struct MoodCarouselCard: View {
         if mood.wallpaper.type == .time {
             let style = mood.wallpaper.resources.first ?? "minimal"
             TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
-                .frame(width: 120, height: 160)
-                .clipped()
-        } else if mood.wallpaper.type == .quote {
-            let style = mood.wallpaper.resources.first ?? "motivational"
-            let quoteID = mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
-            QuoteWallpaperView(style: style, palette: mood.palette, quoteID: quoteID, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
-                .frame(width: 120, height: 160)
-                .clipped()
-        } else if mood.wallpaper.type == .zen {
-            let style = mood.wallpaper.resources.first ?? "breathing"
-            ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL, isPreview: true)
                 .frame(width: 120, height: 160)
                 .clipped()
         } else if mood.wallpaper.type == .website {
@@ -677,7 +664,7 @@ private struct MoodCarouselCard: View {
 
     @MainActor
     private func loadPreviewImage() async {
-        guard mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote,
+        guard mood.wallpaper.type != .time,
               let resource = mood.wallpaper.resources.first else { return }
 
         if let cached = MoodCard.imageCache.object(forKey: resource as NSString) {

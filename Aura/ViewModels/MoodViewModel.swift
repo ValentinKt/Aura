@@ -13,38 +13,23 @@ struct MoodSubthemeSection: Identifiable, Hashable {
 final class MoodViewModel {
     private let moodEngine: MoodEngine
     private let playerViewModel: PlayerViewModel
-    private let quoteEngine: QuoteEngine
     private let dynamicDesktopGenerator: DynamicDesktopGenerator
-    private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Create with AI", "Dynamic Desktop", "Image Playground", "Quotes", "Time"]
+    private static let dynamicSubthemes: Set<String> = ["Create with AI", "Dynamic Desktop", "Image Playground", "Time"]
     private static let miscellaneousSubthemes: Set<String> = ["Website"]
     private static let pinnedDynamicSubthemes: Set<String> = ["Create with AI", "Dynamic Desktop", "Image Playground"]
     var onMoodSelected: ((Mood) -> Void)?
 
-    private static let quoteTemplatesByStyle: [String: Mood] = Dictionary(
-        uniqueKeysWithValues: MoodEngine.builtInMoods()
-            .filter { $0.wallpaper.type == .quote }
-            .compactMap { mood in
-                guard let style = mood.wallpaper.resources.first else {
-                    return nil
-                }
-                return (style, mood)
-            }
-    )
-
     var moods: [Mood] {
-        _ = quoteRefreshToken
-        return moodEngine.moods + customQuoteMoods()
+        return moodEngine.moods
     }
 
     var currentMood: Mood? {
         moodEngine.currentMood
     }
 
-    init(moodEngine: MoodEngine, playerViewModel: PlayerViewModel, quoteEngine: QuoteEngine, dynamicDesktopGenerator: DynamicDesktopGenerator) {
+    init(moodEngine: MoodEngine, playerViewModel: PlayerViewModel, dynamicDesktopGenerator: DynamicDesktopGenerator) {
         self.moodEngine = moodEngine
         self.playerViewModel = playerViewModel
-        self.quoteEngine = quoteEngine
         self.dynamicDesktopGenerator = dynamicDesktopGenerator
     }
 
@@ -123,10 +108,6 @@ final class MoodViewModel {
 
     func firstMood(inSubtheme subtheme: String) -> Mood? {
         moods.first { $0.subtheme.caseInsensitiveCompare(subtheme) == .orderedSame }
-    }
-
-    func refreshQuoteMoods() {
-        quoteRefreshToken += 1
     }
 
     var moodsBySubtheme: [String: [Mood]] {
@@ -243,26 +224,6 @@ final class MoodViewModel {
 
         if let firstMoodInPrevSubtheme = moodsBySubtheme[prevSubtheme]?.first {
             selectMood(firstMoodInPrevSubtheme)
-        }
-    }
-
-    private func customQuoteMoods() -> [Mood] {
-        quoteEngine.loadQuotes().map { quote in
-            let template = Self.quoteTemplatesByStyle[quote.style]
-
-            return Mood(
-                id: "custom_quote_\(quote.id.uuidString)",
-                name: quote.text,
-                theme: template?.theme ?? "Dynamic",
-                subtheme: "Quotes",
-                layerMix: template?.layerMix ?? [:],
-                wallpaper: WallpaperDescriptor(type: .quote, resources: [quote.style, quote.id.uuidString]),
-                palette: template?.palette ?? ThemePalette(
-                    primary: ColorComponents(red: 0.95, green: 0.95, blue: 0.95),
-                    secondary: ColorComponents(red: 0.75, green: 0.75, blue: 0.75),
-                    accent: ColorComponents(red: 0.5, green: 0.5, blue: 0.5)
-                )
-            )
         }
     }
 }

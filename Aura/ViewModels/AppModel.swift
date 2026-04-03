@@ -9,7 +9,6 @@ final class AppModel {
     enum ShortcutRoutine: Sendable {
         case deepFocusJourney
         case windDown
-        case zenBreathMode
     }
 
     private enum StorageKey {
@@ -31,7 +30,6 @@ final class AppModel {
     let weatherEngine: WeatherEngine
     let dynamicDesktopGenerator: DynamicDesktopGenerator
     let presetEngine: PresetEngine
-    let quoteEngine: QuoteEngine
     let smartDuckingService: SmartDuckingService
     let aiImageGenerationViewModel: AIImageGenerationViewModel
 
@@ -69,7 +67,6 @@ final class AppModel {
             dynamicDesktopGenerator = DynamicDesktopGenerator(upscaleManager: fallbackManager)
         }
         let presetEngine = PresetEngine(persistence: persistence)
-        let quoteEngine = QuoteEngine(persistence: persistence)
         let smartDuckingService = SmartDuckingService(soundEngine: soundEngine)
         let aiImageGenerationViewModel = AIImageGenerationViewModel()
 
@@ -83,7 +80,6 @@ final class AppModel {
         self.weatherEngine = weatherEngine
         self.dynamicDesktopGenerator = dynamicDesktopGenerator
         self.presetEngine = presetEngine
-        self.quoteEngine = quoteEngine
         self.smartDuckingService = smartDuckingService
         self.aiImageGenerationViewModel = aiImageGenerationViewModel
         self.favoriteSceneIDs = UserDefaults.standard.stringArray(forKey: StorageKey.favoriteSceneIDs) ?? []
@@ -91,7 +87,7 @@ final class AppModel {
         self.lastResumableSceneID = UserDefaults.standard.string(forKey: StorageKey.lastResumableSceneID)
 
         let playerViewModel = PlayerViewModel(soundEngine: soundEngine, settingsEngine: settingsEngine, moodEngine: moodEngine)
-        let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, quoteEngine: quoteEngine, dynamicDesktopGenerator: dynamicDesktopGenerator)
+        let moodViewModel = MoodViewModel(moodEngine: moodEngine, playerViewModel: playerViewModel, dynamicDesktopGenerator: dynamicDesktopGenerator)
         self.playerViewModel = playerViewModel
         self.moodViewModel = moodViewModel
         self.playlistViewModel = PlaylistViewModel(playlistEngine: playlistEngine)
@@ -198,8 +194,6 @@ final class AppModel {
             mood = moodViewModel.firstMood(inSubtheme: "DeepFocus")
         case .windDown:
             mood = moodViewModel.firstMood(inSubtheme: "Rest")
-        case .zenBreathMode:
-            mood = moodViewModel.mood(for: "zen_breathing") ?? moodViewModel.firstMood(inSubtheme: "Zen")
         }
 
         guard let mood else {

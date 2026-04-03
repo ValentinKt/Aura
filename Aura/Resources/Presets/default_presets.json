@@ -57,18 +57,6 @@
     "isFavorite": false
   },
   {
-    "id": "F6A7B8C9-D0E1-4234-B3C4-D5E6F7A8B9C2",
-    "name": "Zen Garden",
-    "moodID": "meditation",
-    "layerConfig": {
-      "forest": 0.6,
-      "piano": 0.5,
-      "wind": 0.4
-    },
-    "createdAt": "2026-03-14T10:25:00Z",
-    "isFavorite": true
-  },
-  {
     "id": "A7B8C9D0-E1F2-4345-B3C4-D5E6F7A8B9C3",
     "name": "City Rain",
     "moodID": "deep_blue",

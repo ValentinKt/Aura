@@ -109,27 +109,6 @@ struct WallpaperPreviewView: View {
                         TimeWallpaperView(style: "minimal", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .quote {
-                    if let style = mood.wallpaper.resources.first {
-                        QuoteWallpaperView(
-                            style: style,
-                            palette: mood.palette,
-                            quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil,
-                            selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL
-                        )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        QuoteWallpaperView(style: "motivational", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .zen {
-                    if let style = mood.wallpaper.resources.first {
-                        ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ZenWallpaperView(style: "breathing", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .website {
                     if let urlString = mood.wallpaper.resources.first {
                         WebsiteWallpaperView(urlString: urlString)

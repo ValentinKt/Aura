@@ -52,7 +52,5 @@ enum WallpaperType: String, Codable, Hashable {
     case current // Keep current system wallpaper
     case dynamic // HEIC dynamic wallpaper
     case time // Programmatic time wallpaper
-    case quote // Programmatic quote wallpaper
-    case zen // Programmatic zen wallpaper
     case website // Programmatic website wallpaper
 }

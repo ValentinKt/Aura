@@ -490,8 +490,6 @@ struct TahoeMenuBarPopoverView: View {
     private func loadBackgroundMedia() async {
         guard let mood = appModel.moodViewModel.currentMood,
               mood.wallpaper.type != .time,
-              mood.wallpaper.type != .zen,
-              mood.wallpaper.type != .quote,
               let resource = mood.wallpaper.resources.first else {
             withAnimation(.easeInOut(duration: 0.35)) {
                 backgroundImage = nil
@@ -618,9 +616,7 @@ private struct TahoeMoodCarouselCard: View {
                         .padding(14)
 
                     if !primaryResource.isEmpty,
-                       mood.wallpaper.type != .time,
-                       mood.wallpaper.type != .zen,
-                       mood.wallpaper.type != .quote {
+                       mood.wallpaper.type != .time {
                         downloadOverlay
                     }
                 }
@@ -709,7 +705,7 @@ private struct TahoeMoodCarouselCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || primaryResource.isEmpty {
             action(false)
             return
         }
@@ -734,26 +730,6 @@ private struct TahoeMoodCarouselCard: View {
         if mood.wallpaper.type == .time {
             let style = mood.wallpaper.resources.first ?? "minimal"
             TimeWallpaperView(
-                style: style,
-                palette: mood.palette,
-                selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
-                isPreview: true
-            )
-            .frame(width: 148, height: 184)
-        } else if mood.wallpaper.type == .quote {
-            let style = mood.wallpaper.resources.first ?? "motivational"
-            let quoteID = mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil
-            QuoteWallpaperView(
-                style: style,
-                palette: mood.palette,
-                quoteID: quoteID,
-                selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
-                isPreview: true
-            )
-            .frame(width: 148, height: 184)
-        } else if mood.wallpaper.type == .zen {
-            let style = mood.wallpaper.resources.first ?? "breathing"
-            ZenWallpaperView(
                 style: style,
                 palette: mood.palette,
                 selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
@@ -794,8 +770,6 @@ private struct TahoeMoodCarouselCard: View {
     @MainActor
     private func loadPreviewImage() async {
         guard mood.wallpaper.type != .time,
-              mood.wallpaper.type != .zen,
-              mood.wallpaper.type != .quote,
               let resource = mood.wallpaper.resources.first else {
             return
         }

@@ -249,13 +249,13 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
 
     func mapMoodID(for condition: WeatherCondition) -> String {
         switch condition {
-        case .clearDay: return "focus"
-        case .clearNight: return "sleep"
-        case .cloudy: return "calm"
-        case .rain: return "deepwork"
-        case .thunderstorm: return "meditation"
-        case .snow: return "calm"
-        case .windy: return "energy"
+        case .clearDay: return "minimalist"
+        case .clearNight: return "midnight_echo"
+        case .cloudy: return "quiet_mind"
+        case .rain: return "deep_blue"
+        case .thunderstorm: return "midnight_rain"
+        case .snow: return "stillness"
+        case .windy: return "energy_ignition"
         }
     }
 }

@@ -1186,43 +1186,6 @@ final class MoodEngine {
                 wallpaper: WallpaperDescriptor(type: .time, resources: ["fluid"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.4, blue: 0.6), secondary: ColorComponents(red: 0.2, green: 0.5, blue: 0.8), accent: ColorComponents(red: 0.4, green: 0.8, blue: 1.0))
             ),
-            // Quote Subthemes
-            Mood(
-                id: "quote_motivational",
-                name: "Motivational Quote",
-                theme: "Dynamic",
-                subtheme: "Quotes",
-                layerMix: ["hum": 0.1, "wind": 0.2],
-                wallpaper: WallpaperDescriptor(type: .quote, resources: ["motivational"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.1, blue: 0.15), secondary: ColorComponents(red: 0.2, green: 0.2, blue: 0.25), accent: ColorComponents(red: 0.9, green: 0.7, blue: 0.3))
-            ),
-            Mood(
-                id: "quote_philosophical",
-                name: "Philosophical Quote",
-                theme: "Dynamic",
-                subtheme: "Quotes",
-                layerMix: ["piano": 0.3, "rain": 0.2],
-                wallpaper: WallpaperDescriptor(type: .quote, resources: ["philosophical"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.15, green: 0.1, blue: 0.1), secondary: ColorComponents(red: 0.3, green: 0.15, blue: 0.15), accent: ColorComponents(red: 0.8, green: 0.4, blue: 0.3))
-            ),
-            Mood(
-                id: "quote_minimal",
-                name: "Minimal Quote",
-                theme: "Dynamic",
-                subtheme: "Quotes",
-                layerMix: ["hum": 0.2, "night": 0.1],
-                wallpaper: WallpaperDescriptor(type: .quote, resources: ["minimal"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.05, green: 0.05, blue: 0.08), secondary: ColorComponents(red: 0.1, green: 0.1, blue: 0.15), accent: ColorComponents(red: 0.9, green: 0.9, blue: 0.95))
-            ),
-            Mood(
-                id: "quote_bold",
-                name: "Bold Quote",
-                theme: "Dynamic",
-                subtheme: "Quotes",
-                layerMix: ["wind": 0.4, "piano": 0.1],
-                wallpaper: WallpaperDescriptor(type: .quote, resources: ["bold"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.1, green: 0.0, blue: 0.1), secondary: ColorComponents(red: 0.2, green: 0.0, blue: 0.2), accent: ColorComponents(red: 1.0, green: 0.2, blue: 0.8))
-            ),
             // MARK: - Website
             Mood(
                 id: "website_custom",

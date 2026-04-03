@@ -34,10 +34,9 @@ Sculpt your perfect audio environment. Mix and match individual audio layers wit
 
 ### 🖼️ Dynamic Wallpapers
 Transform your desktop background based on your current mood:
-- **Animated Scenes:** High-quality video loops ranging from deep focus geometry to relaxing waterfalls.
-- **Generative Zen:** Programmatic SwiftUI visualizations like *Galaxy*, *Pendulum*, *Prism*, and *Stardust* that react and breathe in real-time.
-- **Dynamic Quotes:** Keep motivated with elegant, animated typographic backgrounds.
-- **Interactive Websites:** Pin live, functional websites directly to your desktop as a wallpaper.
+- **Dynamic Wallpapers:** High-definition video loops that shift throughout the day, providing a living backdrop to your workspace.
+- **Image Playground Integration:** Seamlessly use Apple's Image Playground to generate custom, AI-powered backgrounds.
+- **Atmospheric Soundscapes:** Layered audio environments featuring rain, forest sounds, cafe ambience, and white noise.
 
 ### ⚡ Command Palette & Menu Bar
 Stay in the flow. Hit `⌘K` to instantly search and switch moods, or access quick controls from the unobtrusive Menu Bar popover.
