@@ -108,9 +108,7 @@ struct MenuBarPopoverView: View {
     // adaptive dark tint over the artwork. Each interactive control carries its
     // own individual .glassEffect() and lenses the art beneath it directly.
 
-}
-
-private struct PopoverBackgroundView: View, Equatable {
+    private struct PopoverBackgroundView: View, Equatable {
     let backgroundImage: NSImage?
     let backgroundVideoURL: URL?
     let reduceTransparency: Bool

@@ -106,6 +106,42 @@ actor ImageUpscaler {
         return NSImage(cgImage: upscaledImage, size: NSSize(width: upscaledImage.width, height: upscaledImage.height))
     }
 
+    func upscalePixelBuffer(_ pixelBuffer: CVPixelBuffer) async throws -> CVPixelBuffer {
+        guard let visionModel = visionModel else {
+            return pixelBuffer
+        }
+
+        defer {
+            ciContext.clearCaches()
+        }
+
+        try Task.checkCancellation()
+
+        return try autoreleasepool { () throws -> CVPixelBuffer in
+            let request = VNCoreMLRequest(model: visionModel)
+            request.imageCropAndScaleOption = cropAndScaleOption
+
+            // Use zero-copy GPU execution by avoiding CoreImage conversions
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+            try handler.perform([request])
+
+            guard let results = request.results else {
+                throw UpscalingError.unsupportedModelOutput
+            }
+
+            if let observation = results.compactMap({ $0 as? VNPixelBufferObservation }).first {
+                return observation.pixelBuffer
+            }
+
+            if let observation = results.compactMap({ $0 as? VNCoreMLFeatureValueObservation }).first,
+               let outBuffer = observation.featureValue.imageBufferValue {
+                return outBuffer
+            }
+
+            throw UpscalingError.unsupportedModelOutput
+        }
+    }
+
     func upscaleCGImage(_ image: CGImage) async throws -> CGImage {
         guard visionModel != nil else {
             return image

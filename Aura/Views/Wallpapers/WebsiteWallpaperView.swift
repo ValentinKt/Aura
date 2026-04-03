@@ -97,7 +97,7 @@ private struct WebsitePreviewCard: View {
 
 struct WebsiteWebView: NSViewRepresentable {
     let urlString: String
-    var onLoaded: (() -> Void)? = nil
+    var onLoaded: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onLoaded: onLoaded)

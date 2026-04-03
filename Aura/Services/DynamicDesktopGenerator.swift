@@ -172,11 +172,11 @@ final class DynamicDesktopGenerator {
         progress(ProgressUpdate(fractionCompleted: 1, step: .finalizing))
     }
 
-    private func optimizeFrameForStorage(_ image: CGImage, colorSpace: CGColorSpace) async throws -> CGImage {
+    private func optimizeFrameForStorage(_ pixelBuffer: CVPixelBuffer, colorSpace: CGColorSpace) async throws -> CGImage {
         let context = self.ciContext
         return try await Task.detached(priority: .userInitiated) {
             try autoreleasepool { () throws -> CGImage in
-                let resizedImage = try Self.resizeForRetinaIfNeeded(image, colorSpace: colorSpace, context: context)
+                let resizedImage = try Self.resizeForRetinaIfNeeded(pixelBuffer, colorSpace: colorSpace, context: context)
                 return try Self.compressAsJPEG(resizedImage, colorSpace: colorSpace)
             }
         }.value
@@ -241,10 +241,10 @@ final class DynamicDesktopGenerator {
         frameIndex: Int,
         totalFrames: Int,
         colorSpace: CGColorSpace
-    ) async throws -> CGImage {
+    ) async throws -> CVPixelBuffer {
         let context = self.ciContext
         return try await Task.detached(priority: .userInitiated) {
-            try autoreleasepool { () throws -> CGImage in
+            try autoreleasepool { () throws -> CVPixelBuffer in
                 let timeFraction = Double(frameIndex) / Double(totalFrames)
                 let cycle = timeFraction * 2.0 * .pi
                 let exposure = -0.75 - 1.25 * cos(cycle)
@@ -273,27 +273,62 @@ final class DynamicDesktopGenerator {
                 colorFilter.setValue(contrast, forKey: kCIInputContrastKey)
                 guard let finalOutput = colorFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
 
-                guard let cgImage = context.createCGImage(finalOutput, from: finalOutput.extent, format: .RGBA8, colorSpace: colorSpace) else {
+                // Create CVPixelBuffer backed by IOSurface
+                let extent = finalOutput.extent.integral
+                let width = Int(extent.width)
+                let height = Int(extent.height)
+
+                let attributes: [String: Any] = [
+                    kCVPixelBufferWidthKey as String: width,
+                    kCVPixelBufferHeightKey as String: height,
+                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                    kCVPixelBufferCGImageCompatibilityKey as String: true,
+                    kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+                    kCVPixelBufferMetalCompatibilityKey as String: true,
+                    kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+                ]
+
+                var pixelBuffer: CVPixelBuffer?
+                let status = CVPixelBufferCreate(
+                    kCFAllocatorDefault,
+                    width,
+                    height,
+                    kCVPixelFormatType_32BGRA,
+                    attributes as CFDictionary,
+                    &pixelBuffer
+                )
+
+                guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
                     throw GeneratorError.cgImageCreationFailed
                 }
 
-                return cgImage
+                CVPixelBufferLockBaseAddress(buffer, [])
+                defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+                context.render(finalOutput, to: buffer, bounds: extent, colorSpace: colorSpace)
+
+                return buffer
             }
         }.value
     }
 
     nonisolated private static func resizeForRetinaIfNeeded(
-        _ image: CGImage,
+        _ pixelBuffer: CVPixelBuffer,
         colorSpace: CGColorSpace,
         context: CIContext
     ) throws -> CGImage {
-        let longEdge = max(image.width, image.height)
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        let longEdge = max(width, height)
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace]) ?? CIImage(cvPixelBuffer: pixelBuffer)
+
         guard CGFloat(longEdge) > maximumRetinaLongEdge else {
-            return image
+            guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent, format: .RGBA8, colorSpace: colorSpace) else {
+                throw GeneratorError.cgImageCreationFailed
+            }
+            return cgImage
         }
 
         let scale = maximumRetinaLongEdge / CGFloat(longEdge)
-        let ciImage = CIImage(cgImage: image, options: [.colorSpace: colorSpace])
 
         guard let scaleFilter = CIFilter(name: "CILanczosScaleTransform") else {
             throw GeneratorError.imageProcessingFailed
