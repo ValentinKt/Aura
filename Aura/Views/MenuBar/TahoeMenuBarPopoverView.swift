@@ -670,6 +670,12 @@ private struct TahoeMoodCarouselCard: View {
             }
             await loadPreviewImage()
         }
+        .task(id: isSelected) {
+            // Trigger loadPreviewImage again when selection changes to handle video resolution
+            if isSelected {
+                await loadPreviewImage()
+            }
+        }
         .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
             if newState == .downloaded {
                 Task {

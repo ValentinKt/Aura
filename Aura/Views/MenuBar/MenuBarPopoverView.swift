@@ -595,11 +595,17 @@ private struct MoodCarouselCard: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
-        .task {
+        .task(id: mood.id) {
             if !primaryResource.isEmpty {
                 DownloadManager.shared.checkStatus(for: primaryResource)
             }
             await loadPreviewImage()
+        }
+        .task(id: isSelected) {
+            // Trigger loadPreviewImage again when selection changes to handle video resolution
+            if isSelected {
+                await loadPreviewImage()
+            }
         }
         .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
             if newState == .downloaded {

@@ -45,7 +45,7 @@ actor UpscaleManager {
 
     init(
         maxConcurrentOperations: Int = 2,
-        workerFactory: @escaping @Sendable () throws -> ImageUpscaler = {
+        workerFactory: @Sendable @escaping () throws -> ImageUpscaler = {
             let modelURL = try UpscaleModelManager.shared.compiledModelURL
             return try ImageUpscaler(modelURL: modelURL)
         }
