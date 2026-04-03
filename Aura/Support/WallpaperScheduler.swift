@@ -1,43 +1,36 @@
 import Foundation
 import CoreVideo
 import AppKit
+import QuartzCore
 
 @MainActor
 final class GatedDisplayLink {
-    private var displayLink: CVDisplayLink?
+    private var displayLink: CADisplayLink?
     private var isRunning = false
     var onFrame: (() -> Void)?
 
     func start() {
         guard !isRunning else { return }
-        CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-        guard let dl = displayLink else { return }
-
-        let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
-            let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx!).takeUnretainedValue()
-            DispatchQueue.main.async {
-                self_.onFrame?()
-            }
-            return kCVReturnSuccess
-        }
-        CVDisplayLinkSetOutputCallback(dl, callback, Unmanaged.passUnretained(self).toOpaque())
-        CVDisplayLinkStart(dl)
+        guard let screen = NSScreen.main else { return }
+        
+        displayLink = screen.displayLink(target: self, selector: #selector(tick))
+        displayLink?.add(to: .current, forMode: .default)
         isRunning = true
+    }
+
+    @objc private func tick() {
+        onFrame?()
     }
 
     func stop() {
         guard isRunning else { return }
-        if let dl = displayLink {
-            CVDisplayLinkStop(dl)
-        }
+        displayLink?.invalidate()
         displayLink = nil
         isRunning = false
     }
 
     deinit {
-        if let dl = displayLink {
-            CVDisplayLinkStop(dl)
-        }
+        displayLink?.invalidate()
     }
 }
 

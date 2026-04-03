@@ -25,63 +25,53 @@ struct LiquidGlassLayer<S: Shape>: View {
         if reduceTransparency {
             shape.fill(.regularMaterial).opacity(opacity)
         } else {
-            if #available(macOS 16.0, *) {
-                Group {
-                    if variant == .clear {
-                        if interactive {
-                            Color.clear.glassEffect(.clear.interactive(), in: shape)
-                        } else {
-                            Color.clear.glassEffect(.clear, in: shape)
-                        }
+            Group {
+                if variant == .clear {
+                    if interactive {
+                        Color.clear.glassEffect(.clear.interactive(), in: shape)
                     } else {
-                        if interactive {
-                            Color.clear.glassEffect(.regular.interactive(), in: shape)
-                        } else {
-                            Color.clear.glassEffect(.regular, in: shape)
-                        }
+                        Color.clear.glassEffect(.clear, in: shape)
+                    }
+                } else {
+                    if interactive {
+                        Color.clear.glassEffect(.regular.interactive(), in: shape)
+                    } else {
+                        Color.clear.glassEffect(.regular, in: shape)
                     }
                 }
-                .overlay {
-                    if variant == .regular {
-                        shape
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(0.4),
-                                        .white.opacity(0.1),
-                                        .white.opacity(0.2)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.5
-                            )
-                            .blendMode(.plusLighter)
-                    } else if variant == .clear {
-                        shape
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        .white.opacity(0.2),
-                                        .clear,
-                                        .white.opacity(0.1)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.5
-                            )
-                            .blendMode(.plusLighter)
-                    }
+            }
+            .overlay {
+                if variant == .regular {
+                    shape
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.4),
+                                    .white.opacity(0.1),
+                                    .white.opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                        .blendMode(.plusLighter)
+                } else if variant == .clear {
+                    shape
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.2),
+                                    .clear,
+                                    .white.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.5
+                        )
+                        .blendMode(.plusLighter)
                 }
-            } else {
-                shape
-                    .fill(.regularMaterial)
-                    .opacity(opacity)
-                    .overlay {
-                        shape
-                            .stroke(Color.white.opacity(0.1 * opacity), lineWidth: 0.5)
-                    }
             }
         }
     }
@@ -103,27 +93,19 @@ struct GlassEffectContainer<Content: View, S: Shape>: View {
                 if reduceTransparency {
                     shape.fill(.regularMaterial)
                 } else {
-                    if #available(macOS 16.0, *) {
-                        Color.clear
-                            .glassEffect(.clear, in: shape)
-                            .overlay {
-                                shape
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 0.5
-                                    )
-                            }
-                    } else {
-                        shape
-                            .fill(.regularMaterial)
-                            .overlay {
-                                shape.stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-                            }
-                    }
+                    Color.clear
+                        .glassEffect(.clear, in: shape)
+                        .overlay {
+                            shape
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.5
+                                )
+                        }
                 }
             }
     }

@@ -819,13 +819,8 @@ struct SettingsLiquidGlassCardModifier: ViewModifier {
                 if reduceTransparency {
                     shape.fill(.regularMaterial)
                 } else {
-                    if #available(macOS 16.0, *) {
-                        Color.clear
-                            .glassEffect(.regular.tint(.black.opacity(0.25)), in: shape)
-                    } else {
-                        shape.fill(.black.opacity(0.2))
-                            .background(.ultraThinMaterial, in: shape)
-                    }
+                    Color.clear
+                        .glassEffect(.regular.tint(.black.opacity(0.25)), in: shape)
                 }
             }
             .overlay {
@@ -926,10 +921,8 @@ struct WallpaperThumbnailView: View {
                     )
                 )
                 .overlay {
-                    if #available(macOS 16.0, *) {
-                        Color.clear
-                            .glassEffect(.clear, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    }
+                    Color.clear
+                        .glassEffect(.clear, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 }
                 .overlay {
                     Image(systemName: "desktopcomputer")

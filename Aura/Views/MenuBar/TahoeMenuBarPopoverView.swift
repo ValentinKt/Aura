@@ -74,11 +74,9 @@ struct TahoeMenuBarPopoverView: View {
     private var panelBackground: some View {
         if reduceTransparency {
             panelShape.fill(.regularMaterial)
-        } else if #available(macOS 26.0, *) {
+        } else {
             Color.clear
                 .glassEffect(.clear, in: panelShape)
-        } else {
-            panelShape.fill(.regularMaterial)
         }
     }
 
@@ -99,11 +97,7 @@ struct TahoeMenuBarPopoverView: View {
 
     @ViewBuilder
     private var glassRoot: some View {
-        if #available(macOS 26.0, *) {
-            SwiftUI.GlassEffectContainer(spacing: 16) {
-                contentStack
-            }
-        } else {
+        SwiftUI.GlassEffectContainer(spacing: 16) {
             contentStack
         }
     }
@@ -945,7 +939,7 @@ private struct TahoeGlassModifier<S: InsettableShape>: ViewModifier {
                 .background(shape.fill(.regularMaterial))
                 .overlay { strokeOverlay }
                 .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
-        } else if #available(macOS 26.0, *) {
+        } else {
             if interactive {
                 if let tint {
                     content
@@ -971,11 +965,6 @@ private struct TahoeGlassModifier<S: InsettableShape>: ViewModifier {
                         .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
                 }
             }
-        } else {
-            content
-                .background(shape.fill(.regularMaterial))
-                .overlay { strokeOverlay }
-                .shadow(color: .black.opacity(shadowOpacity), radius: 18, y: 10)
         }
     }
 
@@ -1016,10 +1005,6 @@ private extension View {
 
     @ViewBuilder
     func tahoeGlassID<ID: Hashable>(_ id: ID, in namespace: Namespace.ID) -> some View {
-        if #available(macOS 26.0, *) {
-            glassEffectID(id, in: namespace)
-        } else {
-            self
-        }
+        glassEffectID(id, in: namespace)
     }
 }

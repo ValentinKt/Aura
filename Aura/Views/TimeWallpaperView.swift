@@ -119,7 +119,7 @@ struct MinimalTimeView: View {
 
     var body: some View {
         Group {
-            if #available(macOS 16.0, *), !reduceTransparency {
+            if !reduceTransparency {
                 timeContent
                     .glassEffect(.regular.tint(color.opacity(0.15)), in: RoundedRectangle(cornerRadius: 60, style: .continuous))
                     .overlay(
@@ -175,7 +175,7 @@ struct AnalogTimeView: View {
 
             ZStack {
                 // Glass Base
-                if #available(macOS 16.0, *), !reduceTransparency {
+                if !reduceTransparency {
                     Color.clear
                         .glassEffect(.regular.tint(secondaryColor.opacity(0.15)), in: Circle())
                         .frame(width: size, height: size)
@@ -201,7 +201,7 @@ struct AnalogTimeView: View {
                     .blur(radius: 2)
 
                 // Inner Glass Ring
-                if #available(macOS 16.0, *), !reduceTransparency {
+                if !reduceTransparency {
                     Color.clear
                         .glassEffect(.regular, in: Circle())
                         .frame(width: size * 0.85, height: size * 0.85)
@@ -297,7 +297,7 @@ struct TypographicTimeView: View {
         }
         .padding(80)
         .background {
-            if #available(macOS 16.0, *), !reduceTransparency {
+            if !reduceTransparency {
                 Color.clear
                     .glassEffect(.regular.tint(color.opacity(0.1)), in: RoundedRectangle(cornerRadius: 80, style: .continuous))
                     .overlay(
@@ -326,7 +326,7 @@ struct BinaryTimeView: View {
         let components = calendar.dateComponents([.hour, .minute, .second], from: date)
 
         Group {
-            if #available(macOS 16.0, *), !reduceTransparency {
+            if !reduceTransparency {
                 HStack(spacing: 60) {
                     BinaryColumn(title: "HR", value: components.hour!, bits: 5, activeColor: color, inactiveColor: inactiveColor)
                     BinaryColumn(title: "MIN", value: components.minute!, bits: 6, activeColor: color, inactiveColor: inactiveColor)
@@ -494,7 +494,7 @@ struct SolarTimeView: View {
                 .animation(.linear(duration: 1.0), value: yPos)
 
                 // Horizon line (Glass Shelf)
-                if #available(macOS 16.0, *), !reduceTransparency {
+                if !reduceTransparency {
                     Color.clear
                         .glassEffect(.regular.tint(skyColor.opacity(0.2)), in: Rectangle())
                         .frame(height: geometry.size.height * 0.35)
@@ -569,7 +569,7 @@ struct GlassBlocksTimeView: View {
                     .foregroundStyle(.primary)
                     .frame(width: 160, height: 220)
                     .background {
-                        if #available(macOS 16.0, *), !reduceTransparency {
+                        if !reduceTransparency {
                             Color.clear
                                 .glassEffect(.regular.tint(color.opacity(0.15)), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
                                 .overlay(
@@ -615,7 +615,7 @@ struct WordsTimeView: View {
             .shadow(color: color.opacity(0.5), radius: 30, x: 0, y: 15)
             .padding(60)
             .background {
-                if #available(macOS 16.0, *), !reduceTransparency {
+                if !reduceTransparency {
                     Color.clear
                         .glassEffect(.regular.tint(color.opacity(0.1)), in: RoundedRectangle(cornerRadius: 40, style: .continuous))
                 } else {
@@ -716,7 +716,7 @@ struct NeonTimeView: View {
             .shadow(color: color, radius: 40, x: 0, y: 0)
             .padding(60)
             .background {
-                if #available(macOS 16.0, *), !reduceTransparency {
+                if !reduceTransparency {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .stroke(color, lineWidth: 4)
                         .shadow(color: color, radius: 20)
@@ -745,7 +745,7 @@ struct FluidTimeView: View {
 
     var body: some View {
         ZStack {
-            if #available(macOS 16.0, *), !reduceTransparency {
+            if !reduceTransparency {
                 Color.clear
                     .glassEffect(.regular.tint(color.opacity(0.2)), in: Capsule())
                     .frame(width: 600, height: 250)

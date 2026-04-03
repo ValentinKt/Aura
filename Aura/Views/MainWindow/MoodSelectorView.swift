@@ -399,43 +399,23 @@ struct MoodCard: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Button(action: handleAction) {
-                if #available(macOS 16.0, *) {
-                    cardContent
-                        .background {
-                            if reduceTransparency {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(.regularMaterial)
-                            } else {
-                                Color.clear
-                                    .glassEffect(isSelected ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
+                cardContent
+                    .background {
+                        if reduceTransparency {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(.regularMaterial)
+                        } else {
+                            Color.clear
+                                .glassEffect(isSelected ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
-                        .shadow(color: .black.opacity(isSelected ? 0.4 : 0.2), radius: isSelected ? 15 : 10, y: 5)
-                        .scaleEffect(isHovered ? 1.03 : 1.0)
-                        .scaleEffect(isPressed ? 0.98 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovered)
-                        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                } else {
-                    cardContent
-                        .background {
-                            if reduceTransparency {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(.regularMaterial)
-                            } else {
-                                Color.clear
-                                    .glassEffect(isSelected ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
-                        }
-                        .shadow(color: .black.opacity(isSelected ? 0.4 : 0.2), radius: isSelected ? 15 : 10, y: 5)
-                        .scaleEffect(isHovered ? 1.03 : 1.0)
-                        .scaleEffect(isPressed ? 0.98 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovered)
-                        .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
+                    }
+                    .shadow(color: .black.opacity(isSelected ? 0.4 : 0.2), radius: isSelected ? 15 : 10, y: 5)
+                    .scaleEffect(isHovered ? 1.03 : 1.0)
+                    .scaleEffect(isPressed ? 0.98 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovered)
+                    .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
             .focusable(false)
