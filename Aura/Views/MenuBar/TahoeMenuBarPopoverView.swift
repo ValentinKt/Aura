@@ -490,6 +490,7 @@ struct TahoeMenuBarPopoverView: View {
     private func loadBackgroundMedia() async {
         guard let mood = appModel.moodViewModel.currentMood,
               mood.wallpaper.type != .time,
+              mood.wallpaper.type != .website,
               let resource = mood.wallpaper.resources.first else {
             withAnimation(.easeInOut(duration: 0.35)) {
                 backgroundImage = nil
@@ -705,7 +706,7 @@ private struct TahoeMoodCarouselCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .website || primaryResource.isEmpty {
             action(false)
             return
         }
@@ -770,6 +771,7 @@ private struct TahoeMoodCarouselCard: View {
     @MainActor
     private func loadPreviewImage() async {
         guard mood.wallpaper.type != .time,
+              mood.wallpaper.type != .website,
               let resource = mood.wallpaper.resources.first else {
             return
         }

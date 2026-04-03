@@ -478,11 +478,9 @@ struct MoodCard: View {
                 }
                 .frame(width: 240, height: 160)
                 .overlay {
-                    Circle()
-                        .trim(from: 0, to: 0.7)
-                        .stroke(Color.white.opacity(0.5), lineWidth: 2)
-                        .frame(width: 20, height: 20)
-                        .gpuAnimation([.rotation(duration: 1.0, clockwise: true)])
+                    Image(systemName: "sparkles.rectangle.stack")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
             }
 
@@ -713,7 +711,7 @@ struct TimeWallpaperPreview: View {
                 let scaleY = targetSize.height / baseSize.height
                 let scale = max(scaleX, scaleY)
 
-                TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: selectedWallpaperURL)
+                TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: selectedWallpaperURL, isPreview: true)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)
@@ -734,14 +732,7 @@ struct WebsiteWallpaperPreview: View {
     var body: some View {
         ZStack {
             if let urlString = mood.wallpaper.resources.first {
-                let baseSize = CGSize(width: 1920, height: 1080)
-                let scaleX = targetSize.width / baseSize.width
-                let scaleY = targetSize.height / baseSize.height
-                let scale = max(scaleX, scaleY)
-
-                WebsiteWallpaperView(urlString: urlString)
-                    .frame(width: baseSize.width, height: baseSize.height)
-                    .scaleEffect(scale)
+                WebsiteWallpaperView(urlString: urlString, isPreview: true)
                     .frame(width: targetSize.width, height: targetSize.height)
                     .clipped()
                     .allowsHitTesting(false)

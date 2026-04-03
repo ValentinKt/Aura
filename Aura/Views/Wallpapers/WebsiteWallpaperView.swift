@@ -6,7 +6,68 @@ struct WebsiteWallpaperView: View {
     var isPreview: Bool = false
 
     var body: some View {
-        WebsiteWebView(urlString: urlString)
+        Group {
+            if isPreview {
+                WebsitePreviewCard(urlString: urlString)
+            } else {
+                WebsiteWebView(urlString: urlString)
+            }
+        }
+    }
+}
+
+private struct WebsitePreviewCard: View {
+    let urlString: String
+
+    private var resolvedURL: URL? {
+        WebsiteWebView.resolvedURL(from: urlString)
+    }
+
+    private var hostText: String {
+        resolvedURL?.host(percentEncoded: false) ?? "Website"
+    }
+
+    private var pathText: String? {
+        guard let resolvedURL else { return nil }
+        let path = resolvedURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return path.isEmpty ? nil : path
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.86),
+                    Color.blue.opacity(0.36),
+                    Color.cyan.opacity(0.18)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(alignment: .center, spacing: 8) {
+                Image(systemName: "globe")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+
+                Text(hostText)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+
+                if let pathText {
+                    Text(pathText)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                }
+            }
+            .padding(18)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 

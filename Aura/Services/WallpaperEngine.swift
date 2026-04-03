@@ -16,9 +16,9 @@ final class AnimatedGradientLayer: CAGradientLayer {
 
     func startAnimation(with stops: [ColorComponents]) {
         guard !isAnimating else { return }
-        
+
         let cgColors = stops.map { NSColor(red: $0.red, green: $0.green, blue: $0.blue, alpha: $0.alpha).cgColor }
-        
+
         // Shift colors slightly for the "to" value to create a breathing effect
         let shiftedColors = stops.map { stop in
             NSColor(
@@ -40,7 +40,7 @@ final class AnimatedGradientLayer: CAGradientLayer {
         anim.autoreverses = true
         anim.repeatCount = .infinity
         anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        
+
         add(anim, forKey: "colorShift")
         isAnimating = true
     }
@@ -905,6 +905,7 @@ final class WallpaperWindowController: NSObject {
     private var websiteShouldReceiveMouseEvents = true
     private var websiteGlobalEventMonitor: Any?
     private var websiteLocalEventMonitor: Any?
+    private var websiteHoverProbeWorkItem: DispatchWorkItem?
 
     override init() {
         super.init()
@@ -916,20 +917,18 @@ final class WallpaperWindowController: NSObject {
 
         let eventTypes: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDown, .rightMouseDragged]
         websiteGlobalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventTypes) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.probeWebsiteHoverState()
-            }
+            self?.scheduleWebsiteHoverProbe()
         }
         websiteLocalEventMonitor = NSEvent.addLocalMonitorForEvents(matching: eventTypes) { [weak self] event in
-            Task { @MainActor [weak self] in
-                self?.probeWebsiteHoverState()
-            }
+            self?.scheduleWebsiteHoverProbe()
             return event
         }
         probeWebsiteHoverState()
     }
 
     private func stopWebsiteHoverProbing() {
+        websiteHoverProbeWorkItem?.cancel()
+        websiteHoverProbeWorkItem = nil
         if let websiteGlobalEventMonitor {
             NSEvent.removeMonitor(websiteGlobalEventMonitor)
             self.websiteGlobalEventMonitor = nil
@@ -939,6 +938,17 @@ final class WallpaperWindowController: NSObject {
             self.websiteLocalEventMonitor = nil
         }
         websiteHoverProbeSequence += 1
+    }
+
+    private func scheduleWebsiteHoverProbe() {
+        websiteHoverProbeWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.probeWebsiteHoverState()
+        }
+
+        websiteHoverProbeWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: workItem)
     }
 
     deinit {
@@ -1287,27 +1297,30 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func updatePerformanceState() {
+        let isWindowVisible = window?.isVisible == true
         let isOccluded = window?.occlusionState.contains(.visible) == false
-        let shouldSuspend = window?.isVisible != true || isOccluded || isFullscreenApplicationActive()
+        let isFullscreenActive = isFullscreenApplicationActive()
+        let shouldSuspendDesktopMedia = !isWindowVisible || isFullscreenActive
+        let shouldSuspendSwiftUI = !isWindowVisible || isOccluded || isFullscreenActive
 
         renderStateTask?.cancel()
         renderStateTask = Task(priority: .background) {
-            await AuraBackgroundActor.setRenderingSuspended(shouldSuspend)
+            await AuraBackgroundActor.setRenderingSuspended(shouldSuspendSwiftUI)
         }
 
         // Handle Website
         if currentWebsiteURL != nil {
-            setWebsiteSuspended(shouldSuspend)
+            setWebsiteSuspended(shouldSuspendDesktopMedia)
         }
 
         // Handle Video
         if currentURL != nil {
-            setVideoSuspended(shouldSuspend)
+            setVideoSuspended(shouldSuspendDesktopMedia)
         }
 
         // Handle SwiftUI
         if hostingView != nil {
-            setSwiftUISuspended(shouldSuspend)
+            setSwiftUISuspended(shouldSuspendSwiftUI)
         }
     }
 

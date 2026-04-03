@@ -167,7 +167,7 @@ struct ConditionalRotation: ViewModifier {
     let angle: Angle
     let animation: Animation?
     let isAnimating: Bool
-    
+
     func body(content: Content) -> some View {
         if apply {
             content
@@ -185,7 +185,7 @@ struct ConditionalScale: ViewModifier {
     let scaleY: CGFloat
     let animation: Animation?
     let isAnimating: Bool
-    
+
     func body(content: Content) -> some View {
         if apply {
             content
@@ -202,7 +202,7 @@ struct ConditionalOpacity: ViewModifier {
     let opacityValue: Double
     let animation: Animation?
     let isAnimating: Bool
-    
+
     func body(content: Content) -> some View {
         if apply {
             content
@@ -220,7 +220,7 @@ struct ConditionalTranslation: ViewModifier {
     let y: CGFloat
     let animation: Animation?
     let isAnimating: Bool
-    
+
     func body(content: Content) -> some View {
         if apply {
             content

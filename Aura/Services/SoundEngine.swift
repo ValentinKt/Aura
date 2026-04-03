@@ -1,5 +1,4 @@
 import AVFoundation
-import Combine
 import Foundation
 import Observation
 import os
@@ -77,12 +76,10 @@ final class SoundEngine {
         guard isEngineRunning else { return }
         Logger.sound.info("⏸️ [SoundEngine] All layers silent. Stopping engine to save CPU.")
         engine.stop()
-        for node in layerNodes.values {
-            if node.player.engine != nil {
-                node.player.stop()
-                engine.detach(node.player)
-                engine.detach(node.eq)
-            }
+        for node in layerNodes.values where node.player.engine != nil {
+            node.player.stop()
+            engine.detach(node.player)
+            engine.detach(node.eq)
         }
         if customPlayer.engine != nil {
             customPlayer.stop()
@@ -108,13 +105,24 @@ final class SoundEngine {
             let format = buffers[id]?.format ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)
             engine.connect(node.player, to: node.eq, format: format)
             engine.connect(node.eq, to: engine.mainMixerNode, format: format)
-            
+
             if let buffer = buffers[id] {
                 loopManager.startLoop(on: node.player, buffer: buffer)
             }
         }
         if !node.player.isPlaying {
             node.player.play()
+        }
+    }
+
+    private func detachNodeIfNeeded(_ node: LayerNode) {
+        if node.player.engine != nil {
+            node.player.stop()
+            engine.detach(node.player)
+        }
+
+        if node.eq.engine != nil {
+            engine.detach(node.eq)
         }
     }
 
@@ -179,7 +187,7 @@ final class SoundEngine {
         }
 
         engine.prepare()
-        
+
         // Don't start engine here, only when a layer is > 0 volume
         state = .ready
         Logger.sound.info("🟢 [SoundEngine] Engine ready (idle).")
@@ -188,25 +196,24 @@ final class SoundEngine {
     func stop() {
         Logger.sound.info("Stopping all audio")
         stopRandomizationSchedule()
-        engine.stop()
-        customPlayer.stop()
+        stopEngineAndDetach()
         state = .uninitialized
     }
 
     func pause() {
         guard state == .playing || state == .ready else { return }
         stopRandomizationSchedule()
-        for node in layerNodes.values {
-            node.player.pause()
-        }
-        customPlayer.pause()
+        stopEngineAndDetach()
         state = .paused
     }
 
     func resume() {
         guard state == .paused || state == .ready else { return }
-        
+
         var hasPlayingNode = false
+        if volumes.values.contains(where: { $0 > 0 }) || customPlayer.engine != nil {
+            try? startEngineIfNeeded()
+        }
         for (id, node) in layerNodes {
             if let vol = volumes[id], vol > 0 {
                 hasPlayingNode = true
@@ -221,9 +228,8 @@ final class SoundEngine {
             customPlayer.play()
             hasPlayingNode = true
         }
-        
+
         if hasPlayingNode {
-            try? startEngineIfNeeded()
             state = .playing
             scheduleRandomizationIfNeeded()
         } else {
@@ -284,9 +290,9 @@ final class SoundEngine {
             ensureNodeAttachedAndPlaying(id: id, node: node)
             Logger.sound.debug("Playing node for \(id, privacy: .public)")
         } else if shouldPause {
-            if node.player.isPlaying {
-                Logger.sound.debug("Pausing node for \(id, privacy: .public)")
-                node.player.pause()
+            if node.player.engine != nil {
+                Logger.sound.debug("Detaching silent node for \(id, privacy: .public)")
+                detachNodeIfNeeded(node)
             }
             checkIdleState()
         }
@@ -388,8 +394,6 @@ final class SoundEngine {
         }
     }
 
-    private var randomizationCancellable: AnyCancellable?
-
     private func scheduleRandomizationIfNeeded() {
         stopRandomizationSchedule()
 
@@ -400,28 +404,28 @@ final class SoundEngine {
             return
         }
 
-        randomizationCancellable = Timer.publish(every: interval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                Task(priority: .background) { @MainActor [weak self] in
-                    guard let self else { return }
-                    guard self.state == .playing else { return }
+        randomizationTask = Task(priority: .background) { @MainActor [weak self] in
+            guard let self else { return }
 
-                    let isSuspended = await AuraBackgroundActor.shared.isRenderingSuspended()
-                    if isSuspended { return }
+            while !Task.isCancelled {
+                await AuraBackgroundActor.sleep(for: .seconds(interval))
+                guard !Task.isCancelled else { return }
+                guard self.state == .playing else { continue }
 
-                    for id in SoundLayerID.allCases.map(\.rawValue) {
-                        let random = Float.random(in: validRange)
-                        self.setLayer(id, volume: random)
-                    }
+                let isSuspended = await AuraBackgroundActor.shared.isRenderingSuspended()
+                if isSuspended { continue }
+
+                for id in SoundLayerID.allCases.map(\.rawValue) {
+                    let random = Float.random(in: validRange)
+                    self.setLayer(id, volume: random)
                 }
             }
+        }
     }
 
     private func stopRandomizationSchedule() {
-        randomizationCancellable?.cancel()
-        randomizationCancellable = nil
+        randomizationTask?.cancel()
+        randomizationTask = nil
     }
 
 }

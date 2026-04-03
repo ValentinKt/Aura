@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 struct TimeWallpaperView: View {
     let style: String
@@ -7,6 +6,7 @@ struct TimeWallpaperView: View {
     let selectedWallpaperURL: URL?
     var isPreview: Bool = false
     @State private var backgroundImage: NSImage?
+    @State private var previewDate = Date()
 
     var primaryColor: Color {
         Color(red: palette.primary.red, green: palette.primary.green, blue: palette.primary.blue)
@@ -43,7 +43,9 @@ struct TimeWallpaperView: View {
             }
 
             Group {
-                if needsSeconds {
+                if isPreview {
+                    timeContent(date: previewDate)
+                } else if needsSeconds {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         timeContent(date: context.date)
                     }

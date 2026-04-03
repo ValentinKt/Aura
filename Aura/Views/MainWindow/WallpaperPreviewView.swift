@@ -103,10 +103,10 @@ struct WallpaperPreviewView: View {
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .time {
                     if let style = mood.wallpaper.resources.first {
-                        TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
+                        TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL, isPreview: true)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        TimeWallpaperView(style: "minimal", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL)
+                        TimeWallpaperView(style: "minimal", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL, isPreview: true)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .website {

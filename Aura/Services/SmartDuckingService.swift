@@ -30,16 +30,16 @@ final class SmartDuckingService {
     private var evaluationCancellable: AnyCancellable?
 
     // MediaRemote dynamically loaded
-    private typealias MediaRemoteRegisterForNowPlayingNotificationsFunction = @convention(c) (DispatchQueue) -> Void
-    private typealias MediaRemoteNowPlayingIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
-    private typealias MediaRemoteNowPlayingInfoFunction = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
+    private typealias RegisterNowPlayingHandler = @convention(c) (DispatchQueue) -> Void
+    private typealias NowPlayingStateHandler = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
+    private typealias NowPlayingInfoHandler = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
 
     private let mediaRemoteQueue = DispatchQueue(label: "com.aura.mediaremote", qos: .background)
     private let audioListenerQueue = DispatchQueue(label: "com.aura.smartducking.audio", qos: .background)
 
-    private var mediaRemoteRegisterForNowPlayingNotifications: MediaRemoteRegisterForNowPlayingNotificationsFunction?
-    private var mediaRemoteNowPlayingIsPlaying: MediaRemoteNowPlayingIsPlayingFunction?
-    private var mediaRemoteNowPlayingInfo: MediaRemoteNowPlayingInfoFunction?
+    private var mediaRemoteRegisterForNowPlayingNotifications: RegisterNowPlayingHandler?
+    private var mediaRemoteNowPlayingIsPlaying: NowPlayingStateHandler?
+    private var mediaRemoteNowPlayingInfo: NowPlayingInfoHandler?
     private var mediaRemoteObservers: [NSObjectProtocol] = []
     private var devicesChangedListener: AudioObjectPropertyListenerBlock?
     private var inputDeviceListeners: [AudioDeviceID: AudioObjectPropertyListenerBlock] = [:]
@@ -66,21 +66,21 @@ final class SmartDuckingService {
         if let pointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteRegisterForNowPlayingNotifications" as CFString) {
             mediaRemoteRegisterForNowPlayingNotifications = unsafeBitCast(
                 pointer,
-                to: MediaRemoteRegisterForNowPlayingNotificationsFunction.self
+                to: RegisterNowPlayingHandler.self
             )
         }
 
         if let pointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) {
             mediaRemoteNowPlayingIsPlaying = unsafeBitCast(
                 pointer,
-                to: MediaRemoteNowPlayingIsPlayingFunction.self
+                to: NowPlayingStateHandler.self
             )
         }
 
         if let infoPointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingInfo" as CFString) {
             mediaRemoteNowPlayingInfo = unsafeBitCast(
                 infoPointer,
-                to: MediaRemoteNowPlayingInfoFunction.self
+                to: NowPlayingInfoHandler.self
             )
         }
     }

@@ -12,7 +12,7 @@ final class GatedDisplayLink {
     func start() {
         guard !isRunning else { return }
         guard let screen = NSScreen.main else { return }
-        
+
         displayLink = screen.displayLink(target: self, selector: #selector(tick))
         displayLink?.add(to: .current, forMode: .default)
         isRunning = true

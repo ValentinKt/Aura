@@ -171,7 +171,7 @@ final class UpscaleModelState {
         error = nil
 
         do {
-            if let _ = try await UpscaleModelManager.shared.checkLocalCache() {
+            if try await UpscaleModelManager.shared.checkLocalCache() != nil {
                 self.progress = 1.0
                 self.isReady = true
                 self.isDownloading = false
