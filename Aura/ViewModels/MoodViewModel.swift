@@ -16,7 +16,7 @@ final class MoodViewModel {
     private let quoteEngine: QuoteEngine
     private let dynamicDesktopGenerator: DynamicDesktopGenerator
     private var quoteRefreshToken = 0
-    private static let dynamicSubthemes: Set<String> = ["Create with AI", "Dynamic Desktop", "Image Playground", "Quotes", "Time", "Zen"]
+    private static let dynamicSubthemes: Set<String> = ["Create with AI", "Dynamic Desktop", "Image Playground", "Quotes", "Time"]
     private static let miscellaneousSubthemes: Set<String> = ["Website"]
     private static let pinnedDynamicSubthemes: Set<String> = ["Create with AI", "Dynamic Desktop", "Image Playground"]
     var onMoodSelected: ((Mood) -> Void)?
