@@ -48,7 +48,6 @@ struct MenuBarPopoverView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
         }
-        .drawingGroup()
         .frame(width: 360)
         .background { backgroundLayer }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -303,6 +302,7 @@ struct MenuBarPopoverView: View {
                     isShowingCreateMood = true
                 }
             }
+            .drawingGroup()
         }
         .contentMargins(.horizontal, 24, for: .scrollContent)
         .frame(maxWidth: .infinity)

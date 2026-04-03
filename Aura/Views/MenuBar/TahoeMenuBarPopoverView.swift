@@ -64,7 +64,6 @@ struct TahoeMenuBarPopoverView: View {
 
             ScrollView(showsIndicators: false) {
                 glassRoot
-                    .drawingGroup()
                     .padding(20)
                     .frame(maxWidth: .infinity)
             }
@@ -360,6 +359,7 @@ struct TahoeMenuBarPopoverView: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .drawingGroup()
             }
             .contentMargins(.horizontal, 2, for: .scrollContent)
         }
