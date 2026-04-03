@@ -302,7 +302,6 @@ struct MenuBarPopoverView: View {
                     isShowingCreateMood = true
                 }
             }
-            .drawingGroup()
         }
         .contentMargins(.horizontal, 24, for: .scrollContent)
         .frame(maxWidth: .infinity)
