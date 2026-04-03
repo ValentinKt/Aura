@@ -20,6 +20,10 @@ struct TimeWallpaperView: View {
         Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue)
     }
 
+    private var needsSeconds: Bool {
+        ["analog", "binary", "orbit", "neon"].contains(style)
+    }
+
     var body: some View {
         ZStack {
             if !isPreview, let selectedWallpaperURL, Self.isVideoURL(selectedWallpaperURL) {
@@ -38,38 +42,49 @@ struct TimeWallpaperView: View {
                 Color.black.opacity(0.18).ignoresSafeArea()
             }
 
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let currentTime = context.date
-                // Render specific style
-                switch style {
-                case "minimal":
-                    MinimalTimeView(date: currentTime, color: accentColor)
-                case "analog":
-                    AnalogTimeView(date: currentTime, color: accentColor, secondaryColor: secondaryColor)
-                case "typographic":
-                    TypographicTimeView(date: currentTime, color: accentColor)
-                case "binary":
-                    BinaryTimeView(date: currentTime, color: accentColor, inactiveColor: primaryColor.opacity(0.3))
-                case "solar":
-                    SolarTimeView(date: currentTime, skyColor: primaryColor, sunColor: accentColor)
-                case "glass_blocks":
-                    GlassBlocksTimeView(date: currentTime, color: accentColor)
-                case "words":
-                    WordsTimeView(date: currentTime, color: accentColor)
-                case "orbit":
-                    OrbitTimeView(date: currentTime, color: accentColor)
-                case "neon":
-                    NeonTimeView(date: currentTime, color: accentColor)
-                case "fluid":
-                    FluidTimeView(date: currentTime, color: accentColor)
-                default:
-                    MinimalTimeView(date: currentTime, color: accentColor)
+            Group {
+                if needsSeconds {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        timeContent(date: context.date)
+                    }
+                } else {
+                    TimelineView(.everyMinute) { context in
+                        timeContent(date: context.date)
+                    }
                 }
             }
             .drawingGroup()
         }
         .task(id: backgroundTaskKey) {
             await loadBackgroundImage()
+        }
+    }
+
+    @ViewBuilder
+    private func timeContent(date currentTime: Date) -> some View {
+        switch style {
+        case "minimal":
+            MinimalTimeView(date: currentTime, color: accentColor)
+        case "analog":
+            AnalogTimeView(date: currentTime, color: accentColor, secondaryColor: secondaryColor)
+        case "typographic":
+            TypographicTimeView(date: currentTime, color: accentColor)
+        case "binary":
+            BinaryTimeView(date: currentTime, color: accentColor, inactiveColor: primaryColor.opacity(0.3))
+        case "solar":
+            SolarTimeView(date: currentTime, skyColor: primaryColor, sunColor: accentColor)
+        case "glass_blocks":
+            GlassBlocksTimeView(date: currentTime, color: accentColor)
+        case "words":
+            WordsTimeView(date: currentTime, color: accentColor)
+        case "orbit":
+            OrbitTimeView(date: currentTime, color: accentColor)
+        case "neon":
+            NeonTimeView(date: currentTime, color: accentColor)
+        case "fluid":
+            FluidTimeView(date: currentTime, color: accentColor)
+        default:
+            MinimalTimeView(date: currentTime, color: accentColor)
         }
     }
 
@@ -250,7 +265,6 @@ struct AnalogTimeView: View {
                 }
                 .rotationEffect(.degrees(second * 6))
                 .shadow(color: color, radius: 10, x: 0, y: 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.5, blendDuration: 0), value: second)
 
                 // Center dot
                 Circle()
@@ -491,7 +505,6 @@ struct SolarTimeView: View {
                     }
                 }
                 .position(x: xPos, y: yPos)
-                .animation(.linear(duration: 1.0), value: yPos)
 
                 // Horizon line (Glass Shelf)
                 if !reduceTransparency {
@@ -691,7 +704,6 @@ struct OrbitPlanet: View {
             .shadow(color: color, radius: 10)
             .offset(y: -radius)
             .rotationEffect(.degrees(angle))
-            .animation(.linear(duration: 0.5), value: angle)
     }
 }
 
