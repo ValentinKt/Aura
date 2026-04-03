@@ -8,7 +8,22 @@ struct WebsiteWallpaperView: View {
     var body: some View {
         Group {
             if isPreview {
-                WebsitePreviewCard(urlString: urlString)
+                GeometryReader { geo in
+                    let baseSize = CGSize(width: 1920, height: 1080)
+                    let scaleX = geo.size.width / baseSize.width
+                    let scaleY = geo.size.height / baseSize.height
+                    let scale = max(scaleX, scaleY)
+
+                    ZStack {
+                        // Fallback background while loading
+                        WebsitePreviewCard(urlString: urlString)
+
+                        WebsiteWebView(urlString: urlString)
+                            .frame(width: baseSize.width, height: baseSize.height)
+                            .scaleEffect(scale)
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    }
+                }
             } else {
                 WebsiteWebView(urlString: urlString)
             }
