@@ -1,114 +1,7 @@
 import SwiftUI
 import Combine
 
-// MARK: - GPU Offloading Toolkit
-enum GPUAnimationType {
-    case rotation(duration: TimeInterval, clockwise: Bool = true)
-    case rotationTo(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
-    case scale(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
-    case opacity(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
-    case translationX(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
-    case translationY(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
-}
 
-struct GPUAnimationView<Content: View>: NSViewRepresentable {
-    var animations: [GPUAnimationType]
-    var isVisible: Bool
-    var content: Content
-
-    init(animations: [GPUAnimationType], isVisible: Bool = true, @ViewBuilder content: () -> Content) {
-        self.animations = animations
-        self.isVisible = isVisible
-        self.content = content()
-    }
-
-    func makeNSView(context: Context) -> NSHostingView<Content> {
-        let view = NSHostingView(rootView: content)
-        view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.clear.cgColor
-        applyAnimations(to: view.layer)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSHostingView<Content>, context: Context) {
-        nsView.rootView = content
-        guard let layer = nsView.layer else { return }
-        
-        if isVisible {
-            if layer.animationKeys()?.isEmpty ?? true {
-                applyAnimations(to: layer)
-            }
-        } else {
-            layer.removeAllAnimations()
-        }
-    }
-
-    private func applyAnimations(to layer: CALayer?) {
-        guard let layer = layer else { return }
-        layer.removeAllAnimations()
-        
-        for (index, anim) in animations.enumerated() {
-            let caAnim = CABasicAnimation()
-            switch anim {
-            case .rotation(let duration, let clockwise):
-                caAnim.keyPath = "transform.rotation.z"
-                caAnim.fromValue = 0
-                caAnim.toValue = clockwise ? CGFloat.pi * 2 : -CGFloat.pi * 2
-                caAnim.duration = duration
-                caAnim.repeatCount = .infinity
-            case .rotationTo(let from, let to, let duration, let autoreverses):
-                caAnim.keyPath = "transform.rotation.z"
-                caAnim.fromValue = from
-                caAnim.toValue = to
-                caAnim.duration = duration
-                caAnim.autoreverses = autoreverses
-                caAnim.repeatCount = .infinity
-                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            case .scale(let from, let to, let duration, let autoreverses):
-                caAnim.keyPath = "transform.scale"
-                caAnim.fromValue = from
-                caAnim.toValue = to
-                caAnim.duration = duration
-                caAnim.autoreverses = autoreverses
-                caAnim.repeatCount = .infinity
-                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            case .opacity(let from, let to, let duration, let autoreverses):
-                caAnim.keyPath = "opacity"
-                caAnim.fromValue = from
-                caAnim.toValue = to
-                caAnim.duration = duration
-                caAnim.autoreverses = autoreverses
-                caAnim.repeatCount = .infinity
-                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            case .translationX(let from, let to, let duration, let autoreverses):
-                caAnim.keyPath = "transform.translation.x"
-                caAnim.fromValue = from
-                caAnim.toValue = to
-                caAnim.duration = duration
-                caAnim.autoreverses = autoreverses
-                caAnim.repeatCount = .infinity
-                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            case .translationY(let from, let to, let duration, let autoreverses):
-                caAnim.keyPath = "transform.translation.y"
-                caAnim.fromValue = from
-                caAnim.toValue = to
-                caAnim.duration = duration
-                caAnim.autoreverses = autoreverses
-                caAnim.repeatCount = .infinity
-                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            }
-            layer.add(caAnim, forKey: "gpu_anim_\(index)")
-        }
-    }
-}
-
-extension View {
-    func gpuAnimation(_ animations: [GPUAnimationType], isVisible: Bool = true) -> some View {
-        GPUAnimationView(animations: animations, isVisible: isVisible) {
-            self
-        }
-    }
-}
 
 struct ZenWallpaperView: View {
     let style: String
@@ -272,7 +165,6 @@ struct PendulumZenView: View {
 struct InfinityZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var phase: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -281,26 +173,23 @@ struct InfinityZenView: View {
             HStack(spacing: -60) {
                 Circle()
                     .stroke(
-                        AngularGradient(colors: [primaryColor, accentColor, primaryColor], center: .center, angle: .degrees(phase * 360)),
+                        AngularGradient(colors: [primaryColor, accentColor, primaryColor], center: .center, angle: .zero),
                         lineWidth: 10
                     )
                     .frame(width: 200, height: 200)
                     .blur(radius: 2)
+                    .gpuAnimation([.rotation(duration: 10.0, clockwise: true)])
 
                 Circle()
                     .stroke(
-                        AngularGradient(colors: [accentColor, primaryColor, accentColor], center: .center, angle: .degrees(-phase * 360)),
+                        AngularGradient(colors: [accentColor, primaryColor, accentColor], center: .center, angle: .zero),
                         lineWidth: 10
                     )
                     .frame(width: 200, height: 200)
                     .blur(radius: 2)
+                    .gpuAnimation([.rotation(duration: 10.0, clockwise: false)])
             }
             .scaleEffect(1.2)
-        }
-        .onAppear {
-            withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
-                phase = 1.0
-            }
         }
     }
 }
@@ -309,32 +198,37 @@ struct InfinityZenView: View {
 struct PrismZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var isAnimating = false
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.75).ignoresSafeArea()
 
             ZStack {
-                Path { path in
+                let trianglePath = Path { path in
                     path.move(to: CGPoint(x: 200, y: 50))
                     path.addLine(to: CGPoint(x: 50, y: 350))
                     path.addLine(to: CGPoint(x: 350, y: 350))
                     path.closeSubpath()
                 }
-                .stroke(
-                    LinearGradient(colors: [primaryColor, accentColor], startPoint: isAnimating ? .top : .bottom, endPoint: isAnimating ? .bottom : .top),
-                    lineWidth: 4
-                )
-                .frame(width: 400, height: 400)
-                .blur(radius: isAnimating ? 4 : 1)
-                .scaleEffect(isAnimating ? 1.05 : 0.95)
+
+                trianglePath
+                    .stroke(
+                        LinearGradient(colors: [primaryColor, accentColor], startPoint: .top, endPoint: .bottom),
+                        lineWidth: 4
+                    )
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 1)
+
+                trianglePath
+                    .stroke(
+                        LinearGradient(colors: [primaryColor, accentColor], startPoint: .top, endPoint: .bottom),
+                        lineWidth: 4
+                    )
+                    .frame(width: 400, height: 400)
+                    .blur(radius: 4)
+                    .gpuAnimation([.opacity(from: 0.2, to: 1.0, duration: 4.0, autoreverses: true)])
             }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
-                isAnimating = true
-            }
+            .gpuAnimation([.scale(from: 0.95, to: 1.05, duration: 4.0, autoreverses: true)])
         }
     }
 }
@@ -343,7 +237,6 @@ struct PrismZenView: View {
 struct StardustZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var isAnimating = false
 
     var body: some View {
         ZStack {
@@ -352,6 +245,11 @@ struct StardustZenView: View {
             GeometryReader { geometry in
                 ZStack {
                     ForEach(0..<50, id: \.self) { index in
+                        let duration = Double.random(in: 2...5)
+                        let delay = Double.random(in: 0...2)
+                        let toOpacity = CGFloat.random(in: 0.3...1.0)
+                        let toScale = CGFloat.random(in: 0.8...1.2)
+                        
                         Circle()
                             .fill(index % 3 == 0 ? accentColor : primaryColor)
                             .frame(width: CGFloat.random(in: 2...6))
@@ -359,20 +257,15 @@ struct StardustZenView: View {
                                 x: CGFloat.random(in: 0...geometry.size.width),
                                 y: CGFloat.random(in: 0...geometry.size.height)
                             )
-                            .opacity(isAnimating ? CGFloat.random(in: 0.3...1.0) : 0.1)
-                            .scaleEffect(isAnimating ? CGFloat.random(in: 0.8...1.2) : 1.0)
-                            .animation(
-                                .easeInOut(duration: Double.random(in: 2...5))
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double.random(in: 0...2)),
-                                value: isAnimating
-                            )
+                            .opacity(0.1)
+                            .scaleEffect(1.0)
+                            .gpuAnimation([
+                                .opacity(from: 0.1, to: toOpacity, duration: duration, autoreverses: true, delay: delay),
+                                .scale(from: 1.0, to: toScale, duration: duration, autoreverses: true, delay: delay)
+                            ])
                     }
                 }
             }
-        }
-        .onAppear {
-            isAnimating = true
         }
     }
 }
@@ -543,32 +436,26 @@ struct LotusZenView: View {
 struct WavesZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var phase1: CGFloat = 0
-    @State private var phase2: CGFloat = 0
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
 
             GeometryReader { geometry in
+                let wavelength = geometry.size.width / 2
+
                 ZStack {
-                    SineWave(phase: phase1, amplitude: 60)
+                    SineWave(phase: 0, amplitude: 60)
                         .stroke(primaryColor.opacity(0.6), lineWidth: 4)
                         .shadow(color: primaryColor, radius: 10)
+                        .gpuAnimation([.translationX(from: 0, to: -wavelength, duration: 10.0, autoreverses: false)])
 
-                    SineWave(phase: phase2, amplitude: 80)
+                    SineWave(phase: 0, amplitude: 80)
                         .stroke(accentColor.opacity(0.6), lineWidth: 3)
                         .shadow(color: accentColor, radius: 10)
+                        .gpuAnimation([.translationX(from: 0, to: wavelength, duration: 15.0, autoreverses: false)])
                 }
                 .frame(height: geometry.size.height)
-            }
-        }
-        .onAppear {
-            withAnimation(.linear(duration: 10.0).repeatForever(autoreverses: false)) {
-                phase1 = .pi * 2
-            }
-            withAnimation(.linear(duration: 15.0).repeatForever(autoreverses: false)) {
-                phase2 = -.pi * 2
             }
         }
     }
@@ -593,7 +480,8 @@ struct SineWave: Shape {
 
         path.move(to: CGPoint(x: 0, y: midHeight))
 
-        for x in stride(from: 0, through: width, by: 1) {
+        // Draw an extra wavelength so we can translate it seamlessly
+        for x in stride(from: 0, through: width + wavelength, by: 1) {
             let relativeX = x / wavelength
             let y = midHeight + sin(relativeX * .pi * 2 + phase) * amplitude
             path.addLine(to: CGPoint(x: x, y: y))
@@ -634,7 +522,6 @@ struct EclipseZenView: View {
 struct ParticlesZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var isAnimating = false
 
     var body: some View {
         ZStack {
@@ -643,27 +530,26 @@ struct ParticlesZenView: View {
             GeometryReader { geometry in
                 ZStack {
                     ForEach(0..<30, id: \.self) { index in
+                        let startY = geometry.size.height + 50
+                        let endY: CGFloat = -50
+                        let duration = Double.random(in: 10...30)
+                        let delay = Double.random(in: 0...10)
+                        
                         Circle()
                             .fill(index % 2 == 0 ? primaryColor : accentColor)
                             .frame(width: CGFloat.random(in: 5...20))
-                            .opacity(isAnimating ? CGFloat.random(in: 0.1...0.8) : 0)
+                            .opacity(CGFloat.random(in: 0.1...0.8))
                             .position(
                                 x: CGFloat.random(in: 0...geometry.size.width),
-                                y: isAnimating ? -50 : geometry.size.height + 50
-                            )
-                            .animation(
-                                .linear(duration: Double.random(in: 10...30))
-                                    .repeatForever(autoreverses: false)
-                                    .delay(Double.random(in: 0...10)),
-                                value: isAnimating
+                                y: startY
                             )
                             .blur(radius: CGFloat.random(in: 1...4))
+                            .gpuAnimation([
+                                .translationY(from: 0, to: endY - startY, duration: duration, autoreverses: false, delay: delay)
+                            ])
                     }
                 }
             }
-        }
-        .onAppear {
-            isAnimating = true
         }
     }
 }
