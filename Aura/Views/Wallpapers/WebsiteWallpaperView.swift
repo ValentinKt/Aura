@@ -4,6 +4,7 @@ import WebKit
 struct WebsiteWallpaperView: View {
     let urlString: String
     var isPreview: Bool = false
+    @State private var hasLoaded: Bool = false
 
     var body: some View {
         Group {
@@ -17,11 +18,19 @@ struct WebsiteWallpaperView: View {
                     ZStack {
                         // Fallback background while loading
                         WebsitePreviewCard(urlString: urlString)
+                            .opacity(hasLoaded ? 0 : 1)
+                            .animation(.easeInOut(duration: 0.5), value: hasLoaded)
 
-                        WebsiteWebView(urlString: urlString)
-                            .frame(width: baseSize.width, height: baseSize.height)
-                            .scaleEffect(scale)
-                            .frame(width: geo.size.width, height: geo.size.height)
+                        WebsiteWebView(urlString: urlString) {
+                            withAnimation {
+                                hasLoaded = true
+                            }
+                        }
+                        .frame(width: baseSize.width, height: baseSize.height)
+                        .scaleEffect(scale)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .opacity(hasLoaded ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.5), value: hasLoaded)
                     }
                 }
             } else {
@@ -88,6 +97,11 @@ private struct WebsitePreviewCard: View {
 
 struct WebsiteWebView: NSViewRepresentable {
     let urlString: String
+    var onLoaded: (() -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onLoaded: onLoaded)
+    }
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -95,6 +109,7 @@ struct WebsiteWebView: NSViewRepresentable {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.underPageBackgroundColor = .clear
         webView.allowsMagnification = false
@@ -105,10 +120,28 @@ struct WebsiteWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
+        nsView.navigationDelegate = context.coordinator
         guard let resolvedURL = Self.resolvedURL(from: urlString) else { return }
 
         if nsView.url?.absoluteString != resolvedURL.absoluteString {
             load(urlString, into: nsView)
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        var onLoaded: (() -> Void)?
+
+        init(onLoaded: (() -> Void)?) {
+            self.onLoaded = onLoaded
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            onLoaded?()
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            // Still hide placeholder if failed so user sees why or sees nothing
+            onLoaded?()
         }
     }
 
