@@ -11,24 +11,81 @@ struct WallpaperApplyResult: Hashable {
     var permissionDenied: Bool
 }
 
-struct AnimatedGradientView: View {
-    let stops: [ColorComponents]
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { context in
-            let shift = context.date.timeIntervalSinceReferenceDate / 60.0
-            let shiftedStops = stops.map { stop in
-                ColorComponents(
-                    red: max(0, min(1, stop.red + sin(shift) * 0.1)),
-                    green: max(0, min(1, stop.green + cos(shift) * 0.1)),
-                    blue: max(0, min(1, stop.blue + sin(shift * 0.5) * 0.1)),
-                    alpha: stop.alpha
-                )
-            }
-            let colors = shiftedStops.map { Color(red: $0.red, green: $0.green, blue: $0.blue, opacity: $0.alpha) }
-            LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
-                .ignoresSafeArea()
-                .drawingGroup()
+final class AnimatedGradientLayer: CAGradientLayer {
+    private var isAnimating = false
+
+    func startAnimation(with stops: [ColorComponents]) {
+        guard !isAnimating else { return }
+        
+        let cgColors = stops.map { NSColor(red: $0.red, green: $0.green, blue: $0.blue, alpha: $0.alpha).cgColor }
+        
+        // Shift colors slightly for the "to" value to create a breathing effect
+        let shiftedColors = stops.map { stop in
+            NSColor(
+                red: max(0, min(1, stop.red + 0.1)),
+                green: max(0, min(1, stop.green + 0.1)),
+                blue: max(0, min(1, stop.blue + 0.1)),
+                alpha: stop.alpha
+            ).cgColor
         }
+
+        self.colors = cgColors
+        self.startPoint = CGPoint(x: 0.0, y: 0.0)
+        self.endPoint = CGPoint(x: 1.0, y: 1.0)
+
+        let anim = CABasicAnimation(keyPath: "colors")
+        anim.fromValue = cgColors
+        anim.toValue = shiftedColors
+        anim.duration = 10.0
+        anim.autoreverses = true
+        anim.repeatCount = .infinity
+        anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        
+        add(anim, forKey: "colorShift")
+        isAnimating = true
+    }
+
+    func stopAnimation() {
+        removeAnimation(forKey: "colorShift")
+        isAnimating = false
+    }
+}
+
+final class AnimatedGradientNSView: NSView {
+    private let gradientLayer = AnimatedGradientLayer()
+
+    override func layout() {
+        super.layout()
+        gradientLayer.frame = bounds
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        wantsLayer = true
+        if layer?.sublayers?.contains(gradientLayer) == false {
+            layer?.addSublayer(gradientLayer)
+        }
+        if window == nil {
+            gradientLayer.stopAnimation()
+        }
+    }
+
+    func setStops(_ stops: [ColorComponents]) {
+        gradientLayer.startAnimation(with: stops)
+    }
+}
+
+struct AnimatedGradientView: NSViewRepresentable {
+    let stops: [ColorComponents]
+
+    func makeNSView(context: Context) -> AnimatedGradientNSView {
+        let view = AnimatedGradientNSView()
+        view.setStops(stops)
+        return view
+    }
+
+    func updateNSView(_ nsView: AnimatedGradientNSView, context: Context) {
+        nsView.setStops(stops)
     }
 }
 

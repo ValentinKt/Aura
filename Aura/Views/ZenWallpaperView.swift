@@ -1,8 +1,6 @@
 import SwiftUI
 import Combine
 
-
-
 struct ZenWallpaperView: View {
     let style: String
     let palette: ThemePalette

@@ -546,8 +546,7 @@ struct MoodCard: View {
                         .trim(from: 0, to: 0.7)
                         .stroke(Color.white.opacity(0.5), lineWidth: 2)
                         .frame(width: 20, height: 20)
-                        .rotationEffect(Angle(degrees: isPressed ? 360 : 0))
-                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: true)
+                        .gpuAnimation([.rotation(duration: 1.0, clockwise: true)])
                 }
             }
 

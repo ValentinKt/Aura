@@ -33,7 +33,6 @@ struct QuoteWallpaperView: View {
         self.isPreview = isPreview
     }
 
-    @State private var isAnimating = false
     @State private var textOpacity = 0.0
     @State private var textOffset: CGFloat = 20
 
@@ -59,11 +58,11 @@ struct QuoteWallpaperView: View {
                     Color(red: palette.secondary.red, green: palette.secondary.green, blue: palette.secondary.blue).opacity(colorScheme == .dark ? 0.6 : 0.7),
                     Color(red: palette.accent.red, green: palette.accent.green, blue: palette.accent.blue).opacity(colorScheme == .dark ? 0.5 : 0.8)
                 ],
-                startPoint: isAnimating ? .topLeading : .bottomTrailing,
-                endPoint: isAnimating ? .bottomTrailing : .topLeading
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
             .opacity(backgroundImage == nil && !isShowingVideoBackground ? 1 : 0.45)
-            .animation(.easeInOut(duration: 15).repeatForever(autoreverses: true), value: isAnimating)
+            .gpuAnimation([.opacity(from: 0.8, to: 1.0, duration: 15.0, autoreverses: true)])
             .ignoresSafeArea()
 
             // Ambient floating orbs
@@ -72,15 +71,22 @@ struct QuoteWallpaperView: View {
                     .fill(accentColor.opacity(0.2))
                     .frame(width: 400, height: 400)
                     .blur(radius: 100)
-                    .offset(x: isAnimating ? 200 : -200, y: isAnimating ? -150 : 150)
+                    .offset(x: -200, y: 150)
+                    .gpuAnimation([
+                        .translationX(from: 0, to: 400, duration: 20.0, autoreverses: true),
+                        .translationY(from: 0, to: -300, duration: 20.0, autoreverses: true)
+                    ])
 
                 Circle()
                     .fill(secondaryColor.opacity(0.2))
                     .frame(width: 300, height: 300)
                     .blur(radius: 80)
-                    .offset(x: isAnimating ? -250 : 250, y: isAnimating ? 200 : -200)
+                    .offset(x: 250, y: -200)
+                    .gpuAnimation([
+                        .translationX(from: 0, to: -500, duration: 20.0, autoreverses: true),
+                        .translationY(from: 0, to: 400, duration: 20.0, autoreverses: true)
+                    ])
             }
-            .animation(.easeInOut(duration: 20).repeatForever(autoreverses: true), value: isAnimating)
 
             VStack(spacing: 24) {
                 Image(systemName: "quote.opening")
@@ -112,8 +118,7 @@ struct QuoteWallpaperView: View {
                     .minimumScaleFactor(0.3)
                     .opacity(textOpacity)
                     .offset(y: textOffset)
-                    .scaleEffect(isAnimating ? 1.02 : 0.98)
-                    .animation(.easeInOut(duration: 8).repeatForever(autoreverses: true), value: isAnimating)
+                    .gpuAnimation([.scale(from: 0.98, to: 1.02, duration: 8.0, autoreverses: true)])
 
                 Image(systemName: "quote.closing")
                     .font(.system(size: quoteFontSize * 0.5, weight: .black, design: .serif))
@@ -128,9 +133,6 @@ struct QuoteWallpaperView: View {
             .shadow(color: .black.opacity(0.2), radius: 50, x: 0, y: 20)
         }
         .onAppear {
-            if !isPreview {
-                isAnimating = true
-            }
             loadCustomQuote()
 
             withAnimation(.easeOut(duration: 1.5)) {

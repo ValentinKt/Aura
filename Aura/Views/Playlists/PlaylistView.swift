@@ -166,8 +166,8 @@ struct PlaylistView: View {
                         RoundedRectangle(cornerRadius: 1)
                             .fill(Color.accentColor)
                             .frame(width: 3, height: 12)
-                            .scaleEffect(y: isPlaying ? 1.0 : 0.35)
-                            .animation(.spring(response: 0.45, dampingFraction: 0.72).repeatForever().delay(Double(index) * 0.08), value: isPlaying)
+                            .scaleEffect(y: 0.35)
+                            .gpuAnimation([.scaleY(from: 0.35, to: 1.0, duration: 0.45, autoreverses: true, delay: Double(index) * 0.08)], isVisible: isPlaying)
                     }
                 }
             } else {

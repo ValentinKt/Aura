@@ -57,8 +57,65 @@ final class SoundEngine {
     private var randomizationInterval: TimeInterval?
     private var randomizationRange: ClosedRange<Float>?
 
+    private var isEngineRunning = false
+
     func updateOutputVolume() {
         engine.mainMixerNode.outputVolume = masterVolume * duckingMultiplier
+    }
+
+    private func checkIdleState() {
+        // Check if any layer or custom player is active
+        let hasActiveLayers = volumes.values.contains { $0 > 0.001 }
+        let isCustomPlaying = customPlayer.isPlaying
+
+        if !hasActiveLayers && !isCustomPlaying {
+            stopEngineAndDetach()
+        }
+    }
+
+    private func stopEngineAndDetach() {
+        guard isEngineRunning else { return }
+        Logger.sound.info("⏸️ [SoundEngine] All layers silent. Stopping engine to save CPU.")
+        engine.stop()
+        for node in layerNodes.values {
+            if node.player.engine != nil {
+                node.player.stop()
+                engine.detach(node.player)
+                engine.detach(node.eq)
+            }
+        }
+        if customPlayer.engine != nil {
+            customPlayer.stop()
+            engine.detach(customPlayer)
+            engine.detach(customEQ)
+        }
+        isEngineRunning = false
+    }
+
+    private func startEngineIfNeeded() throws {
+        if !isEngineRunning {
+            Logger.sound.info("▶️ [SoundEngine] Waking engine from idle.")
+            // Ensure main mixer is attached (it is by default, but just in case)
+            try engine.start()
+            isEngineRunning = true
+        }
+    }
+
+    private func ensureNodeAttachedAndPlaying(id: String, node: LayerNode) {
+        if node.player.engine == nil {
+            engine.attach(node.player)
+            engine.attach(node.eq)
+            let format = buffers[id]?.format ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)
+            engine.connect(node.player, to: node.eq, format: format)
+            engine.connect(node.eq, to: engine.mainMixerNode, format: format)
+            
+            if let buffer = buffers[id] {
+                loopManager.startLoop(on: node.player, buffer: buffer)
+            }
+        }
+        if !node.player.isPlaying {
+            node.player.play()
+        }
     }
 
     func fadeDucking(to target: Float, duration: TimeInterval) {
@@ -114,40 +171,18 @@ final class SoundEngine {
             throw error
         }
 
-        // 2. Attach and connect nodes based on buffer format
+        // 2. Initialize layer nodes but do not attach them yet
         for id in SoundLayerID.allCases.map(\.rawValue) {
             let player = AVAudioPlayerNode()
             let eq = AVAudioUnitEQ(numberOfBands: 1)
-            engine.attach(player)
-            engine.attach(eq)
-
-            // Use buffer format if available, otherwise default to stereo
-            let format = buffers[id]?.format ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)
-
-            engine.connect(player, to: eq, format: format)
-            engine.connect(eq, to: engine.mainMixerNode, format: format)
             layerNodes[id] = LayerNode(player: player, eq: eq)
         }
 
-        // Setup custom player
-        engine.attach(customPlayer)
-        engine.attach(customEQ)
-        let standardFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)
-        engine.connect(customPlayer, to: customEQ, format: standardFormat)
-        engine.connect(customEQ, to: engine.mainMixerNode, format: standardFormat)
-
         engine.prepare()
-        do {
-            try engine.start()
-        } catch {
-            Logger.sound.error("🟥 [SoundEngine] Failed to start engine: \(error.localizedDescription)")
-            state = .error
-            throw SoundEngineError.engineStartFailed(error.localizedDescription)
-        }
-
-        startAllLoops()
+        
+        // Don't start engine here, only when a layer is > 0 volume
         state = .ready
-        Logger.sound.info("🟢 [SoundEngine] Engine started and ready.")
+        Logger.sound.info("🟢 [SoundEngine] Engine ready (idle).")
     }
 
     func stop() {
@@ -170,23 +205,31 @@ final class SoundEngine {
 
     func resume() {
         guard state == .paused || state == .ready else { return }
-        if !engine.isRunning {
-            try? engine.start()
-        }
+        
+        var hasPlayingNode = false
         for (id, node) in layerNodes {
             if let vol = volumes[id], vol > 0 {
-                if !node.player.isPlaying {
-                    node.player.play()
-                }
+                hasPlayingNode = true
+                ensureNodeAttachedAndPlaying(id: id, node: node)
             } else {
-                node.player.pause()
+                if node.player.engine != nil {
+                    node.player.pause()
+                }
             }
         }
-        if !customPlayer.isPlaying {
+        if !customPlayer.isPlaying && customPlayer.engine != nil {
             customPlayer.play()
+            hasPlayingNode = true
         }
-        state = .playing
-        scheduleRandomizationIfNeeded()
+        
+        if hasPlayingNode {
+            try? startEngineIfNeeded()
+            state = .playing
+            scheduleRandomizationIfNeeded()
+        } else {
+            state = .playing
+            checkIdleState()
+        }
     }
 
     func playCustomAudio(url: URL) async throws {
@@ -207,16 +250,19 @@ final class SoundEngine {
         let format = file.processingFormat
 
         // Reconnect with correct format if needed
-        engine.disconnectNodeOutput(customPlayer)
-        engine.disconnectNodeOutput(customEQ)
+        if customPlayer.engine == nil {
+            engine.attach(customPlayer)
+            engine.attach(customEQ)
+        } else {
+            engine.disconnectNodeOutput(customPlayer)
+            engine.disconnectNodeOutput(customEQ)
+        }
         engine.connect(customPlayer, to: customEQ, format: format)
         engine.connect(customEQ, to: engine.mainMixerNode, format: format)
 
         await customPlayer.scheduleFile(file, at: nil)
 
-        if !engine.isRunning {
-            try engine.start()
-        }
+        try? startEngineIfNeeded()
 
         customPlayer.volume = 1.0
         customPlayer.play()
@@ -234,18 +280,15 @@ final class SoundEngine {
         let shouldPlay = clampedVolume > 0 && state == .playing
         let shouldPause = clampedVolume <= 0
         if shouldPlay {
-            if !engine.isRunning {
-                try? engine.start()
-            }
-            if !node.player.isPlaying {
-                Logger.sound.debug("Playing node for \(id, privacy: .public)")
-                node.player.play()
-            }
+            try? startEngineIfNeeded()
+            ensureNodeAttachedAndPlaying(id: id, node: node)
+            Logger.sound.debug("Playing node for \(id, privacy: .public)")
         } else if shouldPause {
             if node.player.isPlaying {
                 Logger.sound.debug("Pausing node for \(id, privacy: .public)")
                 node.player.pause()
             }
+            checkIdleState()
         }
 
         if abs(previousVolume - clampedVolume) < 0.002 {
@@ -253,7 +296,9 @@ final class SoundEngine {
         }
 
         let cutoff = id == "brownnoise" ? min(lowPassCutoff, 1200) : lowPassCutoff
-        audioMixer.apply(volume: clampedVolume, pan: pan, lowPassCutoff: cutoff, to: node.player, eq: node.eq)
+        if node.player.engine != nil {
+            audioMixer.apply(volume: clampedVolume, pan: pan, lowPassCutoff: cutoff, to: node.player, eq: node.eq)
+        }
     }
 
     func crossfade(to targetMix: [String: Float], duration: TimeInterval) async {

@@ -69,7 +69,7 @@ struct ImmersiveModeView: View {
     @ViewBuilder
     private var clockSection: some View {
         VStack(spacing: 8) {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
+            TimelineView(.everyMinute) { context in
                 Text(context.date, format: .dateTime.hour().minute())
                     .font(.system(size: 120, weight: .thin, design: .rounded))
                     .lineLimit(1)
