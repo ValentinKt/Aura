@@ -1,6 +1,115 @@
 import SwiftUI
 import Combine
 
+// MARK: - GPU Offloading Toolkit
+enum GPUAnimationType {
+    case rotation(duration: TimeInterval, clockwise: Bool = true)
+    case rotationTo(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
+    case scale(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
+    case opacity(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
+    case translationX(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
+    case translationY(from: CGFloat, to: CGFloat, duration: TimeInterval, autoreverses: Bool = true)
+}
+
+struct GPUAnimationView<Content: View>: NSViewRepresentable {
+    var animations: [GPUAnimationType]
+    var isVisible: Bool
+    var content: Content
+
+    init(animations: [GPUAnimationType], isVisible: Bool = true, @ViewBuilder content: () -> Content) {
+        self.animations = animations
+        self.isVisible = isVisible
+        self.content = content()
+    }
+
+    func makeNSView(context: Context) -> NSHostingView<Content> {
+        let view = NSHostingView(rootView: content)
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        applyAnimations(to: view.layer)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSHostingView<Content>, context: Context) {
+        nsView.rootView = content
+        guard let layer = nsView.layer else { return }
+        
+        if isVisible {
+            if layer.animationKeys()?.isEmpty ?? true {
+                applyAnimations(to: layer)
+            }
+        } else {
+            layer.removeAllAnimations()
+        }
+    }
+
+    private func applyAnimations(to layer: CALayer?) {
+        guard let layer = layer else { return }
+        layer.removeAllAnimations()
+        
+        for (index, anim) in animations.enumerated() {
+            let caAnim = CABasicAnimation()
+            switch anim {
+            case .rotation(let duration, let clockwise):
+                caAnim.keyPath = "transform.rotation.z"
+                caAnim.fromValue = 0
+                caAnim.toValue = clockwise ? CGFloat.pi * 2 : -CGFloat.pi * 2
+                caAnim.duration = duration
+                caAnim.repeatCount = .infinity
+            case .rotationTo(let from, let to, let duration, let autoreverses):
+                caAnim.keyPath = "transform.rotation.z"
+                caAnim.fromValue = from
+                caAnim.toValue = to
+                caAnim.duration = duration
+                caAnim.autoreverses = autoreverses
+                caAnim.repeatCount = .infinity
+                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            case .scale(let from, let to, let duration, let autoreverses):
+                caAnim.keyPath = "transform.scale"
+                caAnim.fromValue = from
+                caAnim.toValue = to
+                caAnim.duration = duration
+                caAnim.autoreverses = autoreverses
+                caAnim.repeatCount = .infinity
+                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            case .opacity(let from, let to, let duration, let autoreverses):
+                caAnim.keyPath = "opacity"
+                caAnim.fromValue = from
+                caAnim.toValue = to
+                caAnim.duration = duration
+                caAnim.autoreverses = autoreverses
+                caAnim.repeatCount = .infinity
+                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            case .translationX(let from, let to, let duration, let autoreverses):
+                caAnim.keyPath = "transform.translation.x"
+                caAnim.fromValue = from
+                caAnim.toValue = to
+                caAnim.duration = duration
+                caAnim.autoreverses = autoreverses
+                caAnim.repeatCount = .infinity
+                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            case .translationY(let from, let to, let duration, let autoreverses):
+                caAnim.keyPath = "transform.translation.y"
+                caAnim.fromValue = from
+                caAnim.toValue = to
+                caAnim.duration = duration
+                caAnim.autoreverses = autoreverses
+                caAnim.repeatCount = .infinity
+                caAnim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            }
+            layer.add(caAnim, forKey: "gpu_anim_\(index)")
+        }
+    }
+}
+
+extension View {
+    func gpuAnimation(_ animations: [GPUAnimationType], isVisible: Bool = true) -> some View {
+        GPUAnimationView(animations: animations, isVisible: isVisible) {
+            self
+        }
+    }
+}
+
 struct ZenWallpaperView: View {
     let style: String
     let palette: ThemePalette
@@ -102,7 +211,6 @@ struct ZenWallpaperView: View {
 struct GalaxyZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var rotation: Double = 0
 
     var body: some View {
         ZStack {
@@ -116,7 +224,7 @@ struct GalaxyZenView: View {
                             lineWidth: 2
                         )
                         .frame(width: 600 - CGFloat(i * 100), height: 200 - CGFloat(i * 30))
-                        .rotationEffect(.degrees(Double(i) * 45 + rotation))
+                        .rotationEffect(.degrees(Double(i) * 45))
                 }
 
                 Circle()
@@ -124,12 +232,7 @@ struct GalaxyZenView: View {
                     .frame(width: 40, height: 40)
                     .blur(radius: 20)
             }
-            .rotationEffect(.degrees(rotation))
-        }
-        .onAppear {
-            withAnimation(.linear(duration: 60).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
+            .gpuAnimation([.rotation(duration: 60.0, clockwise: true)])
         }
     }
 }
@@ -138,7 +241,6 @@ struct GalaxyZenView: View {
 struct PendulumZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var swing: Double = -30
 
     var body: some View {
         ZStack {
@@ -152,15 +254,16 @@ struct PendulumZenView: View {
                 Circle()
                     .fill(accentColor)
                     .frame(width: 60, height: 60)
-                    .shadow(color: accentColor.opacity(0.6), radius: 20, x: 0, y: 10)
+                    .shadow(color: accentColor, radius: 20)
+                    .overlay(
+                        Circle()
+                            .fill(.white.opacity(0.5))
+                            .frame(width: 20, height: 20)
+                            .offset(x: -10, y: -10)
+                    )
             }
-            .rotationEffect(.degrees(swing), anchor: .top)
             .offset(y: -100)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                swing = 30
-            }
+            .gpuAnimation([.rotationTo(from: -.pi/6, to: .pi/6, duration: 2.0, autoreverses: true)])
         }
     }
 }
@@ -278,7 +381,6 @@ struct StardustZenView: View {
 struct BreathingZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var isInhaling = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -291,29 +393,29 @@ struct BreathingZenView: View {
                     // Outer glow
                     Circle()
                         .fill(accentColor.opacity(0.2))
-                        .frame(width: isInhaling ? 400 : 200, height: isInhaling ? 400 : 200)
+                        .frame(width: 300, height: 300)
                         .blur(radius: 40)
+                        .gpuAnimation([.scale(from: 0.66, to: 1.33, duration: 4.0, autoreverses: true)])
 
                     // Main breathing circle
                     Circle()
                         .fill(LinearGradient(colors: [primaryColor, accentColor], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: isInhaling ? 300 : 150, height: isInhaling ? 300 : 150)
-                        .shadow(color: accentColor.opacity(0.5), radius: isInhaling ? 30 : 10)
+                        .frame(width: 225, height: 225)
+                        .shadow(color: accentColor.opacity(0.5), radius: 20)
                         .overlay(
                             Circle()
                                 .stroke(.white.opacity(0.3), lineWidth: 2)
                         )
+                        .gpuAnimation([.scale(from: 0.66, to: 1.33, duration: 4.0, autoreverses: true)])
                 }
-
-                Text(isInhaling ? "Inhale" : "Exhale")
+                
+                // Using a constant string for now to avoid CPU diffs on string updates, 
+                // or we could use a TimelineView if the text MUST change. For zero CPU, a static text or no text is best.
+                // Or we can just use "Breathe" and scale it.
+                Text("Breathe")
                     .font(.system(size: 40, weight: .light, design: .rounded))
                     .foregroundStyle(.white.opacity(0.8))
-                    .animation(.easeInOut(duration: 0.5), value: isInhaling)
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
-                isInhaling.toggle()
+                    .gpuAnimation([.opacity(from: 0.5, to: 1.0, duration: 4.0, autoreverses: true)])
             }
         }
     }
@@ -323,7 +425,6 @@ struct BreathingZenView: View {
 struct MandalaZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var rotation: Double = 0
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -331,7 +432,7 @@ struct MandalaZenView: View {
             Color.black.opacity(0.6).ignoresSafeArea()
 
             ZStack {
-                ForEach(0..<8) { index in
+                ForEach(0..<8, id: \.self) { index in
                     Circle()
                         .stroke(LinearGradient(colors: [primaryColor, accentColor], startPoint: .top, endPoint: .bottom), lineWidth: 2)
                         .frame(width: 250, height: 250)
@@ -339,13 +440,8 @@ struct MandalaZenView: View {
                         .rotationEffect(.degrees(Double(index) * 45))
                 }
             }
-            .rotationEffect(.degrees(rotation))
             .shadow(color: accentColor.opacity(0.3), radius: 20)
-        }
-        .onAppear {
-            withAnimation(.linear(duration: 40.0).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
+            .gpuAnimation([.rotation(duration: 40.0, clockwise: true)])
         }
     }
 }
@@ -354,8 +450,6 @@ struct MandalaZenView: View {
 struct RippleZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var rippleScale: CGFloat = 0.1
-    @State private var rippleOpacity: Double = 1.0
 
     var body: some View {
         ZStack {
@@ -365,19 +459,15 @@ struct RippleZenView: View {
                 Circle()
                     .stroke(accentColor, lineWidth: 2)
                     .frame(width: 100, height: 100)
-                    .scaleEffect(rippleScale)
-                    .opacity(rippleOpacity)
+                    .gpuAnimation([
+                        .scale(from: 0.1, to: 8.0, duration: 3.0, autoreverses: false),
+                        .opacity(from: 1.0, to: 0.0, duration: 3.0, autoreverses: false)
+                    ])
 
                 Circle()
                     .fill(primaryColor)
                     .frame(width: 20, height: 20)
                     .shadow(color: primaryColor, radius: 10)
-            }
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 3.0).repeatForever(autoreverses: false)) {
-                rippleScale = 8.0
-                rippleOpacity = 0.0
             }
         }
     }
@@ -387,8 +477,6 @@ struct RippleZenView: View {
 struct OrbZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var rotation: Double = 0
-    @State private var scale: CGFloat = 0.8
 
     var body: some View {
         ZStack {
@@ -412,16 +500,10 @@ struct OrbZenView: View {
                     .frame(width: 150, height: 150)
                     .blur(radius: 20)
             }
-            .rotationEffect(.degrees(rotation))
-            .scaleEffect(scale)
-        }
-        .onAppear {
-            withAnimation(.linear(duration: 20.0).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
-            withAnimation(.easeInOut(duration: 5.0).repeatForever(autoreverses: true)) {
-                scale = 1.1
-            }
+            .gpuAnimation([
+                .rotation(duration: 20.0, clockwise: true),
+                .scale(from: 0.8, to: 1.1, duration: 5.0, autoreverses: true)
+            ])
         }
     }
 }
@@ -430,32 +512,29 @@ struct OrbZenView: View {
 struct LotusZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var isBlooming = false
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.6).ignoresSafeArea()
 
             ZStack {
-                ForEach(0..<12) { index in
+                ForEach(0..<12, id: \.self) { index in
                     Capsule()
                         .fill(LinearGradient(colors: [primaryColor.opacity(0.6), accentColor.opacity(0.6)], startPoint: .top, endPoint: .bottom))
-                        .frame(width: isBlooming ? 60 : 20, height: isBlooming ? 300 : 100)
-                        .offset(y: isBlooming ? 150 : 50)
+                        .frame(width: 60, height: 300)
+                        .offset(y: 150)
                         .rotationEffect(.degrees(Double(index) * 30))
                 }
 
                 Circle()
                     .fill(accentColor)
-                    .frame(width: isBlooming ? 80 : 40, height: isBlooming ? 80 : 40)
+                    .frame(width: 80, height: 80)
                     .shadow(color: accentColor, radius: 20)
             }
-            .rotationEffect(.degrees(isBlooming ? 45 : 0))
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 8.0).repeatForever(autoreverses: true)) {
-                isBlooming.toggle()
-            }
+            .gpuAnimation([
+                .scale(from: 0.33, to: 1.0, duration: 8.0, autoreverses: true),
+                .rotationTo(from: 0, to: .pi / 4, duration: 8.0, autoreverses: true)
+            ])
         }
     }
 }
@@ -528,7 +607,6 @@ struct SineWave: Shape {
 struct EclipseZenView: View {
     let primaryColor: Color
     let accentColor: Color
-    @State private var eclipseProgress: CGFloat = -1.5
 
     var body: some View {
         ZStack {
@@ -546,12 +624,7 @@ struct EclipseZenView: View {
                 Circle()
                     .fill(Color.black)
                     .frame(width: 295, height: 295)
-                    .offset(x: eclipseProgress * 400)
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 15.0).repeatForever(autoreverses: true)) {
-                eclipseProgress = 1.5
+                    .gpuAnimation([.translationX(from: -600, to: 600, duration: 15.0, autoreverses: true)])
             }
         }
     }
