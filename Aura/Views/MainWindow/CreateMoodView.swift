@@ -2,8 +2,11 @@ import SwiftUI
 import ImagePlayground
 import UniformTypeIdentifiers
 import AppKit
+import os
 
 struct CreateMoodView: View {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "CreateMoodView")
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
@@ -56,7 +59,7 @@ struct CreateMoodView: View {
                     try FileManager.default.copyItem(at: url, to: destinationURL)
                 }
             } catch {
-                print("🟥 [CreateMoodView] Export failed: \(error.localizedDescription)")
+                logger.error("Export failed: \(error.localizedDescription, privacy: .public)")
                 errorMessage = "Export failed: \(error.localizedDescription)"
             }
             isExporting = false
@@ -713,7 +716,7 @@ struct CreateMoodView: View {
             dismiss()
         } catch {
             creationStatusMessage = nil
-            print("🟥 [CreateMoodView] Failed to save wallpaper: \(error.localizedDescription)")
+            logger.error("Failed to save wallpaper: \(error.localizedDescription, privacy: .public)")
             errorMessage = "Failed to save wallpaper: \(error.localizedDescription)"
         }
     }

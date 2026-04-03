@@ -1,7 +1,10 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import os
 
 struct PlaylistEditorView: View {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "PlaylistEditor")
+
     @Bindable var appModel: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -247,10 +250,10 @@ struct PlaylistEditorView: View {
                     transitionStyle: .crossfade
                 ))
             } catch {
-                print("🟥 [PlaylistEditorView] Failed to save custom audio: \(error)")
+                logger.error("Failed to save custom audio: \(String(describing: error), privacy: .public)")
             }
         case .failure(let error):
-            print("🟥 [PlaylistEditorView] Audio import failed: \(error)")
+            logger.error("Audio import failed: \(String(describing: error), privacy: .public)")
         }
     }
 

@@ -1,8 +1,10 @@
 import AVFoundation
 import Foundation
+import os
 
 actor AssetManager {
     private var bufferCache: [String: AVAudioPCMBuffer] = [:]
+    nonisolated private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Asset")
 
     func loadAudioBuffer(named name: String) async -> AVAudioPCMBuffer? {
         if let cached = bufferCache[name] {
@@ -30,7 +32,7 @@ actor AssetManager {
             }()
 
         if let url {
-            print("🟢 [AssetManager] Loading audio buffer for \(name) from \(url.path)")
+            logger.debug("Loading audio buffer for \(name, privacy: .public) from \(url.path, privacy: .public)")
             do {
                 // Check file size to avoid AVFoundation logging error for empty files
                 let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -47,7 +49,7 @@ actor AssetManager {
                     return makeSilentBuffer()
                 }
             } catch {
-                print("🟥 [AssetManager] Error loading buffer for \(name): \(error.localizedDescription)")
+                logger.error("Error loading buffer for \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 return makeSilentBuffer()
             }
         }

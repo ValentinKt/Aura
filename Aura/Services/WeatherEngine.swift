@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import os
 
 private struct WeatherResponse: Codable {
     struct Current: Codable {
@@ -13,6 +14,7 @@ private struct WeatherResponse: Codable {
 
 @MainActor
 final class WeatherEngine: NSObject, CLLocationManagerDelegate {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Weather")
     private let locationManager = CLLocationManager()
     private let moodEngine: MoodEngine
     private let settingsEngine: SettingsEngine
@@ -43,7 +45,7 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
         case .denied, .restricted:
-            print("🟥 [WeatherEngine] Location access denied or restricted")
+            logger.error("Location access denied or restricted")
             state = .failure(.unauthorized)
             return
         case .authorizedAlways:
@@ -64,36 +66,31 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
 
     private func scheduleRefresh() {
         refreshTask?.cancel()
-        refreshTask = Task(priority: .utility) { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { break }
-                // Wait for 30 minutes between refreshes normally,
-                // but shorter if we're retrying after a failure
-                let currentRetry = await MainActor.run { self.retryCount }
-                let waitSeconds: UInt64 = (currentRetry > 0) ? UInt64(pow(2.0, Double(currentRetry)) * 30) : 1800
+        let waitSeconds = nextRefreshDelay()
+        refreshTask = Task(priority: .background) { [weak self] in
+            await AuraBackgroundActor.sleep(for: .seconds(waitSeconds))
+            guard let self, !Task.isCancelled else { return }
 
-                await AuraBackgroundActor.sleep(for: .seconds(waitSeconds))
+            let isEnabled = await MainActor.run {
+                self.settingsEngine.loadSettings().weatherSyncEnabled
+            }
 
-                let isEnabled = await MainActor.run {
-                    self.settingsEngine.loadSettings().weatherSyncEnabled
-                }
-
-                if isEnabled {
-                    await MainActor.run {
-                        self.locationManager.requestLocation()
-                    }
-                } else {
-                    break
-                }
+            guard isEnabled else { return }
+            await MainActor.run {
+                self.locationManager.requestLocation()
             }
         }
+    }
+
+    private func nextRefreshDelay() -> UInt64 {
+        retryCount > 0 ? UInt64(pow(2.0, Double(retryCount)) * 30) : 1800
     }
 
     // MARK: - CLLocationManagerDelegate
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else {
-            print("🟥 [WeatherEngine] Location unavailable")
+            logger.error("Location unavailable")
             state = .failure(.locationUnavailable)
             return
         }
@@ -116,7 +113,8 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
         }
 
         state = .failure(weatherError)
-        print("🟥 [WeatherEngine] Location manager failed: \(weatherError.localizedDescription)")
+        logger.error("Location manager failed: \(weatherError.localizedDescription, privacy: .public)")
+        handleRetry()
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -132,7 +130,7 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
 
         let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(coordinate.latitude)&longitude=\(coordinate.longitude)&current=weather_code,is_day,wind_speed_10m&timezone=auto"
         guard let url = URL(string: urlString) else {
-            print("🟥 [WeatherEngine] Invalid URL: \(urlString)")
+            logger.error("Invalid URL: \(urlString, privacy: .public)")
             state = .failure(.invalidURL)
             return
         }
@@ -141,7 +139,7 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
             let (data, response) = try await URLSession.shared.data(from: url)
 
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                print("🟥 [WeatherEngine] Unknown HTTP error or invalid response")
+                logger.error("Unknown HTTP error or invalid response")
                 state = .failure(.unknown)
                 return
             }
@@ -149,19 +147,20 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
             if let (condition, extraLayers) = decodeCondition(from: data) {
                 lastCondition = condition
                 state = .success(condition)
-                retryCount = 0 // Reset retry count on success
+                retryCount = 0
+                scheduleRefresh()
 
                 if let mood = moodEngine.moods.first(where: { $0.id == mapMoodID(for: condition) }) {
                     await applyWeatherAdjustedMood(mood, extras: extraLayers)
                 }
             } else {
-                print("🟥 [WeatherEngine] Failed to decode weather condition")
+                logger.error("Failed to decode weather condition")
                 state = .failure(.unknown)
                 handleRetry()
             }
         } catch {
             state = .failure(.networkError(error.localizedDescription))
-            print("🟥 [WeatherEngine] Failed to fetch weather: \(error.localizedDescription)")
+            logger.error("Failed to fetch weather: \(error.localizedDescription, privacy: .public)")
             handleRetry()
         }
     }
@@ -242,7 +241,7 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
                 return (.cloudy, extras)
             }
         } catch {
-            print("🟥 [WeatherEngine] Decoding error: \(error)")
+            logger.error("Decoding error: \(String(describing: error), privacy: .public)")
             return nil
         }
     }

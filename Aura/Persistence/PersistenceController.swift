@@ -1,8 +1,10 @@
 import CoreData
 import Foundation
+import os
 
 final class PersistenceController {
     static let shared = PersistenceController()
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Persistence")
     let container: NSPersistentContainer
 
     var viewContext: NSManagedObjectContext {
@@ -51,7 +53,7 @@ final class PersistenceController {
                             inMemoryDescription.type = NSInMemoryStoreType
                             self.container.persistentStoreDescriptions = [inMemoryDescription]
                             self.container.loadPersistentStores { _, _ in }
-                            print("🟥 [PersistenceController] Core Data fallback to in-memory store due to error: \(retryError)")
+                            Self.logger.error("Core Data fallback to in-memory store due to error: \(String(describing: retryError), privacy: .public)")
                         }
                     }
                 }
@@ -69,7 +71,7 @@ final class PersistenceController {
             do {
                 try context.save()
             } catch {
-                print("🟥 [PersistenceController] Error saving context: \(error)")
+                Self.logger.error("Error saving context: \(String(describing: error), privacy: .public)")
             }
         }
     }
@@ -238,6 +240,7 @@ struct CustomQuoteModel: Identifiable, Codable, Hashable {
 @MainActor
 final class QuoteEngine {
     private let persistence: PersistenceController
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Quote")
 
     init(persistence: PersistenceController) {
         self.persistence = persistence
@@ -280,7 +283,7 @@ final class QuoteEngine {
                 )
             }
         } catch {
-            print("🟥 [QuoteEngine] Failed to load quotes: \(error)")
+            logger.error("Failed to load quotes: \(String(describing: error), privacy: .public)")
             return []
         }
     }
@@ -306,7 +309,7 @@ final class QuoteEngine {
             try context.save()
             NotificationCenter.default.post(name: Notification.Name("quotesDidChange"), object: quote.style)
         } catch {
-            print("🟥 [QuoteEngine] Failed to save quote: \(error)")
+            logger.error("Failed to save quote: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -322,7 +325,7 @@ final class QuoteEngine {
                 NotificationCenter.default.post(name: Notification.Name("quotesDidChange"), object: style)
             }
         } catch {
-            print("🟥 [QuoteEngine] Failed to delete quote: \(error)")
+            logger.error("Failed to delete quote: \(String(describing: error), privacy: .public)")
         }
     }
 

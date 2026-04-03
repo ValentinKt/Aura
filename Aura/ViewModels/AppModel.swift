@@ -47,11 +47,11 @@ final class AppModel {
     var recentSceneIDs: [String]
     var lastResumableSceneID: String?
     var sleepTimerEndDate: Date?
-    var sleepTimerTick: Date = .now
     private var cancellables = Set<AnyCancellable>()
     private let startupTimeout: Duration = .seconds(8)
     private let recentSceneLimit = 6
     private var sleepTimerTask: Task<Void, Never>?
+    private var startupWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(persistence: PersistenceController) {
         let themeManager = ThemeManager()
@@ -118,6 +118,7 @@ final class AppModel {
                 wallpaperEngine.setPresentationSuppressed(false)
             }
             isStarting = false
+            resumeStartupWaiters()
         }
         Logger.app.info("🟢 [AppModel] Starting engines...")
         let startupCompleted = await runInitialStartupSequence()
@@ -146,8 +147,8 @@ final class AppModel {
         guard !isReady else { return }
 
         if isStarting {
-            while isStarting && !isReady {
-                try? await Task.sleep(nanoseconds: 100_000_000)
+            await withCheckedContinuation { continuation in
+                startupWaiters.append(continuation)
             }
             return
         }
@@ -230,7 +231,7 @@ final class AppModel {
 
     var sleepTimerRemainingDescription: String? {
         guard let sleepTimerEndDate else { return nil }
-        let remaining = max(0, Int(sleepTimerEndDate.timeIntervalSince(sleepTimerTick)))
+        let remaining = max(0, Int(sleepTimerEndDate.timeIntervalSinceNow))
         let minutes = remaining / 60
         let seconds = remaining % 60
         return String(format: "%02d:%02d", minutes, seconds)
@@ -301,27 +302,13 @@ final class AppModel {
         sleepTimerTask?.cancel()
         let endDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
         sleepTimerEndDate = endDate
-        sleepTimerTick = .now
 
-        sleepTimerTask = Task { @MainActor [weak self] in
+        sleepTimerTask = Task(priority: .background) { @MainActor [weak self] in
             guard let self else { return }
-
-            while !Task.isCancelled {
-                self.sleepTimerTick = .now
-
-                guard let activeEndDate = self.sleepTimerEndDate else {
-                    return
-                }
-
-                if activeEndDate.timeIntervalSinceNow <= 0 {
-                    self.pauseForSleepTimer()
-                    self.sleepTimerEndDate = nil
-                    self.sleepTimerTick = .now
-                    return
-                }
-
-                await AuraBackgroundActor.sleep(for: .seconds(1))
-            }
+            await AuraBackgroundActor.sleep(for: .seconds(minutes * 60))
+            guard !Task.isCancelled, self.sleepTimerEndDate == endDate else { return }
+            self.pauseForSleepTimer()
+            self.sleepTimerEndDate = nil
         }
     }
 
@@ -329,7 +316,12 @@ final class AppModel {
         sleepTimerTask?.cancel()
         sleepTimerTask = nil
         sleepTimerEndDate = nil
-        sleepTimerTick = .now
+    }
+
+    private func resumeStartupWaiters() {
+        let waiters = startupWaiters
+        startupWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 
     func availableAutomationScenes() -> [Mood] {
@@ -444,9 +436,10 @@ final class DownloadManager {
     var downloadStates: [String: DownloadState] = [:]
 
     private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.1/"
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Download")
 
-    // Network Throttling: Max 2 concurrent downloads to prevent network controller overheating
     private let urlSession: URLSession
+    private var downloadWaiters: [String: [CheckedContinuation<Bool, Never>]] = [:]
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -494,13 +487,10 @@ final class DownloadManager {
     func downloadIfNeeded(_ resource: String) async -> Bool {
         if isDownloaded(resource: resource) { return true }
 
-        // Prevent concurrent downloads of the same resource
         if case .downloading = downloadStates[resource] {
-            // Wait for it to finish (simple polling for now)
-            while case .downloading = downloadStates[resource] {
-                try? await Task.sleep(nanoseconds: 500_000_000)
+            return await withCheckedContinuation { continuation in
+                downloadWaiters[resource, default: []].append(continuation)
             }
-            return isDownloaded(resource: resource)
         }
 
         await download(resource)
@@ -508,11 +498,11 @@ final class DownloadManager {
     }
 
     func download(_ resource: String) async {
-        downloadStates[resource] = .downloading(progress: 0.0)
+        updateDownloadState(.downloading(progress: 0.0), for: resource)
 
         let fileManager = FileManager.default
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            downloadStates[resource] = .failed(error: "Application Support directory not found")
+            updateDownloadState(.failed(error: "Application Support directory not found"), for: resource)
             return
         }
 
@@ -521,7 +511,7 @@ final class DownloadManager {
         do {
             try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true, attributes: nil)
         } catch {
-            downloadStates[resource] = .failed(error: error.localizedDescription)
+            updateDownloadState(.failed(error: error.localizedDescription), for: resource)
             return
         }
 
@@ -532,15 +522,13 @@ final class DownloadManager {
                 continue
             }
 
-            print("⬇️ [DownloadManager] Starting download for wallpaper from: \(url.absoluteString)")
+            logger.debug("Starting wallpaper download from \(url.absoluteString, privacy: .public)")
 
             do {
                 let wrapper = DownloadTaskWrapper(session: self.urlSession)
                 let tempURL = try await wrapper.download(url: url) { progress in
-                    Task { @MainActor in
-                        if case .downloading = self.downloadStates[resource] {
-                            self.downloadStates[resource] = .downloading(progress: progress)
-                        }
+                    Task(priority: .background) { @MainActor in
+                        self.updateDownloadProgress(progress, for: resource)
                     }
                 }
 
@@ -553,14 +541,14 @@ final class DownloadManager {
 
                 if candidate.shouldExtract {
                     if MediaUtils.extractZip(targetURL, originalResource: resource, destinationDir: videosDir) != nil {
-                        print("✅ [DownloadManager] Successfully downloaded and extracted wallpaper from: \(url.absoluteString)")
+                        logger.notice("Downloaded and extracted wallpaper from \(url.absoluteString, privacy: .public)")
                         try? fileManager.removeItem(at: targetURL)
                         MediaUtils.clearCache(for: resource)
-                        downloadStates[resource] = .downloaded
+                        updateDownloadState(.downloaded, for: resource)
                         return
                     }
 
-                    print("❌ [DownloadManager] Extraction failed for archive: \(candidate.remoteName)")
+                    logger.error("Extraction failed for archive \(candidate.remoteName, privacy: .public)")
                     try? fileManager.removeItem(at: targetURL)
                     lastError = NSError(
                         domain: "DownloadManager",
@@ -570,19 +558,41 @@ final class DownloadManager {
                     continue
                 }
 
-                print("✅ [DownloadManager] Successfully downloaded wallpaper from: \(url.absoluteString)")
+                logger.notice("Downloaded wallpaper from \(url.absoluteString, privacy: .public)")
                 MediaUtils.clearCache(for: resource)
-                downloadStates[resource] = .downloaded
+                updateDownloadState(.downloaded, for: resource)
                 return
             } catch {
-                print("❌ [DownloadManager] Download attempt failed for \(candidate.remoteName): \(error.localizedDescription)")
+                logger.error("Download attempt failed for \(candidate.remoteName, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 lastError = error
             }
         }
 
         let message = lastError?.localizedDescription ?? "Download failed"
-        print("❌ [DownloadManager] Download failed with error: \(message)")
-        downloadStates[resource] = .failed(error: message)
+        logger.error("Download failed: \(message, privacy: .public)")
+        updateDownloadState(.failed(error: message), for: resource)
+    }
+
+    private func updateDownloadProgress(_ progress: Double, for resource: String) {
+        guard case .downloading(let currentProgress) = downloadStates[resource] else { return }
+
+        let clampedProgress = min(max(progress, 0), 1)
+        let threshold = 0.05
+        let shouldPublish = abs(clampedProgress - currentProgress) >= threshold || clampedProgress >= 1 || clampedProgress <= 0
+
+        guard shouldPublish else { return }
+        updateDownloadState(.downloading(progress: clampedProgress), for: resource)
+    }
+
+    private func updateDownloadState(_ state: DownloadState, for resource: String) {
+        downloadStates[resource] = state
+
+        guard case .downloading = state else {
+            let result = state == .downloaded
+            let continuations = downloadWaiters.removeValue(forKey: resource) ?? []
+            continuations.forEach { $0.resume(returning: result) }
+            return
+        }
     }
 
     private func remoteCandidates(for resource: String) -> [RemoteDownloadCandidate] {

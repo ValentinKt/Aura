@@ -52,6 +52,9 @@ final class SoundEngine {
     }
 
     private var duckingTask: Task<Void, Never>?
+    private var randomizationTask: Task<Void, Never>?
+    private var randomizationInterval: TimeInterval?
+    private var randomizationRange: ClosedRange<Float>?
 
     func updateOutputVolume() {
         engine.mainMixerNode.outputVolume = masterVolume * duckingMultiplier
@@ -83,8 +86,6 @@ final class SoundEngine {
             }
         }
     }
-
-    private var randomizationTask: Task<Void, Never>?
 
     init(assetManager: AssetManager, loopManager: LoopManager, audioMixer: AudioMixer) {
         self.assetManager = assetManager
@@ -149,7 +150,8 @@ final class SoundEngine {
     }
 
     func stop() {
-        print("🟢 [SoundEngine] Stopping all audio")
+        Logger.sound.info("Stopping all audio")
+        stopRandomizationSchedule()
         engine.stop()
         customPlayer.stop()
         state = .uninitialized
@@ -157,6 +159,7 @@ final class SoundEngine {
 
     func pause() {
         guard state == .playing || state == .ready else { return }
+        stopRandomizationSchedule()
         for node in layerNodes.values {
             node.player.pause()
         }
@@ -182,10 +185,11 @@ final class SoundEngine {
             customPlayer.play()
         }
         state = .playing
+        scheduleRandomizationIfNeeded()
     }
 
     func playCustomAudio(url: URL) async throws {
-        print("🟢 [SoundEngine] Playing custom audio from URL: \(url.path)")
+        Logger.sound.info("Playing custom audio from URL: \(url.path, privacy: .public)")
         // Mute all other layers
         await crossfade(to: [:], duration: 1.0)
 
@@ -196,7 +200,7 @@ final class SoundEngine {
         do {
             file = try AVAudioFile(forReading: url)
         } catch {
-            print("🟥 [SoundEngine] Failed to read audio file at \(url.path): \(error.localizedDescription)")
+            Logger.sound.error("Failed to read audio file at \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw error
         }
         let format = file.processingFormat
@@ -233,12 +237,12 @@ final class SoundEngine {
                 try? engine.start()
             }
             if !node.player.isPlaying {
-                print("🟢 [SoundEngine] Playing node for \(id)")
+                Logger.sound.debug("Playing node for \(id, privacy: .public)")
                 node.player.play()
             }
         } else if shouldPause {
             if node.player.isPlaying {
-                print("🟢 [SoundEngine] Pausing node for \(id)")
+                Logger.sound.debug("Pausing node for \(id, privacy: .public)")
                 node.player.pause()
             }
         }
@@ -252,7 +256,7 @@ final class SoundEngine {
     }
 
     func crossfade(to targetMix: [String: Float], duration: TimeInterval) async {
-        print("🟢 [SoundEngine] Crossfade started over \(duration)s")
+        Logger.sound.debug("Crossfade started over \(duration, privacy: .public)s")
         if state == .ready || state == .paused {
             resume()
         }
@@ -289,23 +293,16 @@ final class SoundEngine {
     }
 
     func startRandomization(interval: TimeInterval, validRange: ClosedRange<Float>) {
-        randomizationTask?.cancel()
         guard interval > 0 else { return }
-        randomizationTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                await AuraBackgroundActor.sleep(for: .seconds(interval))
-                for id in SoundLayerID.allCases.map(\.rawValue) {
-                    let random = Float.random(in: validRange)
-                    self.setLayer(id, volume: random)
-                }
-            }
-        }
+        randomizationInterval = interval
+        randomizationRange = validRange
+        scheduleRandomizationIfNeeded()
     }
 
     func stopRandomization() {
-        randomizationTask?.cancel()
-        randomizationTask = nil
+        randomizationInterval = nil
+        randomizationRange = nil
+        stopRandomizationSchedule()
     }
 
     func currentLayerCount() -> Int {
@@ -345,6 +342,34 @@ final class SoundEngine {
         }
     }
 
-    deinit {
+    private func scheduleRandomizationIfNeeded() {
+        stopRandomizationSchedule()
+
+        guard state == .playing,
+              let interval = randomizationInterval,
+              interval > 0,
+              let validRange = randomizationRange else {
+            return
+        }
+
+        randomizationTask = Task(priority: .background) { @MainActor [weak self] in
+            guard let self else { return }
+
+            await AuraBackgroundActor.sleep(for: .seconds(interval))
+            guard !Task.isCancelled, self.state == .playing else { return }
+
+            for id in SoundLayerID.allCases.map(\.rawValue) {
+                let random = Float.random(in: validRange)
+                self.setLayer(id, volume: random)
+            }
+
+            self.scheduleRandomizationIfNeeded()
+        }
     }
+
+    private func stopRandomizationSchedule() {
+        randomizationTask?.cancel()
+        randomizationTask = nil
+    }
+
 }

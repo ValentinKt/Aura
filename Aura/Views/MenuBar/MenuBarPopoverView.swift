@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import os
 
 struct MenuBarPopoverView: View {
     @Bindable var appModel: AppModel
@@ -434,6 +435,8 @@ struct MenuBarPopoverView: View {
     }
 }
 
+private let popoverMoodCardLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "PopoverMoodCard")
+
 // MARK: - NewMoodButtonContent
 
 private struct NewMoodButtonContent: View {
@@ -718,11 +721,11 @@ private struct MoodCarouselCard: View {
         }.value
 
         if let loaded {
-            print("🟢 [Popover MoodCard] Setting image for \(resource)")
+            popoverMoodCardLogger.debug("Setting image for \(resource, privacy: .public)")
             MoodCard.imageCache.setObject(loaded, forKey: resource as NSString)
             self.image = loaded
         } else {
-            print("🟥 [Popover MoodCard] loadedImage is nil for \(resource)")
+            popoverMoodCardLogger.error("Loaded image is nil for \(resource, privacy: .public)")
             self.image = nil
         }
     }

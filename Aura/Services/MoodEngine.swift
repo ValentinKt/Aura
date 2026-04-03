@@ -1,9 +1,12 @@
 import Foundation
 import Observation
+import os
 
 @MainActor
 @Observable
 final class MoodEngine {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Mood")
+
     enum MoodState: String, Codable {
         case idle
         case transitioning
@@ -75,14 +78,14 @@ final class MoodEngine {
     }
 
     func addCustomMood(_ mood: Mood) {
-        print("🟢 [MoodEngine] Adding custom mood: \(mood.name)")
+        logger.info("Adding custom mood: \(mood.name, privacy: .public)")
         customMoods.append(mood)
         settingsEngine.saveCustomMoods(customMoods)
         self.moods = MoodEngine.builtInMoods() + customMoods
     }
 
     func removeCustomMood(id: String) {
-        print("🟢 [MoodEngine] Removing custom mood ID: \(id)")
+        logger.info("Removing custom mood ID: \(id, privacy: .public)")
         customMoods.removeAll { $0.id == id }
         settingsEngine.saveCustomMoods(customMoods)
         self.moods = MoodEngine.builtInMoods() + customMoods
@@ -108,7 +111,7 @@ final class MoodEngine {
         } catch {
             state = .error
             lastError = error.localizedDescription
-            print("🟥 [MoodEngine] Failed to start: \(error)")
+            logger.error("Failed to start: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -132,7 +135,7 @@ final class MoodEngine {
     }
 
     private func applyMood(_ mood: Mood, strategy: ApplyStrategy) async {
-        print("🟢 [MoodEngine] Applying mood: \(mood.name) (ID: \(mood.id))")
+        logger.info("Applying mood: \(mood.name, privacy: .public) (ID: \(mood.id, privacy: .public))")
         currentMood = mood
 
         transitionTask?.cancel()
@@ -187,7 +190,7 @@ final class MoodEngine {
     }
 
     func playCustomAudio(url: URL) async {
-        print("🟢 [MoodEngine] Requesting custom audio at \(url.path)")
+        logger.info("Requesting custom audio at \(url.path, privacy: .public)")
 
         // Cancel any existing mood transition
         transitionTask?.cancel()
@@ -203,7 +206,7 @@ final class MoodEngine {
                 if !Task.isCancelled {
                     state = .error
                     lastError = error.localizedDescription
-                    print("🟥 [MoodEngine] Failed to play custom audio: \(error)")
+                    logger.error("Failed to play custom audio: \(String(describing: error), privacy: .public)")
                 }
             }
         }

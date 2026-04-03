@@ -59,21 +59,28 @@ struct WallpaperSchedule: Hashable, Codable {
 final class WallpaperScheduler {
     private var schedules: [WallpaperSchedule] = []
     private var schedulerTask: Task<Void, Never>?
-    private var lastTick: TimeInterval = 0
+    private var handler: ((WallpaperDescriptor) -> Void)?
+    private var lastTriggerByScheduleID: [UUID: Date] = [:]
 
     func updateSchedules(_ schedules: [WallpaperSchedule]) {
         self.schedules = schedules
+        guard let handler else { return }
+        start(handler: handler)
     }
 
     func start(handler: @escaping (WallpaperDescriptor) -> Void) {
         stop()
-        schedulerTask = Task(priority: .utility) { [weak self] in
-            while !Task.isCancelled {
-                await AuraBackgroundActor.sleep(for: .seconds(60))
-                guard let self = self else { return }
-                await MainActor.run {
-                    self.tick(handler: handler)
-                }
+        self.handler = handler
+        guard let nextTrigger = nextTrigger() else { return }
+
+        let delay = max(0, nextTrigger.fireDate.timeIntervalSinceNow)
+        schedulerTask = Task(priority: .background) { [weak self] in
+            await AuraBackgroundActor.sleep(for: .seconds(delay))
+            guard let self, !Task.isCancelled else { return }
+            await MainActor.run {
+                self.lastTriggerByScheduleID[nextTrigger.schedule.id] = nextTrigger.fireDate
+                handler(nextTrigger.schedule.wallpaper)
+                self.start(handler: handler)
             }
         }
     }
@@ -83,22 +90,38 @@ final class WallpaperScheduler {
         schedulerTask = nil
     }
 
-    private func tick(handler: (WallpaperDescriptor) -> Void) {
-        let now = Date()
+    private func nextTrigger(referenceDate: Date = Date()) -> (schedule: WallpaperSchedule, fireDate: Date)? {
         let calendar = Calendar.current
-        for schedule in schedules {
-            if let time = schedule.timeOfDay {
-                if calendar.dateComponents([.hour, .minute], from: now) == DateComponents(hour: time.hour, minute: time.minute) {
-                    handler(schedule.wallpaper)
-                    return
-                }
+
+        return schedules.compactMap { schedule -> (schedule: WallpaperSchedule, fireDate: Date)? in
+            var candidates: [Date] = []
+
+            if let time = schedule.timeOfDay,
+               let nextDate = calendar.nextDate(
+                   after: referenceDate.addingTimeInterval(-1),
+                   matching: time,
+                   matchingPolicy: .nextTime,
+                   repeatedTimePolicy: .first,
+                   direction: .forward
+               ) {
+                candidates.append(nextDate)
             }
+
             if let interval = schedule.interval, interval > 0 {
-                if Int(now.timeIntervalSince1970) % Int(interval) < 60 {
-                    handler(schedule.wallpaper)
-                    return
-                }
+                let referenceTimestamp = referenceDate.timeIntervalSince1970
+                let nextTimestamp = ceil(referenceTimestamp / interval) * interval
+                candidates.append(Date(timeIntervalSince1970: nextTimestamp))
             }
+
+            guard let fireDate = candidates.min() else { return nil }
+
+            if let lastTrigger = lastTriggerByScheduleID[schedule.id],
+               abs(fireDate.timeIntervalSince(lastTrigger)) < 1 {
+                return nil
+            }
+
+            return (schedule, fireDate)
         }
+        .min(by: { $0.fireDate < $1.fireDate })
     }
 }

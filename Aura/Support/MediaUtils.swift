@@ -10,7 +10,7 @@ enum MediaUtils {
         return cache
     }()
 
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
+    nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
 
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
         #if DEBUG
@@ -96,7 +96,7 @@ enum MediaUtils {
                 ext: ext,
                 in: videosDirectory
             ) {
-                print("🟢 [MediaUtils] Found downloaded resource at \(localResourceURL.path)")
+                log.debug("Found downloaded resource at \(localResourceURL.path, privacy: .public)")
                 return localResourceURL
             }
 
@@ -107,7 +107,7 @@ enum MediaUtils {
                 ext: ext,
                 in: customDirectory
             ) {
-                print("🟢 [MediaUtils] Found custom resource at \(customResourceURL.path)")
+                log.debug("Found custom resource at \(customResourceURL.path, privacy: .public)")
                 return customResourceURL
             }
         }
@@ -115,7 +115,7 @@ enum MediaUtils {
         let bundle = Bundle.main
         if allowVideoFallback, isVideo && !name.hasSuffix("_1") {
             if let imageFallbackURL = resolveImageFallback(for: name) {
-                print("🟢 [MediaUtils] Returning image fallback for \(name)")
+                log.debug("Returning image fallback for \(name, privacy: .public)")
                 return imageFallbackURL
             }
             return nil
@@ -170,12 +170,12 @@ enum MediaUtils {
             }
 
             if let zipURL = potentialZipURL {
-                print("🟢 [MediaUtils] Found zip for \(targetName) at \(zipURL.path)")
+                log.debug("Found zip for \(targetName, privacy: .public) at \(zipURL.path, privacy: .public)")
                 if let extractedURL = extractZip(zipURL, originalResource: targetName) {
-                    print("🟢 [MediaUtils] Successfully extracted to \(extractedURL.path)")
+                    log.notice("Successfully extracted to \(extractedURL.path, privacy: .public)")
                     return extractedURL
                 } else {
-                    print("🟥 [MediaUtils] Failed to extract \(targetName) from \(zipURL.path)")
+                    log.error("Failed to extract \(targetName, privacy: .public) from \(zipURL.path, privacy: .public)")
                 }
             }
         }
@@ -187,7 +187,7 @@ enum MediaUtils {
         if let resourceRoot = bundle.resourceURL {
             let candidate = resourceRoot.appendingPathComponent(resource)
             if FileManager.default.fileExists(atPath: candidate.path) {
-                print("🟢 [MediaUtils] Found candidate at \(candidate.path)")
+                log.debug("Found candidate at \(candidate.path, privacy: .public)")
                 return candidate
             }
 
@@ -195,7 +195,7 @@ enum MediaUtils {
                 let fileName = "\(name).\(ext)"
                 let direct = resourceRoot.appendingPathComponent(fileName)
                 if FileManager.default.fileExists(atPath: direct.path) {
-                    print("🟢 [MediaUtils] Found direct at \(direct.path)")
+                    log.debug("Found direct resource at \(direct.path, privacy: .public)")
                     return direct
                 }
             }
@@ -203,7 +203,7 @@ enum MediaUtils {
             if let enumerator = FileManager.default.enumerator(at: resourceRoot, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) {
                 let targetName = ext == nil ? name : "\(name).\(ext!)"
                 for case let fileURL as URL in enumerator where fileURL.lastPathComponent == targetName {
-                    print("🟢 [MediaUtils] Found enumerator at \(fileURL.path)")
+                    log.debug("Found enumerated resource at \(fileURL.path, privacy: .public)")
                     return fileURL
                 }
             }
@@ -211,11 +211,11 @@ enum MediaUtils {
 
         if allowVideoFallback, isVideo {
             if let imageFallbackURL = resolveImageFallback(for: name) {
-                print("🟢 [MediaUtils] Returning image fallback for missing video \(name)")
+                log.debug("Returning image fallback for missing video \(name, privacy: .public)")
                 return imageFallbackURL
             }
         } else {
-            print("🟥 [MediaUtils] Warning - Could not resolve resource: \(resource)")
+            log.error("Could not resolve resource \(resource, privacy: .public)")
         }
         return nil
     }
@@ -249,13 +249,13 @@ enum MediaUtils {
 
             if process.terminationStatus == 0,
                let extractedURL = extractedResourceURL(for: originalResource, in: targetDir) {
-                print("🟢 [MediaUtils] Successfully extracted \(originalResource)")
+                log.notice("Successfully extracted \(originalResource, privacy: .public)")
                 return extractedURL
             }
 
-            print("🟥 [MediaUtils] Failed to extract \(originalResource). Status: \(process.terminationStatus)")
+            log.error("Failed to extract \(originalResource, privacy: .public). Status: \(process.terminationStatus)")
         } catch {
-            print("🟥 [MediaUtils] Error running unzip: \(error)")
+            log.error("Error running unzip: \(String(describing: error), privacy: .public)")
         }
 
         return nil
@@ -366,12 +366,12 @@ enum MediaUtils {
 
         do {
             let (cgImage, _) = try await generator.image(at: time)
-            print("🟢 [MediaUtils] Generated thumbnail for \(url.lastPathComponent)")
+            log.debug("Generated thumbnail for \(url.lastPathComponent, privacy: .public)")
             let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
             imageCache.setObject(image, forKey: cacheKey)
             return image
         } catch {
-            print("🟥 [MediaUtils] Failed to generate thumbnail for \(url.lastPathComponent): \(error)")
+            log.error("Failed to generate thumbnail for \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
             return nil
         }
     }

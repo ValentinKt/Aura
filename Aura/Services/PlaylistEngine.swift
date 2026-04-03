@@ -1,6 +1,7 @@
 import CoreData
 import Foundation
 import Observation
+import os
 
 enum PlaylistError: Error, LocalizedError {
     case playlistNotFound
@@ -38,6 +39,7 @@ enum PlaylistState: Equatable {
 @MainActor
 @Observable
 final class PlaylistEngine {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Playlist")
     private(set) var playlists: [Playlist] = []
     private(set) var state: PlaylistState = .idle
     private(set) var lastError: PlaylistError?
@@ -136,7 +138,7 @@ final class PlaylistEngine {
             playlists = loadPlaylists()
             startScheduling()
         } catch {
-            print("🟥 [PlaylistEngine] Failed to save playlist: \(error)")
+            logger.error("Failed to save playlist: \(String(describing: error), privacy: .public)")
             lastError = .persistenceError(error)
         }
     }
@@ -161,7 +163,7 @@ final class PlaylistEngine {
                 startScheduling()
             }
         } catch {
-            print("🟥 [PlaylistEngine] Failed to delete playlist: \(error)")
+            logger.error("Failed to delete playlist: \(String(describing: error), privacy: .public)")
             lastError = .persistenceError(error)
         }
     }
@@ -267,7 +269,7 @@ final class PlaylistEngine {
             let results = try context.fetch(request)
             return results.compactMap { playlist(from: $0) }
         } catch {
-            print("🟥 [PlaylistEngine] Failed to load playlists: \(error)")
+            logger.error("Failed to load playlists: \(String(describing: error), privacy: .public)")
             lastError = .persistenceError(error)
             return []
         }
@@ -278,43 +280,47 @@ final class PlaylistEngine {
 
     private func startScheduling() {
         scheduleTask?.cancel()
-        scheduleTask = Task(priority: .utility) { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
+        guard let nextTrigger = nextScheduledTrigger() else { return }
 
-                let now = Date()
-
-                let playlistToStart = await MainActor.run { () -> Playlist? in
-                    self.playlists.first { p in
-                        guard let schedule = p.scheduleTime else { return false }
-
-                        // Check if we already started this today within the last hour
-                        if self.lastScheduledPlaylistID == p.id,
-                           let lastDate = self.lastScheduledDate,
-                           now.timeIntervalSince(lastDate) < 3600 {
-                            return false
-                        }
-
-                        let calendar = Calendar.current
-                        let nowComponents = calendar.dateComponents([.hour, .minute], from: now)
-                        let scheduleComponents = calendar.dateComponents([.hour, .minute], from: schedule)
-
-                        return nowComponents.hour == scheduleComponents.hour &&
-                            nowComponents.minute == scheduleComponents.minute
-                    }
-                }
-
-                if let playlistToStart {
-                    await MainActor.run {
-                        self.lastScheduledPlaylistID = playlistToStart.id
-                        self.lastScheduledDate = now
-                        self.play(playlistToStart)
-                    }
-                }
-
-                await AuraBackgroundActor.sleep(for: .seconds(30))
+        let delay = max(0, nextTrigger.fireDate.timeIntervalSinceNow)
+        scheduleTask = Task(priority: .background) { [weak self] in
+            await AuraBackgroundActor.sleep(for: .seconds(delay))
+            guard let self, !Task.isCancelled else { return }
+            await MainActor.run {
+                self.lastScheduledPlaylistID = nextTrigger.playlist.id
+                self.lastScheduledDate = nextTrigger.fireDate
+                self.play(nextTrigger.playlist)
+                self.startScheduling()
             }
         }
+    }
+
+    private func nextScheduledTrigger(referenceDate: Date = Date()) -> (playlist: Playlist, fireDate: Date)? {
+        let calendar = Calendar.current
+
+        return playlists.compactMap { playlist -> (playlist: Playlist, fireDate: Date)? in
+            guard let schedule = playlist.scheduleTime else { return nil }
+
+            if lastScheduledPlaylistID == playlist.id,
+               let lastScheduledDate,
+               referenceDate.timeIntervalSince(lastScheduledDate) < 3600 {
+                return nil
+            }
+
+            let components = calendar.dateComponents([.hour, .minute], from: schedule)
+            guard let nextDate = calendar.nextDate(
+                after: referenceDate.addingTimeInterval(-1),
+                matching: components,
+                matchingPolicy: .nextTime,
+                repeatedTimePolicy: .first,
+                direction: .forward
+            ) else {
+                return nil
+            }
+
+            return (playlist, nextDate)
+        }
+        .min(by: { $0.fireDate < $1.fireDate })
     }
 
     private static let entriesDecoder = JSONDecoder()

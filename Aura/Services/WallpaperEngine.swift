@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import CoreImage
 import Observation
+import os
 import SwiftUI
 import WebKit
 
@@ -85,6 +86,7 @@ struct WallpaperDisplayPreview: Identifiable, Hashable {
 @MainActor
 @Observable
 final class WallpaperEngine {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "Wallpaper")
     private let fileManager = FileManager.default
     private let themeManager: ThemeManager
     private let wallpaperDirectory: URL
@@ -169,7 +171,7 @@ final class WallpaperEngine {
     }
 
     func applyWallpaper(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
-        print("🟢 [WallpaperEngine] Applying wallpaper of type: \(descriptor.type)")
+        logger.notice("Applying wallpaper of type \(String(describing: descriptor.type), privacy: .public)")
         let storesConcreteWallpaper = descriptor.type == .staticImage || descriptor.type == .animated || descriptor.type == .dynamic
         if storesConcreteWallpaper {
             selectedWallpaperResource = descriptor.resources.first
@@ -184,7 +186,7 @@ final class WallpaperEngine {
         }
 
         if isPresentationSuppressed {
-            print("🟢 [WallpaperEngine] Presentation suppressed, skipping application")
+            logger.debug("Presentation suppressed, skipping wallpaper application")
             return WallpaperApplyResult(success: true, permissionDenied: false)
         }
 
@@ -247,7 +249,7 @@ final class WallpaperEngine {
             return await applyScreenWallpaperURLsAsync(primaryURL: resolvedURL, secondaryURL: secondaryURL)
         }
 
-        print("🟥 [WallpaperEngine] Error: Could not find wallpaper resource: \(resource)")
+        logger.error("Could not find wallpaper resource \(resource, privacy: .public)")
         return WallpaperApplyResult(success: false, permissionDenied: false)
     }
 
@@ -260,7 +262,7 @@ final class WallpaperEngine {
             return applyImageURLs([resolvedURL])
         }
 
-        print("🟥 [WallpaperEngine] Error: Could not find wallpaper resource: \(resource)")
+        logger.error("Could not find wallpaper resource \(resource, privacy: .public)")
         return WallpaperApplyResult(success: false, permissionDenied: false)
     }
 
@@ -446,7 +448,7 @@ final class WallpaperEngine {
                     try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
                     applied = true
                 } catch let error as NSError {
-                    print("🟥 [WallpaperEngine] Error setting desktop image URL: \(error.localizedDescription)")
+                    logger.error("Error setting desktop image URL: \(error.localizedDescription, privacy: .public)")
                     if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
                         permissionDenied = true
                     }
@@ -484,7 +486,7 @@ final class WallpaperEngine {
                 try NSWorkspace.shared.setDesktopImageURL(targetURL, for: screen, options: [:])
                 applied = true
             } catch let error as NSError {
-                print("🟥 [WallpaperEngine] Error setting desktop image URL: \(error.localizedDescription)")
+                logger.error("Error setting desktop image URL: \(error.localizedDescription, privacy: .public)")
                 if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
                     permissionDenied = true
                 }
@@ -515,7 +517,7 @@ final class WallpaperEngine {
                     try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
                     applied = true
                 } catch let error as NSError {
-                    print("🟥 [WallpaperEngine] Error setting desktop image URL: \(error.localizedDescription)")
+                    logger.error("Error setting desktop image URL: \(error.localizedDescription, privacy: .public)")
                     if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
                         permissionDenied = true
                     }
@@ -648,7 +650,7 @@ final class WallpaperEngine {
                     }
                     continuation.resume(returning: url)
                 } catch {
-                    print("🟥 [WallpaperEngine] Error writing image: \(error.localizedDescription)")
+                    self.logger.error("Error writing image: \(error.localizedDescription, privacy: .public)")
                     continuation.resume(returning: nil)
                 }
             }
@@ -674,7 +676,7 @@ final class WallpaperEngine {
                         try jpeg.write(to: url, options: [.atomic])
                         urls.append(url)
                     } catch {
-                        print("🟥 [WallpaperEngine] Error writing image: \(error.localizedDescription)")
+                        self.logger.error("Error writing image: \(error.localizedDescription, privacy: .public)")
                         continuation.resume(returning: nil)
                         return
                     }
@@ -854,6 +856,7 @@ private struct SeededRandomNumberGenerator: RandomNumberGenerator {
 }
 
 final class WallpaperWindowController: NSObject {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "WallpaperWindow")
     private var window: NSWindow?
     private var playerView: NSView?
     private var playerLayer: AVPlayerLayer?
@@ -868,9 +871,10 @@ final class WallpaperWindowController: NSObject {
     private var currentWebsiteURL: URL?
     private var isWebsiteInteractive = false
     private var isWebsiteSuspended = false
-    private var websiteHoverProbeTask: Task<Void, Never>?
     private var websiteHoverProbeSequence: Int = 0
     private var websiteShouldReceiveMouseEvents = true
+    private var websiteGlobalEventMonitor: Any?
+    private var websiteLocalEventMonitor: Any?
 
     override init() {
         super.init()
@@ -878,28 +882,37 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func startWebsiteHoverProbing() {
-        guard websiteHoverProbeTask == nil else { return }
+        guard websiteGlobalEventMonitor == nil, websiteLocalEventMonitor == nil else { return }
 
-        websiteHoverProbeTask = Task(priority: .utility) { [weak self] in
-            while !Task.isCancelled {
-                guard let controller = self else { return }
-                try? await AuraBackgroundActor.throwIfRenderingSuspended()
-                await MainActor.run {
-                    controller.probeWebsiteHoverState()
-                }
-                await AuraBackgroundActor.sleep(for: .milliseconds(500))
+        let eventTypes: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDown, .rightMouseDragged]
+        websiteGlobalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: eventTypes) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.probeWebsiteHoverState()
             }
+        }
+        websiteLocalEventMonitor = NSEvent.addLocalMonitorForEvents(matching: eventTypes) { [weak self] event in
+            Task { @MainActor [weak self] in
+                self?.probeWebsiteHoverState()
+            }
+            return event
         }
         probeWebsiteHoverState()
     }
 
     private func stopWebsiteHoverProbing() {
-        websiteHoverProbeTask?.cancel()
-        websiteHoverProbeTask = nil
+        if let websiteGlobalEventMonitor {
+            NSEvent.removeMonitor(websiteGlobalEventMonitor)
+            self.websiteGlobalEventMonitor = nil
+        }
+        if let websiteLocalEventMonitor {
+            NSEvent.removeMonitor(websiteLocalEventMonitor)
+            self.websiteLocalEventMonitor = nil
+        }
         websiteHoverProbeSequence += 1
     }
 
     deinit {
+        stopWebsiteHoverProbing()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -1130,7 +1143,7 @@ final class WallpaperWindowController: NSObject {
 
     @objc private func videoPlayerItemFailedToPlayToEndTime(_ notification: Notification) {
         if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-            print("🟥 [WallpaperWindowController] Video playback failed: \(error.localizedDescription)")
+            logger.error("Video playback failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -1165,7 +1178,7 @@ final class WallpaperWindowController: NSObject {
         CATransaction.flush()
         CATransaction.commit()
 
-        print("🟢 [WallpaperEngine] Hardware Decoder Released")
+        logger.debug("Hardware decoder released")
     }
 
     private func ensureWebsiteContainerView() {
@@ -1248,7 +1261,7 @@ final class WallpaperWindowController: NSObject {
         let shouldSuspend = window?.isVisible != true || isOccluded || isFullscreenApplicationActive()
 
         renderStateTask?.cancel()
-        renderStateTask = Task(priority: .utility) {
+        renderStateTask = Task(priority: .background) {
             await AuraBackgroundActor.setRenderingSuspended(shouldSuspend)
         }
 
@@ -1449,7 +1462,7 @@ final class WallpaperWindowController: NSObject {
         // On libère le droit d'accès AU DERNIER MOMENT
         if isSecurityScoped, let url = currentURL {
             url.stopAccessingSecurityScopedResource()
-            print("🟢 [WallpaperEngine] Security Scope Released")
+            logger.debug("Security scope released")
         }
 
         currentURL = nil

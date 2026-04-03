@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import os
 
 struct MoodSelectorView: View {
     @Bindable var appModel: AppModel
@@ -368,6 +369,8 @@ struct CreateImagePlaygroundCard: View {
 }
 
 struct MoodCard: View {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "MoodCard")
+
     let mood: Mood
     let isSelected: Bool
     let isFavorite: Bool
@@ -699,7 +702,7 @@ struct MoodCard: View {
                 // Clean up temp file
                 try? FileManager.default.removeItem(at: tempURL)
             } catch {
-                print("🟥 [MoodCard] Export failed: \(error.localizedDescription)")
+                Self.logger.error("Export failed: \(error.localizedDescription, privacy: .public)")
                 exportError = error.localizedDescription
             }
             isExporting = false
@@ -768,11 +771,11 @@ struct MoodCard: View {
         guard !Task.isCancelled else { return }
 
         if let loadedImage {
-            print("🟢 [MoodCard] Setting image for \(resource)")
+            Self.logger.debug("Setting image for \(resource, privacy: .public)")
             MoodCard.imageCache.setObject(loadedImage, forKey: resource as NSString)
             self.image = loadedImage
         } else {
-            print("🟥 [MoodCard] loadedImage is nil for \(resource)")
+            Self.logger.error("Loaded image is nil for \(resource, privacy: .public)")
             self.image = nil
         }
     }
