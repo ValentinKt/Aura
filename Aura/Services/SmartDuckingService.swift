@@ -24,6 +24,8 @@ final class SmartDuckingService {
     private typealias MediaRemoteNowPlayingIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
     private typealias MediaRemoteNowPlayingInfoFunction = @convention(c) (DispatchQueue, @escaping ([String: Any]?) -> Void) -> Void
 
+    private let mediaRemoteQueue = DispatchQueue(label: "com.aura.mediaremote", qos: .background)
+
     private var mediaRemoteNowPlayingIsPlaying: MediaRemoteNowPlayingIsPlayingFunction?
     private var mediaRemoteNowPlayingInfo: MediaRemoteNowPlayingInfoFunction?
 
@@ -157,7 +159,7 @@ final class SmartDuckingService {
                 continuation.resume(returning: false)
                 return
             }
-            checkMedia(DispatchQueue.global(qos: .background)) { isPlaying in
+            checkMedia(mediaRemoteQueue) { isPlaying in
                 continuation.resume(returning: isPlaying)
             }
         }
@@ -169,7 +171,7 @@ final class SmartDuckingService {
                 continuation.resume(returning: false)
                 return
             }
-            getInfo(DispatchQueue.global(qos: .background)) { info in
+            getInfo(mediaRemoteQueue) { info in
                 var rate: Double = 0.0
                 if let info = info {
                     if let r = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double {

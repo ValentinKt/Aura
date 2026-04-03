@@ -57,14 +57,20 @@ struct FallbackImageView: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
-        } else if let url = url, let imageFromUrl = NSImage(contentsOf: url) {
-            Image(nsImage: imageFromUrl)
+        } else if let url = url {
+            Image(nsImage: loadImage(from: url))
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
         } else {
             Color.black.ignoresSafeArea()
         }
+    }
+
+    private func loadImage(from url: URL) -> NSImage {
+        let isScoped = url.startAccessingSecurityScopedResource()
+        defer { if isScoped { url.stopAccessingSecurityScopedResource() } }
+        return NSImage(contentsOf: url) ?? NSImage()
     }
 }
 

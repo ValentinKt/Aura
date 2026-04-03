@@ -487,7 +487,7 @@ private struct MoodCarouselCard: View {
     let mood: Mood
    let isSelected: Bool
     var appModel: AppModel
-    var onDelete: (() -> Void)? = nil
+    var onDelete: (() -> Void)?
     let action: (Bool) -> Void
 
     @State private var image: NSImage?

@@ -444,7 +444,7 @@ final class DownloadManager {
     var downloadStates: [String: DownloadState] = [:]
 
     private let baseURL = "https://github.com/ValentinKt/Aura/releases/download/v1.0.1/"
-    
+
     // Network Throttling: Max 2 concurrent downloads to prevent network controller overheating
     private let urlSession: URLSession
 

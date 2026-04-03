@@ -99,7 +99,7 @@ enum MediaUtils {
                 print("🟢 [MediaUtils] Found downloaded resource at \(localResourceURL.path)")
                 return localResourceURL
             }
-            
+
             let customDirectory = appSupport.appendingPathComponent("Aura/CustomWallpapers", isDirectory: true)
             if let customResourceURL = resolveDownloadedResourceURL(
                 resource: resource,

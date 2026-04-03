@@ -15,7 +15,7 @@ final class GatedDisplayLink {
 
         let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, ctx in
             let self_ = Unmanaged<GatedDisplayLink>.fromOpaque(ctx!).takeUnretainedValue()
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 self_.onFrame?()
             }
             return kCVReturnSuccess

@@ -22,7 +22,6 @@ struct ContentView: View {
     }
 
     var body: some View {
-        let _ = Self._printChanges()
         @Bindable var appModel = appModel
         mainContent(appModel: appModel)
     }
@@ -210,7 +209,7 @@ struct ContentView: View {
             },
             set: { newValue in
                 guard let newValue else { return }
-                
+
                 if atmosphereMenuItems.contains(where: { $0.id == newValue }) {
                     lastSelectedAtmosphereID = newValue
                 }
@@ -824,7 +823,7 @@ private struct AtmospheresWheelMenu: View {
                 }
 
                 normalizeScrollPositionIfNeeded(for: repeatedItem)
-                
+
                 guard repeatedItem.item.id != selectedID else {
                     return
                 }

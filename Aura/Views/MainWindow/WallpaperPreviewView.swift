@@ -10,7 +10,6 @@ struct WallpaperPreviewView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        let _ = Self._printChanges()
         ZStack(alignment: .bottomLeading) {
             Group {
                 if appModel.settingsViewModel.settings.keepCurrentWallpaper {
