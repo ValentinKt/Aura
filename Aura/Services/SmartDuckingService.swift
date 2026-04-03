@@ -1,6 +1,7 @@
 import Foundation
 import CoreAudio
 import Observation
+import Combine
 import os
 
 @MainActor
@@ -25,6 +26,9 @@ final class SmartDuckingService {
     private let soundEngine: SoundEngine
     private var stateEvaluationTask: Task<Void, Never>?
 
+    private let evaluationSubject = PassthroughSubject<Void, Never>()
+    private var evaluationCancellable: AnyCancellable?
+
     // MediaRemote dynamically loaded
     private typealias MediaRemoteRegisterForNowPlayingNotificationsFunction = @convention(c) (DispatchQueue) -> Void
     private typealias MediaRemoteNowPlayingIsPlayingFunction = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
@@ -42,6 +46,15 @@ final class SmartDuckingService {
 
     init(soundEngine: SoundEngine) {
         self.soundEngine = soundEngine
+
+        evaluationCancellable = evaluationSubject
+            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task(priority: .background) { @MainActor [weak self] in
+                    await self?.evaluateCurrentActivityState()
+                }
+            }
+
         loadMediaRemote()
         startMonitoring()
     }
@@ -93,14 +106,8 @@ final class SmartDuckingService {
     }
 
     private func scheduleStateEvaluation() {
-        stateEvaluationTask?.cancel()
         guard isEnabled else { return }
-
-        stateEvaluationTask = Task(priority: .background) { [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
-            guard let self, !Task.isCancelled else { return }
-            await self.evaluateCurrentActivityState()
-        }
+        evaluationSubject.send()
     }
 
     private func evaluateCurrentActivityState() async {
@@ -136,7 +143,7 @@ final class SmartDuckingService {
                 object: nil,
                 queue: nil
             ) { [weak self] _ in
-                Task { @MainActor [weak self] in
+                Task(priority: .background) { @MainActor [weak self] in
                     self?.scheduleStateEvaluation()
                 }
             }
@@ -148,7 +155,7 @@ final class SmartDuckingService {
         var devicesAddress = makeDevicesAddress()
 
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            Task { @MainActor [weak self] in
+            Task(priority: .background) { @MainActor [weak self] in
                 self?.refreshInputDeviceListeners()
                 self?.scheduleStateEvaluation()
             }
@@ -207,7 +214,7 @@ final class SmartDuckingService {
 
         for deviceID in currentDeviceIDs where inputDeviceListeners[deviceID] == nil {
             let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-                Task { @MainActor [weak self] in
+                Task(priority: .background) { @MainActor [weak self] in
                     self?.scheduleStateEvaluation()
                 }
             }

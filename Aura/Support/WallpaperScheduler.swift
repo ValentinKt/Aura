@@ -76,6 +76,7 @@ final class WallpaperScheduler {
         let delay = max(0, nextTrigger.fireDate.timeIntervalSinceNow)
         schedulerTask = Task(priority: .background) { [weak self] in
             await AuraBackgroundActor.sleep(for: .seconds(delay))
+            await AuraBackgroundActor.waitUntilRenderingActive()
             guard let self, !Task.isCancelled else { return }
             await MainActor.run {
                 self.lastTriggerByScheduleID[nextTrigger.schedule.id] = nextTrigger.fireDate

@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Foundation
 import Observation
 import os
@@ -342,6 +343,8 @@ final class SoundEngine {
         }
     }
 
+    private var randomizationCancellable: AnyCancellable?
+    
     private func scheduleRandomizationIfNeeded() {
         stopRandomizationSchedule()
 
@@ -352,24 +355,28 @@ final class SoundEngine {
             return
         }
 
-        randomizationTask = Task(priority: .background) { @MainActor [weak self] in
-            guard let self else { return }
+        randomizationCancellable = Timer.publish(every: interval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                Task(priority: .background) { @MainActor [weak self] in
+                    guard let self else { return }
+                    guard self.state == .playing else { return }
+                    
+                    let isSuspended = await AuraBackgroundActor.shared.isRenderingSuspended()
+                    if isSuspended { return }
 
-            await AuraBackgroundActor.sleep(for: .seconds(interval))
-            guard !Task.isCancelled, self.state == .playing else { return }
-
-            for id in SoundLayerID.allCases.map(\.rawValue) {
-                let random = Float.random(in: validRange)
-                self.setLayer(id, volume: random)
+                    for id in SoundLayerID.allCases.map(\.rawValue) {
+                        let random = Float.random(in: validRange)
+                        self.setLayer(id, volume: random)
+                    }
+                }
             }
-
-            self.scheduleRandomizationIfNeeded()
-        }
     }
 
     private func stopRandomizationSchedule() {
-        randomizationTask?.cancel()
-        randomizationTask = nil
+        randomizationCancellable?.cancel()
+        randomizationCancellable = nil
     }
 
 }

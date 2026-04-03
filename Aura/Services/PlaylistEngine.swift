@@ -285,6 +285,7 @@ final class PlaylistEngine {
         let delay = max(0, nextTrigger.fireDate.timeIntervalSinceNow)
         scheduleTask = Task(priority: .background) { [weak self] in
             await AuraBackgroundActor.sleep(for: .seconds(delay))
+            await AuraBackgroundActor.waitUntilRenderingActive()
             guard let self, !Task.isCancelled else { return }
             await MainActor.run {
                 self.lastScheduledPlaylistID = nextTrigger.playlist.id

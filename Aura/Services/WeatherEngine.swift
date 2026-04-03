@@ -69,6 +69,7 @@ final class WeatherEngine: NSObject, CLLocationManagerDelegate {
         let waitSeconds = nextRefreshDelay()
         refreshTask = Task(priority: .background) { [weak self] in
             await AuraBackgroundActor.sleep(for: .seconds(waitSeconds))
+            await AuraBackgroundActor.waitUntilRenderingActive()
             guard let self, !Task.isCancelled else { return }
 
             let isEnabled = await MainActor.run {

@@ -306,6 +306,7 @@ final class AppModel {
         sleepTimerTask = Task(priority: .background) { @MainActor [weak self] in
             guard let self else { return }
             await AuraBackgroundActor.sleep(for: .seconds(minutes * 60))
+            await AuraBackgroundActor.waitUntilRenderingActive()
             guard !Task.isCancelled, self.sleepTimerEndDate == endDate else { return }
             self.pauseForSleepTimer()
             self.sleepTimerEndDate = nil
