@@ -1171,6 +1171,16 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func configureVideoPlayback(for url: URL) {
+        // Explicitly clear previous asset and item to prevent video memory leak
+        currentVideoItem?.cancelPendingSeeks()
+        currentVideoAsset?.cancelLoading()
+        playerQueue?.replaceCurrentItem(with: nil)
+        playerQueue?.removeAllItems()
+        playerLooper?.disableLooping()
+        playerLooper = nil
+        currentVideoItem = nil
+        currentVideoAsset = nil
+        
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
 

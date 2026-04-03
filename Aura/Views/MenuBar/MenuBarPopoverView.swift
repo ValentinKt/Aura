@@ -49,7 +49,14 @@ struct MenuBarPopoverView: View {
                 .padding(.bottom, 24)
         }
         .frame(width: 360)
-        .background { backgroundLayer }
+        .background {
+            PopoverBackgroundView(
+                backgroundImage: backgroundImage,
+                backgroundVideoURL: backgroundVideoURL,
+                reduceTransparency: reduceTransparency
+            )
+            .equatable()
+        }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -101,8 +108,14 @@ struct MenuBarPopoverView: View {
     // adaptive dark tint over the artwork. Each interactive control carries its
     // own individual .glassEffect() and lenses the art beneath it directly.
 
-    @ViewBuilder
-    private var backgroundLayer: some View {
+}
+
+private struct PopoverBackgroundView: View, Equatable {
+    let backgroundImage: NSImage?
+    let backgroundVideoURL: URL?
+    let reduceTransparency: Bool
+
+    var body: some View {
         if reduceTransparency {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color(NSColor.windowBackgroundColor).opacity(0.97))
@@ -134,8 +147,9 @@ struct MenuBarPopoverView: View {
             }
         }
     }
+}
 
-    // MARK: - Header
+// MARK: - Header
 
     private var headerSection: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -306,6 +320,8 @@ struct MenuBarPopoverView: View {
         .contentMargins(.horizontal, 24, for: .scrollContent)
         .frame(maxWidth: .infinity)
         .frame(height: 180)
+        .drawingGroup()
+        .auraPersistentSystemOverlaysHidden()
     }
 
     // MARK: - Footer

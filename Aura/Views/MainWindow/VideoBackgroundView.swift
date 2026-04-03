@@ -156,6 +156,16 @@ struct VideoBackgroundView: NSViewRepresentable {
         }
 
         private func configureVideoPlayback(for url: URL, in view: VideoBackgroundSurfaceView) {
+            // Explicitly clear previous asset and item to prevent video memory leak
+            currentItem?.cancelPendingSeeks()
+            currentAsset?.cancelLoading()
+            player.replaceCurrentItem(with: nil)
+            player.removeAllItems()
+            looper?.disableLooping()
+            looper = nil
+            currentItem = nil
+            currentAsset = nil
+            
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
             let item = AVPlayerItem(asset: asset)
 

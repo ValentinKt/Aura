@@ -172,7 +172,7 @@ struct ConditionalRotation: ViewModifier {
         if apply {
             content
                 .rotationEffect(angle)
-                .animation(animation, value: isAnimating)
+                .animation(isAnimating ? animation : .default, value: isAnimating)
         } else {
             content
         }
@@ -190,7 +190,7 @@ struct ConditionalScale: ViewModifier {
         if apply {
             content
                 .scaleEffect(x: scaleX, y: scaleY)
-                .animation(animation, value: isAnimating)
+                .animation(isAnimating ? animation : .default, value: isAnimating)
         } else {
             content
         }
@@ -207,7 +207,7 @@ struct ConditionalOpacity: ViewModifier {
         if apply {
             content
                 .opacity(opacityValue)
-                .animation(animation, value: isAnimating)
+                .animation(isAnimating ? animation : .default, value: isAnimating)
         } else {
             content
         }
@@ -225,7 +225,7 @@ struct ConditionalTranslation: ViewModifier {
         if apply {
             content
                 .offset(x: x, y: y)
-                .animation(animation, value: isAnimating)
+                .animation(isAnimating ? animation : .default, value: isAnimating)
         } else {
             content
         }
