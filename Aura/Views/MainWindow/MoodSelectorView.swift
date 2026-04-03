@@ -47,9 +47,6 @@ struct MoodSelectorView: View {
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("quotesDidChange"))) { _ in
-                appModel.moodViewModel.refreshQuoteMoods()
-            }
         }
     }
 }
@@ -57,7 +54,6 @@ struct MoodSelectorView: View {
 struct SubthemeRow: View {
     let subtheme: String
     @Bindable var appModel: AppModel
-    @State private var showingQuotesManager = false
     @State private var showingWebsiteManager = false
     @State private var showingImagePlaygroundDesigner = false
 
@@ -107,9 +103,6 @@ struct SubthemeRow: View {
                 }
             }
         }
-        .sheet(isPresented: $showingQuotesManager) {
-            QuotesManagerView(appModel: appModel)
-        }
         .sheet(isPresented: $showingWebsiteManager) {
             WebsiteManagerView(appModel: appModel)
         }
@@ -146,12 +139,6 @@ struct SubthemeRow: View {
                 .id(mood.id)
             }
 
-            if subtheme.caseInsensitiveCompare("Quotes") == .orderedSame {
-                CreateQuoteCard {
-                    showingQuotesManager = true
-                }
-            }
-
             if ["Website", "Websites"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
                 CreateWebsiteCard {
                     showingWebsiteManager = true
@@ -185,53 +172,6 @@ struct SubthemeRow: View {
             appModel.moodViewModel.selectMood(mood)
             appModel.moodViewModel.selectedSubtheme = nil
         }
-    }
-}
-
-struct CreateQuoteCard: View {
-    let action: () -> Void
-
-    @State private var isHovered = false
-    @State private var isPressed = false
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 10) {
-                Image(systemName: "plus")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
-
-                Text("Create a\nnew Quote")
-                    .font(.system(size: 14, weight: .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-            }
-            .padding(16)
-            .frame(width: 120, height: 160)
-            .liquidGlass(RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: false, variant: .clear)
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.white.opacity(isHovered ? 0.42 : 0.24), lineWidth: isHovered ? 1.5 : 1)
-            }
-            .shadow(color: .black.opacity(isHovered ? 0.24 : 0.16), radius: isHovered ? 14 : 10, y: 6)
-            .scaleEffect(isHovered ? 1.03 : 1.0)
-            .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.68), value: isHovered)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .focusable(false)
-        .onHover { isHovered = $0 }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-        .accessibilityLabel("Create a new quote")
-        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -511,10 +451,6 @@ struct MoodCard: View {
             if mood.wallpaper.type == .time {
                 // Time wallpaper specific preview
                 TimeWallpaperPreview(mood: mood, isPressed: isPressed, selectedWallpaperURL: selectedWallpaperURL)
-            } else if mood.wallpaper.type == .quote {
-                QuoteWallpaperPreview(mood: mood, isPressed: isPressed, selectedWallpaperURL: selectedWallpaperURL)
-            } else if mood.wallpaper.type == .zen {
-                ZenWallpaperPreview(mood: mood, isPressed: isPressed, selectedWallpaperURL: selectedWallpaperURL)
             } else if mood.wallpaper.type == .website {
                 WebsiteWallpaperPreview(mood: mood, isPressed: isPressed)
             } else if let image = image {
@@ -573,7 +509,7 @@ struct MoodCard: View {
                     )
             }
 
-            if mood.wallpaper.type != .time, mood.wallpaper.type != .zen, mood.wallpaper.type != .quote, mood.wallpaper.type != .website, !primaryResource.isEmpty {
+            if mood.wallpaper.type != .time, mood.wallpaper.type != .website, !primaryResource.isEmpty {
                 let downloadState = DownloadManager.shared.downloadStates[primaryResource] ?? .notDownloaded
                 if downloadState == .notDownloaded {
                     VStack {
@@ -618,7 +554,7 @@ struct MoodCard: View {
     }
 
     private var canToggleFavorite: Bool {
-        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || mood.wallpaper.type == .website {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .website {
             return true
         }
 
@@ -630,7 +566,7 @@ struct MoodCard: View {
     }
 
     private func handleAction() {
-        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote || mood.wallpaper.type == .website || primaryResource.isEmpty {
+        if mood.wallpaper.type == .time || mood.wallpaper.type == .website || primaryResource.isEmpty {
             action(false)
             return
         }
@@ -690,7 +626,7 @@ struct MoodCard: View {
 
     @MainActor
     private func loadPreview() async {
-        if mood.wallpaper.type == .time || mood.wallpaper.type == .zen || mood.wallpaper.type == .quote {
+        if mood.wallpaper.type == .time {
             // No preview image needed for programmatic wallpapers, they render directly
             return
         }
@@ -778,65 +714,6 @@ struct TimeWallpaperPreview: View {
                 let scale = max(scaleX, scaleY)
 
                 TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: selectedWallpaperURL)
-                    .frame(width: baseSize.width, height: baseSize.height)
-                    .scaleEffect(scale)
-                    .frame(width: targetSize.width, height: targetSize.height)
-                    .clipped()
-                    .allowsHitTesting(false)
-            }
-        }
-        .frame(width: targetSize.width, height: targetSize.height)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-}
-
-struct QuoteWallpaperPreview: View {
-    let mood: Mood
-    let isPressed: Bool
-    let selectedWallpaperURL: URL?
-    var targetSize: CGSize = CGSize(width: 240, height: 160)
-
-    var body: some View {
-        ZStack {
-            if let style = mood.wallpaper.resources.first {
-                let baseSize = CGSize(width: 1920, height: 1080)
-                let scaleX = targetSize.width / baseSize.width
-                let scaleY = targetSize.height / baseSize.height
-                let scale = max(scaleX, scaleY)
-
-                QuoteWallpaperView(
-                    style: style,
-                    palette: mood.palette,
-                    quoteID: mood.wallpaper.resources.count > 1 ? UUID(uuidString: mood.wallpaper.resources[1]) : nil,
-                    selectedWallpaperURL: selectedWallpaperURL
-                )
-                    .frame(width: baseSize.width, height: baseSize.height)
-                    .scaleEffect(scale)
-                    .frame(width: targetSize.width, height: targetSize.height)
-                    .clipped()
-                    .allowsHitTesting(false)
-            }
-        }
-        .frame(width: targetSize.width, height: targetSize.height)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-}
-
-struct ZenWallpaperPreview: View {
-    let mood: Mood
-    let isPressed: Bool
-    let selectedWallpaperURL: URL?
-    var targetSize: CGSize = CGSize(width: 240, height: 160)
-
-    var body: some View {
-        ZStack {
-            if let style = mood.wallpaper.resources.first {
-                let baseSize = CGSize(width: 1920, height: 1080)
-                let scaleX = targetSize.width / baseSize.width
-                let scaleY = targetSize.height / baseSize.height
-                let scale = max(scaleX, scaleY)
-
-                ZenWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: selectedWallpaperURL)
                     .frame(width: baseSize.width, height: baseSize.height)
                     .scaleEffect(scale)
                     .frame(width: targetSize.width, height: targetSize.height)
