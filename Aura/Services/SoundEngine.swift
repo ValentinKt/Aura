@@ -344,7 +344,7 @@ final class SoundEngine {
     }
 
     private var randomizationCancellable: AnyCancellable?
-    
+
     private func scheduleRandomizationIfNeeded() {
         stopRandomizationSchedule()
 
@@ -362,7 +362,7 @@ final class SoundEngine {
                 Task(priority: .background) { @MainActor [weak self] in
                     guard let self else { return }
                     guard self.state == .playing else { return }
-                    
+
                     let isSuspended = await AuraBackgroundActor.shared.isRenderingSuspended()
                     if isSuspended { return }
 
