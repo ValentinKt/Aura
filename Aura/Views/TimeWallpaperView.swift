@@ -27,7 +27,8 @@ struct TimeWallpaperView: View {
     var body: some View {
         ZStack {
             if !isPreview, let selectedWallpaperURL, Self.isVideoURL(selectedWallpaperURL) {
-                VideoBackgroundView(url: selectedWallpaperURL)
+                IsolatedVideoBackgroundView(url: selectedWallpaperURL)
+                    .equatable()
                     .ignoresSafeArea()
             } else if let image = backgroundImage {
                 Image(nsImage: image)

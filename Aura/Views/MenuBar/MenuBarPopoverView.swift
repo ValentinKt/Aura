@@ -48,6 +48,7 @@ struct MenuBarPopoverView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
         }
+        .drawingGroup()
         .frame(width: 360)
         .background { backgroundLayer }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -86,6 +87,7 @@ struct MenuBarPopoverView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ReopenMainWindow"))) { _ in
             openWindow(id: "main")
         }
+        .auraPersistentSystemOverlaysHidden()
     }
 
     // MARK: - Background
@@ -111,11 +113,8 @@ struct MenuBarPopoverView: View {
                 Color(red: 0.08, green: 0.12, blue: 0.10)
 
                 if let videoURL = backgroundVideoURL {
-                    // ── Video path: play live, no blur ────────────────────────
-                    // VideoBackgroundView fills the frame; a single dark scrim
-                    // (0.30 alpha) is sufficient for WCAG-AA white-text contrast
-                    // while keeping the motion clearly visible.
-                    VideoBackgroundView(url: videoURL)
+                    IsolatedVideoBackgroundView(url: videoURL)
+                        .equatable()
                         .aspectRatio(contentMode: .fill)
                         .transition(.opacity.animation(.easeInOut(duration: 0.4)))
 
@@ -647,7 +646,8 @@ private struct MoodCarouselCard: View {
                   let resource = mood.wallpaper.resources.first,
                   let url = MediaUtils.resolveResourceURL(resource),
                   ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-            VideoBackgroundView(url: url)
+            IsolatedVideoBackgroundView(url: url)
+                .equatable()
                 .frame(width: 120, height: 160)
                 .clipped()
         } else if let image {

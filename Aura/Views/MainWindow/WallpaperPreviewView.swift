@@ -32,7 +32,8 @@ struct WallpaperPreviewView: View {
                           mood.wallpaper.type == .staticImage || mood.wallpaper.type == .dynamic || mood.wallpaper.type == .animated {
                     ZStack(alignment: .topTrailing) {
                         if mood.wallpaper.type == .animated, let resource = mood.wallpaper.resources.first, let url = MediaUtils.resolveResourceURL(resource) {
-                            VideoBackgroundView(url: url)
+                            IsolatedVideoBackgroundView(url: url)
+                                .equatable()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if let image = previewImage {
                             GeometryReader { geo in

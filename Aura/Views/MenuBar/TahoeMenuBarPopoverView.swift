@@ -46,6 +46,7 @@ struct TahoeMenuBarPopoverView: View {
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ReopenMainWindow"))) { _ in
                 revealMainWindow()
             }
+            .auraPersistentSystemOverlaysHidden()
     }
 
     private var panelContainer: some View {
@@ -63,6 +64,7 @@ struct TahoeMenuBarPopoverView: View {
 
             ScrollView(showsIndicators: false) {
                 glassRoot
+                    .drawingGroup()
                     .padding(20)
                     .frame(maxWidth: .infinity)
             }
@@ -134,7 +136,8 @@ struct TahoeMenuBarPopoverView: View {
                 )
 
                 if let videoURL = backgroundVideoURL {
-                    VideoBackgroundView(url: videoURL)
+                    IsolatedVideoBackgroundView(url: videoURL)
+                        .equatable()
                         .aspectRatio(contentMode: .fill)
                         .transition(.opacity.animation(.easeInOut(duration: 0.35)))
                 } else if let backgroundImage {
@@ -748,7 +751,8 @@ private struct TahoeMoodCarouselCard: View {
                   let resource = mood.wallpaper.resources.first,
                   let url = MediaUtils.resolveResourceURL(resource),
                   ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-            VideoBackgroundView(url: url)
+            IsolatedVideoBackgroundView(url: url)
+                .equatable()
                 .frame(width: 148, height: 184)
         } else if let image {
             Image(nsImage: image)

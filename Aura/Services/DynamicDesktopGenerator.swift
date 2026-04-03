@@ -111,9 +111,6 @@ final class DynamicDesktopGenerator {
             Double(completedUnits) / Double(totalUnits)
         }
 
-        var generatedFrames = [CGImage]()
-        generatedFrames.reserveCapacity(totalFrames)
-
         for i in 0..<totalFrames {
             try Task.checkCancellation()
             let frameNumber = i + 1
@@ -131,37 +128,29 @@ final class DynamicDesktopGenerator {
                 totalFrames: totalFrames,
                 colorSpace: colorSpace
             )
-            generatedFrames.append(generatedFrame)
             completedUnits += 1
-        }
 
-        let upscaledFrames = try await upscaleManager.upscale(generatedFrames) { update in
             progress(
                 ProgressUpdate(
-                    fractionCompleted: progressFraction(totalFrames + update.completedCount),
+                    fractionCompleted: progressFraction(completedUnits),
                     step: .upscalingFrame(
-                        completed: update.completedCount,
-                        total: update.totalCount,
-                        currentIndex: update.currentIndex
+                        completed: frameNumber - 1,
+                        total: totalFrames,
+                        currentIndex: frameNumber
                     )
                 )
             )
-        }
-
-        completedUnits += upscaledFrames.count
-
-        for (index, frameCGImage) in upscaledFrames.enumerated() {
-            let frameNumber = index + 1
-            try Task.checkCancellation()
+            let upscaledFrame = try await upscaleManager.upscale(generatedFrame)
+            completedUnits += 1
             progress(
                 ProgressUpdate(
                     fractionCompleted: progressFraction(completedUnits),
                     step: .encodingFrame(index: frameNumber, total: totalFrames)
                 )
             )
-            let optimizedFrame = try await optimizeFrameForStorage(frameCGImage, colorSpace: colorSpace)
+            let optimizedFrame = try await optimizeFrameForStorage(upscaledFrame, colorSpace: colorSpace)
 
-            if index == 0 {
+            if i == 0 {
                 CGImageDestinationAddImageAndMetadata(destination, optimizedFrame, metadata, destinationOptions as CFDictionary)
             } else {
                 CGImageDestinationAddImage(destination, optimizedFrame, destinationOptions as CFDictionary)

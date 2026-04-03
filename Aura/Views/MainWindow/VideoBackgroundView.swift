@@ -1,6 +1,30 @@
 import AVFoundation
 import SwiftUI
 
+struct IsolatedVideoBackgroundView: View, Equatable {
+    let url: URL
+
+    static func == (lhs: IsolatedVideoBackgroundView, rhs: IsolatedVideoBackgroundView) -> Bool {
+        lhs.url == rhs.url
+    }
+
+    var body: some View {
+        VideoBackgroundView(url: url)
+            .allowsHitTesting(false)
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func auraPersistentSystemOverlaysHidden() -> some View {
+        if #available(macOS 26.0, *) {
+            persistentSystemOverlays(.hidden)
+        } else {
+            self
+        }
+    }
+}
+
 struct VideoBackgroundView: NSViewRepresentable {
     let url: URL
 
@@ -31,7 +55,10 @@ struct VideoBackgroundView: NSViewRepresentable {
         private let player = AVQueuePlayer()
         private var looper: AVPlayerLooper?
         private var currentURL: URL?
+        private var currentAsset: AVURLAsset?
+        private var currentItem: AVPlayerItem?
         private var isSecurityScoped = false
+        private var isFrozen = false
         private weak var view: VideoBackgroundSurfaceView?
         private var assetLoadTask: Task<Void, Never>?
 
@@ -86,11 +113,49 @@ struct VideoBackgroundView: NSViewRepresentable {
                 layer.contents = NSImage(contentsOf: url)
                 layer.contentsGravity = .resizeAspectFill
                 imageLayer = layer
+                isFrozen = false
                 view.attachImageLayer(layer)
                 updatePlaybackState()
                 return
             }
 
+            configureVideoPlayback(for: url, in: view)
+            updatePlaybackState()
+        }
+
+        func teardown() {
+            assetLoadTask?.cancel()
+            assetLoadTask = nil
+            freezePlayback()
+            currentAsset = nil
+            currentItem = nil
+            imageLayer?.removeFromSuperlayer()
+            imageLayer = nil
+
+            if let currentURL, isSecurityScoped {
+                currentURL.stopAccessingSecurityScopedResource()
+            }
+            currentURL = nil
+            isSecurityScoped = false
+        }
+
+        private func updatePlaybackState() {
+            guard let view else {
+                freezePlayback()
+                return
+            }
+
+            let shouldRender = view.shouldRender
+            imageLayer?.isHidden = !shouldRender
+
+            if shouldRender {
+                resumePlaybackIfNeeded(in: view)
+            } else {
+                freezePlayback()
+            }
+        }
+
+        private func configureVideoPlayback(for url: URL, in view: VideoBackgroundSurfaceView) {
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
             let item = AVPlayerItem(asset: asset)
 
@@ -110,56 +175,55 @@ struct VideoBackgroundView: NSViewRepresentable {
             item.audioTimePitchAlgorithm = .varispeed
             item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
 
+            currentAsset = asset
+            currentItem = item
+            isFrozen = false
+
             player.removeAllItems()
             player.replaceCurrentItem(with: nil)
             player.insert(item, after: nil)
             looper = AVPlayerLooper(player: player, templateItem: item)
 
-            let layer = AVPlayerLayer(player: player)
-            layer.videoGravity = .resizeAspectFill
-            layer.drawsAsynchronously = true
-            playerLayer = layer
-            view.attachVideoLayer(layer)
-            updatePlaybackState()
+            if let playerLayer {
+                playerLayer.player = player
+                playerLayer.isHidden = false
+                view.attachVideoLayer(playerLayer)
+            } else {
+                let layer = AVPlayerLayer(player: player)
+                layer.videoGravity = .resizeAspectFill
+                layer.drawsAsynchronously = true
+                playerLayer = layer
+                view.attachVideoLayer(layer)
+            }
         }
 
-        func teardown() {
-            assetLoadTask?.cancel()
-            assetLoadTask = nil
+        private func freezePlayback() {
             player.pause()
+            currentItem?.cancelPendingSeeks()
+            currentAsset?.cancelLoading()
             looper?.disableLooping()
             looper = nil
             player.removeAllItems()
             player.replaceCurrentItem(with: nil)
             playerLayer?.player = nil
-            playerLayer?.removeFromSuperlayer()
-            playerLayer = nil
-            imageLayer?.removeFromSuperlayer()
-            imageLayer = nil
-
-            if let currentURL, isSecurityScoped {
-                currentURL.stopAccessingSecurityScopedResource()
-            }
-            currentURL = nil
-            isSecurityScoped = false
+            playerLayer?.isHidden = true
+            isFrozen = true
         }
 
-        private func updatePlaybackState() {
-            guard let view else {
-                player.pause()
-                playerLayer?.isHidden = true
+        private func resumePlaybackIfNeeded(in view: VideoBackgroundSurfaceView) {
+            guard imageLayer == nil else {
+                imageLayer?.isHidden = false
                 return
             }
 
-            let shouldRender = view.shouldRender
-            playerLayer?.isHidden = !shouldRender
-            imageLayer?.isHidden = !shouldRender
+            guard let currentURL else { return }
 
-            if shouldRender {
-                player.play()
-            } else {
-                player.pause()
+            if isFrozen || player.currentItem == nil || playerLayer?.player == nil {
+                configureVideoPlayback(for: currentURL, in: view)
             }
+
+            playerLayer?.isHidden = false
+            player.play()
         }
     }
 }
@@ -185,7 +249,10 @@ final class VideoBackgroundSurfaceView: NSView {
 
     var shouldRender: Bool {
         guard let window else { return false }
-        return window.isVisible && window.occlusionState.contains(.visible)
+        return window.isVisible &&
+            !window.isMiniaturized &&
+            window.occlusionState.contains(.visible) &&
+            !NSApp.isHidden
     }
 
     func attachVideoLayer(_ layer: AVPlayerLayer) {
@@ -210,9 +277,14 @@ final class VideoBackgroundSurfaceView: NSView {
                 self?.visibilityDidChange?()
             }
             NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didChangeOcclusionStateNotification, object: window)
+            NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didMiniaturizeNotification, object: window)
+            NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didDeminiaturizeNotification, object: window)
         } else {
             visibilityDidChange?()
         }
+
+        NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSApplication.didHideNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSApplication.didUnhideNotification, object: nil)
     }
 
     @objc private func windowOcclusionDidChange() {

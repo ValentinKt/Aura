@@ -41,6 +41,7 @@ actor UpscaleManager {
 
     private let maxConcurrentOperations: Int
     private let workerFactory: @Sendable () throws -> ImageUpscaler
+    private var sharedWorker: ImageUpscaler?
 
     init(
         maxConcurrentOperations: Int = 2,
@@ -79,6 +80,19 @@ actor UpscaleManager {
         return cgImages.map { image in
             NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         }
+    }
+
+    func upscale(_ image: NSImage) async throws -> NSImage {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            return image
+        }
+
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            throw UpscaleError.cgImageCreationFailed(index: 0)
+        }
+
+        let upscaledImage = try await upscale(cgImage)
+        return NSImage(cgImage: upscaledImage, size: NSSize(width: upscaledImage.width, height: upscaledImage.height))
     }
 
     func upscale(
@@ -129,6 +143,15 @@ actor UpscaleManager {
         }
 
         return try await upscale(workItems, progress: progress)
+    }
+
+    func upscale(_ image: CGImage) async throws -> CGImage {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            return image
+        }
+
+        let worker = try makeSharedWorkerIfNeeded()
+        return try await worker.upscaleCGImage(image)
     }
 
     private func upscale(
@@ -190,6 +213,16 @@ actor UpscaleManager {
         }
 
         return cgImage
+    }
+
+    private func makeSharedWorkerIfNeeded() throws -> ImageUpscaler {
+        if let sharedWorker {
+            return sharedWorker
+        }
+
+        let worker = try workerFactory()
+        sharedWorker = worker
+        return worker
     }
 }
 
