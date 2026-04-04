@@ -69,7 +69,7 @@ struct ContentView: View {
             .opacity(appModel.showImmersive ? 0 : 1)
             .animation(.easeInOut(duration: 0.5), value: appModel.showImmersive)
         }
-        .frame(minWidth: 950, minHeight: 800)
+        .frame(minWidth: 1050, minHeight: 900)
         .overlay {
             if appModel.showCommandPalette {
                 ZStack {
@@ -411,7 +411,7 @@ struct ContentView: View {
 
     private var mainMoodView: some View {
         ScrollViewReader { proxy in
-            let moodListHeight: CGFloat = 380
+            let moodListHeight: CGFloat = 480
             VStack(spacing: 0) {
                 headerView
 

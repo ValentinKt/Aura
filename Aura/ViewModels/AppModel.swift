@@ -116,8 +116,10 @@ final class AppModel {
             isStarting = false
             resumeStartupWaiters()
         }
-        Logger.app.info("🟢 [AppModel] Starting engines...")
-        let startupCompleted = await runInitialStartupSequence()
+        let isFirstLaunch = !UserDefaults.standard.bool(forKey: StorageKey.initialAuraWallpaperApplied)
+        
+        Logger.app.info("🟢 [AppModel] Starting engines (First launch: \(isFirstLaunch))...")
+        let startupCompleted = await runInitialStartupSequence(isFirstLaunch: isFirstLaunch)
         if !startupCompleted {
             Logger.app.warning("🟧 [AppModel] Startup timed out, continuing with partial readiness.")
         }
@@ -127,7 +129,7 @@ final class AppModel {
         isReady = true
         wallpaperEngine.setPresentationSuppressed(false)
         await moodEngine.completeDeferredStartupIfNeeded()
-        await applyInitialAuraWallpaperIfNeeded()
+        await setupFirstLaunchExperience()
         weatherEngine.start()
         if settings.randomAmbienceInterval > 0 {
             soundEngine.startRandomization(interval: settings.randomAmbienceInterval, validRange: 0.1...0.9)
@@ -152,10 +154,10 @@ final class AppModel {
         await start()
     }
 
-    private func runInitialStartupSequence() async -> Bool {
+    private func runInitialStartupSequence(isFirstLaunch: Bool) async -> Bool {
         await withTaskGroup(of: Bool.self) { group in
             group.addTask { [moodEngine] in
-                await moodEngine.start(deferInitialPresentation: true)
+                await moodEngine.start(deferInitialPresentation: true, skipDefaultMood: isFirstLaunch)
                 return true
             }
 
@@ -170,7 +172,7 @@ final class AppModel {
         }
     }
 
-    private func applyInitialAuraWallpaperIfNeeded() async {
+    private func setupFirstLaunchExperience() async {
         guard !UserDefaults.standard.bool(forKey: StorageKey.initialAuraWallpaperApplied) else { return }
         guard let firstAuraMood = moodViewModel.firstMood(inSubtheme: "Aura") else { return }
 

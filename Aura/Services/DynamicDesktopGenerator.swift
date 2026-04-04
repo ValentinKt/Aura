@@ -75,17 +75,34 @@ final class DynamicDesktopGenerator {
     }
 
     func generate(from sourceURL: URL, outputURL: URL, progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }) async throws {
-        let sourceImage = try await loadImage(from: sourceURL)
-        try await generate(from: sourceImage, outputURL: outputURL, progress: progress)
+        let cgSourceImage: CGImage = try await Task.detached(priority: .userInitiated) { () throws -> CGImage in
+            let isSecurityScoped = sourceURL.startAccessingSecurityScopedResource()
+            defer { if isSecurityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
+
+            if let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+               let cg = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: false] as CFDictionary) {
+                return cg
+            }
+            throw GeneratorError.sourceImageLoadingFailed
+        }.value
+
+        try await generate(from: cgSourceImage, outputURL: outputURL, progress: progress)
     }
 
     func generate(from sourceImage: NSImage, outputURL: URL, progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }) async throws {
+        let cgSourceImage: CGImage = try await MainActor.run { () throws -> CGImage in
+            guard let cg = sourceImage.cgImage(forProposedRect: nil, context: nil, hints: [NSImageRep.HintKey: Any]()) else {
+                throw GeneratorError.cgImageCreationFailed
+            }
+            return cg
+        }
+
+        try await generate(from: cgSourceImage, outputURL: outputURL, progress: progress)
+    }
+
+    private func generate(from cgSourceImage: CGImage, outputURL: URL, progress: @escaping @Sendable (ProgressUpdate) -> Void = { _ in }) async throws {
         progress(ProgressUpdate(fractionCompleted: 0, step: .preparing))
         let totalFrames = self.totalFrames
-
-        guard let cgSourceImage = sourceImage.cgImage(forProposedRect: nil, context: nil, hints: [NSImageRep.HintKey: Any]()) else {
-            throw GeneratorError.cgImageCreationFailed
-        }
 
         let colorSpace = CGColorSpace(name: CGColorSpace.displayP3) ?? CGColorSpaceCreateDeviceRGB()
         let ciSourceImage = CIImage(cgImage: cgSourceImage, options: [.colorSpace: colorSpace])
@@ -94,9 +111,7 @@ final class DynamicDesktopGenerator {
             throw GeneratorError.destinationCreationFailed
         }
 
-        defer {
-            ciContext.clearCaches()
-        }
+        defer { ciContext.clearCaches() }
 
         let metadata = try makeMetadata(totalFrames: totalFrames)
         let destinationOptions: [String: Any] = [
@@ -115,14 +130,9 @@ final class DynamicDesktopGenerator {
             try Task.checkCancellation()
             let frameNumber = i + 1
 
-            progress(
-                ProgressUpdate(
-                    fractionCompleted: progressFraction(completedUnits),
-                    step: .generatingFrame(index: frameNumber, total: totalFrames)
-                )
-            )
+            progress(ProgressUpdate(fractionCompleted: progressFraction(completedUnits), step: .generatingFrame(index: frameNumber, total: totalFrames)))
 
-            let generatedFrame = try await generateFrame(
+            let generatedFrame = try generateFrame(
                 from: ciSourceImage,
                 frameIndex: i,
                 totalFrames: totalFrames,
@@ -130,25 +140,12 @@ final class DynamicDesktopGenerator {
             )
             completedUnits += 1
 
-            progress(
-                ProgressUpdate(
-                    fractionCompleted: progressFraction(completedUnits),
-                    step: .upscalingFrame(
-                        completed: frameNumber - 1,
-                        total: totalFrames,
-                        currentIndex: frameNumber
-                    )
-                )
-            )
+            progress(ProgressUpdate(fractionCompleted: progressFraction(completedUnits), step: .upscalingFrame(completed: frameNumber - 1, total: totalFrames, currentIndex: frameNumber)))
             let upscaledFrame = try await upscaleManager.upscale(generatedFrame)
             completedUnits += 1
-            progress(
-                ProgressUpdate(
-                    fractionCompleted: progressFraction(completedUnits),
-                    step: .encodingFrame(index: frameNumber, total: totalFrames)
-                )
-            )
-            let optimizedFrame = try await optimizeFrameForStorage(upscaledFrame, colorSpace: colorSpace)
+
+            progress(ProgressUpdate(fractionCompleted: progressFraction(completedUnits), step: .encodingFrame(index: frameNumber, total: totalFrames)))
+            let optimizedFrame = try optimizeFrameForStorage(upscaledFrame, colorSpace: colorSpace)
 
             if i == 0 {
                 CGImageDestinationAddImageAndMetadata(destination, optimizedFrame, metadata, destinationOptions as CFDictionary)
@@ -158,12 +155,7 @@ final class DynamicDesktopGenerator {
             completedUnits += 1
         }
 
-        progress(
-            ProgressUpdate(
-                fractionCompleted: progressFraction(completedUnits),
-                step: .finalizing
-            )
-        )
+        progress(ProgressUpdate(fractionCompleted: progressFraction(completedUnits), step: .finalizing))
 
         if !CGImageDestinationFinalize(destination) {
             throw GeneratorError.destinationCreationFailed
@@ -172,14 +164,12 @@ final class DynamicDesktopGenerator {
         progress(ProgressUpdate(fractionCompleted: 1, step: .finalizing))
     }
 
-    private func optimizeFrameForStorage(_ pixelBuffer: CVPixelBuffer, colorSpace: CGColorSpace) async throws -> CGImage {
+    private func optimizeFrameForStorage(_ pixelBuffer: CVPixelBuffer, colorSpace: CGColorSpace) throws -> CGImage {
         let context = self.ciContext
-        return try await Task.detached(priority: .userInitiated) {
-            try autoreleasepool { () throws -> CGImage in
-                let resizedImage = try Self.resizeForRetinaIfNeeded(pixelBuffer, colorSpace: colorSpace, context: context)
-                return try Self.compressAsJPEG(resizedImage, colorSpace: colorSpace)
-            }
-        }.value
+        return try autoreleasepool { () throws -> CGImage in
+            let resizedImage = try Self.resizeForRetinaIfNeeded(pixelBuffer, colorSpace: colorSpace, context: context)
+            return try Self.compressAsJPEG(resizedImage, colorSpace: colorSpace)
+        }
     }
 
     private func loadImage(from sourceURL: URL) async throws -> NSImage {
@@ -241,74 +231,72 @@ final class DynamicDesktopGenerator {
         frameIndex: Int,
         totalFrames: Int,
         colorSpace: CGColorSpace
-    ) async throws -> CVPixelBuffer {
+    ) throws -> CVPixelBuffer {
         let context = self.ciContext
-        return try await Task.detached(priority: .userInitiated) {
-            try autoreleasepool { () throws -> CVPixelBuffer in
-                let timeFraction = Double(frameIndex) / Double(totalFrames)
-                let cycle = timeFraction * 2.0 * .pi
-                let exposure = -0.75 - 1.25 * cos(cycle)
-                let daylight = max(0.0, sin(timeFraction * .pi))
-                let sunriseWarmth = Self.gaussianPeak(at: timeFraction, center: 0.25, width: 0.09) +
-                Self.gaussianPeak(at: timeFraction, center: 0.75, width: 0.09)
-                let nightBlend = max(0.0, cos(cycle))
-                let saturation = 1.0 - (nightBlend * 0.35)
-                let contrast = 1.0 + (nightBlend * 0.18)
-                let temperature = min(8000.0, max(3000.0, 3500.0 + (daylight * 3000.0) + (sunriseWarmth * 1500.0)))
+        return try autoreleasepool { () throws -> CVPixelBuffer in
+            let timeFraction = Double(frameIndex) / Double(totalFrames)
+            let cycle = timeFraction * 2.0 * .pi
+            let exposure = -0.75 - 1.25 * cos(cycle)
+            let daylight = max(0.0, sin(timeFraction * .pi))
+            let sunriseWarmth = Self.gaussianPeak(at: timeFraction, center: 0.25, width: 0.09) +
+            Self.gaussianPeak(at: timeFraction, center: 0.75, width: 0.09)
+            let nightBlend = max(0.0, cos(cycle))
+            let saturation = 1.0 - (nightBlend * 0.35)
+            let contrast = 1.0 + (nightBlend * 0.18)
+            let temperature = min(8000.0, max(3000.0, 3500.0 + (daylight * 3000.0) + (sunriseWarmth * 1500.0)))
 
-                guard let exposureFilter = CIFilter(name: "CIExposureAdjust") else { throw GeneratorError.imageProcessingFailed }
-                exposureFilter.setValue(masterImage, forKey: kCIInputImageKey)
-                exposureFilter.setValue(exposure, forKey: kCIInputEVKey)
-                guard let exposedImage = exposureFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
+            guard let exposureFilter = CIFilter(name: "CIExposureAdjust") else { throw GeneratorError.imageProcessingFailed }
+            exposureFilter.setValue(masterImage, forKey: kCIInputImageKey)
+            exposureFilter.setValue(exposure, forKey: kCIInputEVKey)
+            guard let exposedImage = exposureFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
 
-                guard let tempFilter = CIFilter(name: "CITemperatureAndTint") else { throw GeneratorError.imageProcessingFailed }
-                tempFilter.setValue(exposedImage, forKey: kCIInputImageKey)
-                tempFilter.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
-                tempFilter.setValue(CIVector(x: temperature, y: 0), forKey: "inputTargetNeutral")
-                guard let temperatureAdjustedImage = tempFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
+            guard let tempFilter = CIFilter(name: "CITemperatureAndTint") else { throw GeneratorError.imageProcessingFailed }
+            tempFilter.setValue(exposedImage, forKey: kCIInputImageKey)
+            tempFilter.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
+            tempFilter.setValue(CIVector(x: temperature, y: 0), forKey: "inputTargetNeutral")
+            guard let temperatureAdjustedImage = tempFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
 
-                guard let colorFilter = CIFilter(name: "CIColorControls") else { throw GeneratorError.imageProcessingFailed }
-                colorFilter.setValue(temperatureAdjustedImage, forKey: kCIInputImageKey)
-                colorFilter.setValue(saturation, forKey: kCIInputSaturationKey)
-                colorFilter.setValue(contrast, forKey: kCIInputContrastKey)
-                guard let finalOutput = colorFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
+            guard let colorFilter = CIFilter(name: "CIColorControls") else { throw GeneratorError.imageProcessingFailed }
+            colorFilter.setValue(temperatureAdjustedImage, forKey: kCIInputImageKey)
+            colorFilter.setValue(saturation, forKey: kCIInputSaturationKey)
+            colorFilter.setValue(contrast, forKey: kCIInputContrastKey)
+            guard let finalOutput = colorFilter.outputImage else { throw GeneratorError.imageProcessingFailed }
 
-                // Create CVPixelBuffer backed by IOSurface
-                let extent = finalOutput.extent.integral
-                let width = Int(extent.width)
-                let height = Int(extent.height)
+            // Create CVPixelBuffer backed by IOSurface
+            let extent = finalOutput.extent.integral
+            let width = Int(extent.width)
+            let height = Int(extent.height)
 
-                let attributes: [String: Any] = [
-                    kCVPixelBufferWidthKey as String: width,
-                    kCVPixelBufferHeightKey as String: height,
-                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-                    kCVPixelBufferCGImageCompatibilityKey as String: true,
-                    kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
-                    kCVPixelBufferMetalCompatibilityKey as String: true,
-                    kCVPixelBufferIOSurfacePropertiesKey as String: [:]
-                ]
+            let attributes: [String: Any] = [
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferCGImageCompatibilityKey as String: true,
+                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+                kCVPixelBufferMetalCompatibilityKey as String: true,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            ]
 
-                var pixelBuffer: CVPixelBuffer?
-                let status = CVPixelBufferCreate(
-                    kCFAllocatorDefault,
-                    width,
-                    height,
-                    kCVPixelFormatType_32BGRA,
-                    attributes as CFDictionary,
-                    &pixelBuffer
-                )
+            var pixelBuffer: CVPixelBuffer?
+            let status = CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                width,
+                height,
+                kCVPixelFormatType_32BGRA,
+                attributes as CFDictionary,
+                &pixelBuffer
+            )
 
-                guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
-                    throw GeneratorError.cgImageCreationFailed
-                }
-
-                CVPixelBufferLockBaseAddress(buffer, [])
-                defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-                context.render(finalOutput, to: buffer, bounds: extent, colorSpace: colorSpace)
-
-                return buffer
+            guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+                throw GeneratorError.cgImageCreationFailed
             }
-        }.value
+
+            CVPixelBufferLockBaseAddress(buffer, [])
+            defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+            context.render(finalOutput, to: buffer, bounds: extent, colorSpace: colorSpace)
+
+            return buffer
+        }
     }
 
     nonisolated private static func resizeForRetinaIfNeeded(
@@ -319,7 +307,7 @@ final class DynamicDesktopGenerator {
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let longEdge = max(width, height)
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace]) ?? CIImage(cvPixelBuffer: pixelBuffer)
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer, options: [.colorSpace: colorSpace])
 
         guard CGFloat(longEdge) > maximumRetinaLongEdge else {
             guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent, format: .RGBA8, colorSpace: colorSpace) else {

@@ -72,6 +72,7 @@ struct AuraApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
+        .defaultSize(width: 1050, height: 900)
         .commands {
             CommandMenu("Aura") {
                 Button(appModel.playerViewModel.isPlaying ? "Pause" : "Play") {

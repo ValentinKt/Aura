@@ -97,12 +97,12 @@ final class MoodEngine {
         }
     }
 
-    func start(deferInitialPresentation: Bool = false) async {
+    func start(deferInitialPresentation: Bool = false, skipDefaultMood: Bool = false) async {
         do {
             try await soundEngine.prepare()
             if let last = settingsEngine.loadSettings().lastUsedMoodID, let mood = moods.first(where: { $0.id == last }) {
                 await applyMood(mood, strategy: deferInitialPresentation ? .deferredStartup : .standard)
-            } else if let first = moods.first {
+            } else if !skipDefaultMood, let first = moods.first {
                 await applyMood(first, strategy: deferInitialPresentation ? .deferredStartup : .standard)
             }
             if state != .error {

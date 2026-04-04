@@ -113,7 +113,7 @@ enum MediaUtils {
         }
 
         let bundle = Bundle.main
-        if allowVideoFallback, isVideo && !name.hasSuffix("_1") {
+        if allowVideoFallback, isVideo {
             if let imageFallbackURL = resolveImageFallback(for: name) {
                 log.debug("Returning image fallback for \(name, privacy: .public)")
                 return imageFallbackURL

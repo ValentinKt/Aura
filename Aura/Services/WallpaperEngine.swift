@@ -180,6 +180,10 @@ final class WallpaperEngine {
     var backgroundImageURL: URL?
     var currentPrimaryWallpaperURL: URL?
     var currentSecondaryWallpaperURL: URL?
+    
+    private var isPresentationSuppressed = false
+    private var pendingDescriptor: WallpaperDescriptor?
+
 
     var displayWallpaperPreviews: [WallpaperDisplayPreview] {
         let screens = NSScreen.screens
@@ -226,8 +230,15 @@ final class WallpaperEngine {
     private var selectedWallpaperResource: String?
 
     func setPresentationSuppressed(_ suppressed: Bool) {
-        // Kept as no-op for call-site compatibility: suppression logic
-        // was removed; callers should be migrated if needed.
+        let changed = isPresentationSuppressed != suppressed
+        isPresentationSuppressed = suppressed
+        
+        if changed && !suppressed, let pending = pendingDescriptor {
+            pendingDescriptor = nil
+            Task {
+                await applyWallpaper(pending)
+            }
+        }
     }
 
     init(themeManager: ThemeManager) {
@@ -259,6 +270,13 @@ final class WallpaperEngine {
                 backgroundImageURL = resolveResourceURL(resource)
             }
         }
+
+        if isPresentationSuppressed {
+            logger.notice("Presentation suppressed, caching descriptor for later application")
+            pendingDescriptor = descriptor
+            return WallpaperApplyResult(success: true, permissionDenied: false)
+        }
+
 
         let isStatic = descriptor.type == .staticImage || descriptor.type == .dynamic || descriptor.type == .current
 
@@ -806,7 +824,8 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func setupWindow() {
-        let screenFrame = NSScreen.main?.frame ?? .zero
+        // Use a fallback frame if NSScreen.main is not yet available during early launch
+        let screenFrame = NSScreen.main?.frame ?? NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
         let window = DesktopWallpaperWindow(
             contentRect: screenFrame,
             styleMask: [.borderless],
@@ -906,6 +925,8 @@ final class WallpaperWindowController: NSObject {
 
         // Remove existing hosting view if any
         hostingView?.removeFromSuperview()
+        
+        ensureCorrectFrame()
 
         // Create and pin the SwiftUI hosting view
         let host = NSHostingView(rootView: AnyView(view))
@@ -937,8 +958,11 @@ final class WallpaperWindowController: NSObject {
 
     func playVideo(url: URL) {
         if self.currentURL == url && self.isPlaying() {
+            ensureCorrectFrame() // Still ensure frame is correct even if already playing
             return
         }
+        
+        ensureCorrectFrame()
 
         stopVideo()
         stopWebsite()
@@ -966,6 +990,7 @@ final class WallpaperWindowController: NSObject {
     func showWebsite(url: URL) {
         stopVideo()
         hideSwiftUIView()
+        ensureCorrectFrame()
         ensureWebsiteContainerView()
 
         guard let container = websiteContainerView,
@@ -1413,6 +1438,25 @@ final class WallpaperWindowController: NSObject {
         stopWebsite()
         hideSwiftUIView()
         window?.orderOut(nil)
+        
+        if let pv = playerView {
+            pv.layer?.backgroundColor = NSColor.clear.cgColor
+        }
+        
+        if let scv = websiteContainerView {
+            scv.isHidden = true
+        }
+    }
+
+    private func ensureCorrectFrame() {
+        guard let window = self.window, let screen = NSScreen.main else { return }
+        
+        // If the window is currently at (0,0,0,0) or incorrect for the main screen, update it
+        if window.frame.size == .zero || window.frame != screen.frame {
+            window.setFrame(screen.frame, display: true)
+            playerLayer?.frame = window.contentView?.bounds ?? screen.frame
+            logger.notice("Updated wallpaper window frame to match screen: \(String(describing: screen.frame))")
+        }
     }
 
     func isPlaying() -> Bool {
