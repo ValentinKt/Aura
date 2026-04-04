@@ -154,6 +154,15 @@ actor UpscaleManager {
         return try await worker.upscaleCGImage(image)
     }
 
+    func upscale(_ pixelBuffer: CVPixelBuffer) async throws -> CVPixelBuffer {
+        if ProcessInfo.processInfo.isLowPowerModeEnabled {
+            return pixelBuffer
+        }
+
+        let worker = try makeSharedWorkerIfNeeded()
+        return try await worker.upscalePixelBuffer(pixelBuffer)
+    }
+
     private func upscale(
         _ workItems: [WorkItem],
         progress: @escaping @Sendable (ProgressUpdate) -> Void

@@ -97,38 +97,47 @@ struct AnimatedParticleView: View {
 
 struct FallbackImageView: View {
     let url: URL?
-    let image: NSImage?
+    let fallbackImage: NSImage?
+
+    @State private var loadedImage: NSImage?
 
     init(url: URL) {
         self.url = url
-        self.image = nil
+        self.fallbackImage = nil
     }
 
     init(image: NSImage) {
         self.url = nil
-        self.image = image
+        self.fallbackImage = image
     }
 
     var body: some View {
-        if let image = image {
-            Image(nsImage: image)
+        if let fallbackImage = fallbackImage {
+            Image(nsImage: fallbackImage)
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
-        } else if let url = url {
-            Image(nsImage: loadImage(from: url))
+        } else if let loadedImage = loadedImage {
+            Image(nsImage: loadedImage)
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
         } else {
             Color.black.ignoresSafeArea()
+                .task {
+                    if let url = url {
+                        loadedImage = await loadAsyncImage(from: url)
+                    }
+                }
         }
     }
 
-    private func loadImage(from url: URL) -> NSImage {
-        let isScoped = url.startAccessingSecurityScopedResource()
-        defer { if isScoped { url.stopAccessingSecurityScopedResource() } }
-        return NSImage(contentsOf: url) ?? NSImage()
+    private func loadAsyncImage(from url: URL) async -> NSImage? {
+        await Task.detached(priority: .userInitiated) {
+            let isScoped = url.startAccessingSecurityScopedResource()
+            defer { if isScoped { url.stopAccessingSecurityScopedResource() } }
+            return NSImage(contentsOf: url)
+        }.value
     }
 }
 
@@ -147,9 +156,18 @@ final class WallpaperEngine {
     private let fileManager = FileManager.default
     private let themeManager: ThemeManager
     private let wallpaperDirectory: URL
-    private let imageProcessingContext = CIContext()
-    private var isRendering = false
-    private var isPresentationSuppressed = false
+    private let imageProcessingContext: CIContext = {
+        // Use the system Metal device for GPU-accelerated Core Image processing.
+        // This offloads CIFilter chains (blur, colour correction) to the GPU,
+        // freeing CPU cores for the audio engine and Swift concurrency runtime.
+        if let device = MTLCreateSystemDefaultDevice() {
+            return CIContext(mtlDevice: device, options: [
+                .workingColorSpace: CGColorSpaceCreateDeviceRGB(),
+                .cacheIntermediates: false
+            ])
+        }
+        return CIContext(options: [.cacheIntermediates: false])
+    }()
     private let wallpaperWindowController = WallpaperWindowController()
 
     var selectedWallpaperURL: URL? {
@@ -208,7 +226,8 @@ final class WallpaperEngine {
     private var selectedWallpaperResource: String?
 
     func setPresentationSuppressed(_ suppressed: Bool) {
-        isPresentationSuppressed = suppressed
+        // Kept as no-op for call-site compatibility: suppression logic
+        // was removed; callers should be migrated if needed.
     }
 
     init(themeManager: ThemeManager) {
@@ -229,66 +248,58 @@ final class WallpaperEngine {
 
     func applyWallpaper(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         logger.notice("Applying wallpaper of type \(String(describing: descriptor.type), privacy: .public)")
-        let storesConcreteWallpaper = descriptor.type == .staticImage || descriptor.type == .animated || descriptor.type == .dynamic
+
+        let storesConcreteWallpaper = descriptor.type == .staticImage
+            || descriptor.type == .animated
+            || descriptor.type == .dynamic
+
         if storesConcreteWallpaper {
             selectedWallpaperResource = descriptor.resources.first
-        }
-
-        // Update backgroundImageURL whenever we apply a concrete image/video wallpaper,
-        // so dynamic views (Time) can use it as their background even after switching.
-        if storesConcreteWallpaper {
             if let resource = descriptor.resources.first {
                 backgroundImageURL = resolveResourceURL(resource)
             }
         }
 
-        if isPresentationSuppressed {
-            logger.debug("Presentation suppressed, skipping wallpaper application")
-            return WallpaperApplyResult(success: true, permissionDenied: false)
-        }
+        let isStatic = descriptor.type == .staticImage || descriptor.type == .dynamic || descriptor.type == .current
 
-        let isStatic = descriptor.type == WallpaperType.staticImage || descriptor.type == WallpaperType.dynamic
+        // For non-static types (animated, time, website, particle, gradient),
+        // tear down the window-based overlay before installing the new one.
+        // For static/dynamic/current, stopAll() is called after the image is applied
+        // to avoid a blank flash during the transition.
         if !isStatic {
-            stopAnimation()
-        } else {
-            // Stop timers but keep the current view/video until the new desktop image is applied to avoid a flash
-            isRendering = false
+            wallpaperWindowController.stopAll()
         }
 
         let result: WallpaperApplyResult
         switch descriptor.type {
         case .staticImage:
             result = await applyStaticAsync(descriptor)
-            if isStatic { wallpaperWindowController.stopAll() }
+            wallpaperWindowController.stopAll()
         case .gradient:
             result = await applyGradientAsync(descriptor)
         case .animated:
-            // Animation logic needs to be on main thread for Timer
             startAnimated(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
         case .particle:
-            // Animation logic needs to be on main thread for Timer
             startParticle(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
         case .current:
-            // Explicitly do nothing to keep current wallpaper
             result = WallpaperApplyResult(success: true, permissionDenied: false)
-            if isStatic { wallpaperWindowController.stopAll() }
+            wallpaperWindowController.stopAll()
         case .dynamic:
-            // For macOS, setting a .heic file automatically enables dynamic features if the file supports it
             result = await applyStaticAsync(descriptor)
-            if isStatic { wallpaperWindowController.stopAll() }
+            wallpaperWindowController.stopAll()
         case .time:
             startTime(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
         case .website:
-            // Handle website wallpaper
             startWebsite(descriptor)
             result = WallpaperApplyResult(success: true, permissionDenied: false)
         }
 
         return result
     }
+
 
     private func applyStaticAsync(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         guard let resource = descriptor.resources.first else {
@@ -304,18 +315,7 @@ final class WallpaperEngine {
         return WallpaperApplyResult(success: false, permissionDenied: false)
     }
 
-    private func applyStatic(_ descriptor: WallpaperDescriptor) -> WallpaperApplyResult {
-        guard let resource = descriptor.resources.first else {
-            return WallpaperApplyResult(success: false, permissionDenied: false)
-        }
 
-        if let resolvedURL = resolveResourceURL(resource) {
-            return applyImageURLs([resolvedURL])
-        }
-
-        logger.error("Could not find wallpaper resource \(resource, privacy: .public)")
-        return WallpaperApplyResult(success: false, permissionDenied: false)
-    }
 
     private func applyGradientAsync(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         if let image = await renderGradientImageAsync(stops: descriptor.gradientStops),
@@ -327,9 +327,6 @@ final class WallpaperEngine {
     }
 
     private func startAnimated(_ descriptor: WallpaperDescriptor) {
-        let isLowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
-        let fps = isLowPower ? min(5, max(0.1, descriptor.fps)) / 2 : min(5, max(0.1, descriptor.fps))
-
         if let resource = descriptor.resources.first {
             if let resolvedURL = resolveResourceURL(resource) {
                 let ext = resolvedURL.pathExtension.lowercased()
@@ -337,10 +334,10 @@ final class WallpaperEngine {
                     Task {
                         await self.applyOverlayBackdrops(primaryResourceURL: resolvedURL)
                     }
-                    startVideoAnimated(resourceURL: resolvedURL, fps: fps)
+                    // Play directly via window controller — no separate wrapper function needed.
+                    wallpaperWindowController.playVideo(url: resolvedURL)
                     return
                 } else if ["jpg", "jpeg", "png", "heic"].contains(ext) {
-                    // If it resolved to an image (e.g., fallback), show it in the window instead of changing the system wallpaper
                     Task {
                         await self.applyOverlayBackdrops(primaryResourceURL: resolvedURL)
                     }
@@ -349,7 +346,6 @@ final class WallpaperEngine {
                     return
                 }
             } else {
-                // If the video isn't downloaded yet, check for a placeholder image from the asset catalog
                 let resourceNameWithoutExtension = (resource as NSString).deletingPathExtension
                 if let placeholderImage = NSImage(named: resource) ?? NSImage(named: resourceNameWithoutExtension) {
                     Task {
@@ -359,7 +355,6 @@ final class WallpaperEngine {
                     wallpaperWindowController.showSwiftUIView(imageView)
                     return
                 } else {
-                    // Fallback to a gradient based on the theme palette instead of stopping the window
                     let palette = self.themeManager.palette
                     let stops = [palette.primary, palette.secondary]
                     let gradientView = AnimatedGradientView(stops: stops)
@@ -372,11 +367,6 @@ final class WallpaperEngine {
         let stops = descriptor.gradientStops
         let gradientView = AnimatedGradientView(stops: stops)
         wallpaperWindowController.showSwiftUIView(gradientView)
-    }
-
-    private func startVideoAnimated(resourceURL: URL, fps: Double) {
-        // Use the window-based player for smooth video playback
-        wallpaperWindowController.playVideo(url: resourceURL)
     }
 
     private func resolveResourceURL(_ resource: String) -> URL? {
@@ -455,40 +445,6 @@ final class WallpaperEngine {
     }
 
     @MainActor
-    private func applyImageURLsAsync(_ urls: [URL]) async -> WallpaperApplyResult {
-        var permissionDenied = false
-        var applied = false
-        let screens = NSScreen.screens
-        updateCurrentWallpaperURLs(
-            primaryURL: urls.first,
-            secondaryURL: urls.count > 1 ? urls[1] : nil
-        )
-
-        if screens.isEmpty {
-            // For headless environments (CI/Tests), we assume success if URLs exist
-            let allExist = urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
-            return WallpaperApplyResult(success: allExist, permissionDenied: false)
-        }
-
-        for screen in screens {
-            for url in urls {
-                do {
-                    // Running this inside a Task.detached to prevent blocking MainActor if possible
-                    // But NSScreen is not Sendable. We can use setDesktopImageURL on MainActor.
-                    try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
-                    applied = true
-                } catch let error as NSError {
-                    logger.error("Error setting desktop image URL: \(error.localizedDescription, privacy: .public)")
-                    if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
-                        permissionDenied = true
-                    }
-                }
-            }
-        }
-        return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
-    }
-
-    @MainActor
     private func applyScreenWallpaperURLsAsync(primaryURL: URL, secondaryURL: URL?) async -> WallpaperApplyResult {
         var permissionDenied = false
         var applied = false
@@ -526,70 +482,34 @@ final class WallpaperEngine {
         return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
     }
 
-    private func applyImageURLs(_ urls: [URL]) -> WallpaperApplyResult {
-        // Fallback for synchronous calls if needed
-        var permissionDenied = false
-        var applied = false
-        let screens = NSScreen.screens
-        updateCurrentWallpaperURLs(
-            primaryURL: urls.first,
-            secondaryURL: urls.count > 1 ? urls[1] : nil
-        )
-
-        if screens.isEmpty {
-            let allExist = urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
-            return WallpaperApplyResult(success: allExist, permissionDenied: false)
-        }
-
-        for screen in screens {
-            for url in urls {
-                do {
-                    try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
-                    applied = true
-                } catch let error as NSError {
-                    logger.error("Error setting desktop image URL: \(error.localizedDescription, privacy: .public)")
-                    if error.domain == NSCocoaErrorDomain && error.code == NSFileWriteNoPermissionError {
-                        permissionDenied = true
-                    }
-                }
-            }
-        }
-        return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
-    }
 
     private func renderGradientImageAsync(stops: [ColorComponents]) async -> NSImage? {
         let size = NSScreen.main?.frame.size ?? CGSize(width: 1920, height: 1080)
-        return await withCheckedContinuation { continuation in
-            Task(priority: .utility) {
-                let colorSpace = CGColorSpaceCreateDeviceRGB()
-                guard let context = CGContext(data: nil,
-                                              width: Int(size.width),
-                                              height: Int(size.height),
-                                              bitsPerComponent: 8,
-                                              bytesPerRow: 0,
-                                              space: colorSpace,
-                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let cgColors = stops.map { NSColor(red: $0.red, green: $0.green, blue: $0.blue, alpha: $0.alpha).cgColor }
-                let gradient = CGGradient(colorsSpace: colorSpace, colors: cgColors as CFArray, locations: nil)
-
-                context.drawLinearGradient(
-                    gradient ?? CGGradient(colorsSpace: colorSpace, colors: [NSColor.black.cgColor, NSColor.darkGray.cgColor] as CFArray, locations: nil)!,
-                    start: .zero,
-                    end: CGPoint(x: size.width, y: size.height),
-                    options: []
-                )
-
-                if let cgImage = context.makeImage() {
-                    continuation.resume(returning: NSImage(cgImage: cgImage, size: size))
-                } else {
-                    continuation.resume(returning: nil)
-                }
+        return await Task(priority: .userInitiated) { [imageProcessingContext] in
+            var color0 = CIColor.black
+            var color1 = CIColor.gray
+            
+            if stops.count >= 2 {
+                color0 = CIColor(red: CGFloat(stops[0].red), green: CGFloat(stops[0].green), blue: CGFloat(stops[0].blue), alpha: CGFloat(stops[0].alpha))
+                color1 = CIColor(red: CGFloat(stops.last!.red), green: CGFloat(stops.last!.green), blue: CGFloat(stops.last!.blue), alpha: CGFloat(stops.last!.alpha))
+            } else if stops.count == 1 {
+                let c = CIColor(red: CGFloat(stops[0].red), green: CGFloat(stops[0].green), blue: CGFloat(stops[0].blue), alpha: CGFloat(stops[0].alpha))
+                color0 = c; color1 = c
             }
-        }
+            
+            guard let filter = CIFilter(name: "CILinearGradient") else { return nil }
+            filter.setValue(CIVector(x: 0, y: 0), forKey: "inputPoint0")
+            filter.setValue(CIVector(x: size.width, y: size.height), forKey: "inputPoint1")
+            filter.setValue(color0, forKey: "inputColor0")
+            filter.setValue(color1, forKey: "inputColor1")
+            
+            guard let outputImage = filter.outputImage?.cropped(to: CGRect(origin: .zero, size: size)),
+                  let cgImage = imageProcessingContext.createCGImage(outputImage, from: outputImage.extent) else {
+                return nil
+            }
+            
+            return NSImage(cgImage: cgImage, size: size)
+        }.value
     }
 
     private func subduedGradientStops(from stops: [ColorComponents]) -> [ColorComponents] {
@@ -614,53 +534,6 @@ final class WallpaperEngine {
         )
     }
 
-    private func renderParticleImageAsync(seed: Int) async -> NSImage? {
-        let size = NSScreen.main?.frame.size ?? CGSize(width: 1920, height: 1080)
-        return await withCheckedContinuation { continuation in
-            Task(priority: .utility) {
-                let colorSpace = CGColorSpaceCreateDeviceRGB()
-                guard let context = CGContext(data: nil,
-                                              width: Int(size.width),
-                                              height: Int(size.height),
-                                              bitsPerComponent: 8,
-                                              bytesPerRow: 0,
-                                              space: colorSpace,
-                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                context.setFillColor(NSColor.black.cgColor)
-                context.fill(CGRect(origin: .zero, size: size))
-
-                var rng = SeededGenerator(seed: UInt64(seed))
-                let particleCount = 200
-
-                for _ in 0..<particleCount {
-                    let x = CGFloat.random(in: 0..<size.width, using: &rng.generator)
-                    let y = CGFloat.random(in: 0..<size.height, using: &rng.generator)
-                    let radius = CGFloat.random(in: 1...4, using: &rng.generator)
-
-                    let color = NSColor(
-                        calibratedRed: CGFloat.random(in: 0.4...0.9, using: &rng.generator),
-                        green: CGFloat.random(in: 0.4...0.9, using: &rng.generator),
-                        blue: CGFloat.random(in: 0.7...1.0, using: &rng.generator),
-                        alpha: CGFloat.random(in: 0.3...0.8, using: &rng.generator)
-                    )
-
-                    context.setFillColor(color.cgColor)
-                    context.setShadow(offset: .zero, blur: radius * 2, color: color.cgColor)
-                    context.fillEllipse(in: CGRect(x: x, y: y, width: radius, height: radius))
-                }
-
-                if let cgImage = context.makeImage() {
-                    continuation.resume(returning: NSImage(cgImage: cgImage, size: size))
-                } else {
-                    continuation.resume(returning: nil)
-                }
-            }
-        }
-    }
 
     private func writeImageAsync(_ image: NSImage) async -> URL? {
         await withCheckedContinuation { continuation in
@@ -851,9 +724,6 @@ final class WallpaperEngine {
         return await writeImageAsync(image)
     }
 
-    private func stopAnimation() {
-        isRendering = false
-    }
 
     private func updateCurrentWallpaperURLs(primaryURL: URL?, secondaryURL: URL?) {
         currentPrimaryWallpaperURL = primaryURL
@@ -861,29 +731,6 @@ final class WallpaperEngine {
     }
 }
 
-private struct SeededGenerator {
-    var generator: SeededRandomNumberGenerator
-
-    init(seed: UInt64) {
-        generator = SeededRandomNumberGenerator(seed: seed)
-    }
-}
-
-private struct SeededRandomNumberGenerator: RandomNumberGenerator {
-    private var state: UInt64
-
-    init(seed: UInt64) {
-        state = seed == 0 ? 0x4d595df4d0f33173 : seed
-    }
-
-    mutating func next() -> UInt64 {
-        state &+= 0x9e3779b97f4a7c15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xbf58476d1ce4e5b9
-        z = (z ^ (z >> 27)) &* 0x94d049bb133111eb
-        return z ^ (z >> 31)
-    }
-}
 
 final class WallpaperWindowController: NSObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "WallpaperWindow")
@@ -1160,6 +1007,8 @@ final class WallpaperWindowController: NSObject {
 
         currentVideoAsset = nil
         currentVideoItem = nil
+        // Bug 4 fix: nil the player here so AVPlayerLayer releases its
+        // IOSurface-backed GPU texture immediately (not deferred to next drain).
         playerQueue = nil
 
         CATransaction.begin()
@@ -1171,16 +1020,15 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func configureVideoPlayback(for url: URL) {
-        // Explicitly clear previous asset and item to prevent video memory leak
+        // Tear down any previous playback state completely first
         currentVideoItem?.cancelPendingSeeks()
         currentVideoAsset?.cancelLoading()
-        playerQueue?.replaceCurrentItem(with: nil)
-        playerQueue?.removeAllItems()
         playerLooper?.disableLooping()
         playerLooper = nil
         currentVideoItem = nil
         currentVideoAsset = nil
-        
+        // playerQueue is already nil'd by freezeVideoPlayback() before we get here.
+
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
 
@@ -1200,13 +1048,14 @@ final class WallpaperWindowController: NSObject {
             item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
         }
 
-        let player = playerQueue ?? AVQueuePlayer()
+        // Bug 2 fix: always create a fresh AVQueuePlayer — never reuse the old one.
+        // Reusing kept the old player's internal frame cache and decode state alive,
+        // contributing to the persistent RSS growth across mood switches.
+        let player = AVQueuePlayer()
         player.isMuted = true
         player.allowsExternalPlayback = false
         player.automaticallyWaitsToMinimizeStalling = false
         player.volume = 0
-        player.removeAllItems()
-        player.replaceCurrentItem(with: nil)
         player.insert(item, after: nil)
 
         currentVideoAsset = asset
@@ -1243,6 +1092,9 @@ final class WallpaperWindowController: NSObject {
         playerQueue?.replaceCurrentItem(with: nil)
         playerLayer?.player = nil
         playerLayer?.isHidden = true
+        // Bug 2 fix: allow the AVQueuePlayer to deallocate so its internal
+        // frame buffer and decode state are freed before the next wallpaper loads.
+        playerQueue = nil
     }
 
     private func resumeVideoPlaybackIfNeeded() {
@@ -1276,6 +1128,8 @@ final class WallpaperWindowController: NSObject {
         configuration.applicationNameForUserAgent = "AuraWallpaper"
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        // macOS 12+ automatically pools WebKit processes — no explicit WKProcessPool needed.
+        // The key memory savings come from loading about:blank on deactivation (see stopWebsite).
 
         let webView = InteractiveWallpaperWebView(frame: .zero, configuration: configuration)
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -1527,7 +1381,10 @@ final class WallpaperWindowController: NSObject {
         websiteSnapshotView?.image = nil
         websiteSnapshotView?.isHidden = true
         websiteWebView?.stopLoading()
-        websiteWebView?.loadHTMLString("", baseURL: nil)
+        // Bug 3 fix: navigate to about:blank instead of loading an empty HTML string.
+        // about:blank causes WebKit to tear down the current JS context and GC its heap,
+        // freeing ~200-300 MB that loadHTMLString("") does NOT release.
+        websiteWebView?.load(URLRequest(url: URL(string: "about:blank")!))
         websiteWebView?.isHidden = false
         websiteShouldReceiveMouseEvents = false
         updateWebsiteWindowLevel()

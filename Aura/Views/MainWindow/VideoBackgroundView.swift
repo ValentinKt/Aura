@@ -15,13 +15,8 @@ struct IsolatedVideoBackgroundView: View, Equatable {
 }
 
 extension View {
-    @ViewBuilder
     func auraPersistentSystemOverlaysHidden() -> some View {
-        if #available(macOS 26.0, *) {
-            persistentSystemOverlays(.hidden)
-        } else {
-            self
-        }
+        persistentSystemOverlays(.hidden)
     }
 }
 
@@ -165,7 +160,7 @@ struct VideoBackgroundView: NSViewRepresentable {
             looper = nil
             currentItem = nil
             currentAsset = nil
-            
+
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
             let item = AVPlayerItem(asset: asset)
 

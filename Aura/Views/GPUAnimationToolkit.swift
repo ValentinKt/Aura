@@ -146,10 +146,14 @@ struct NativeGPUAnimationModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .modifier(ConditionalRotation(apply: hasRotation, angle: rotationAngle, animation: rotationAnimation, isAnimating: isAnimating))
-            .modifier(ConditionalScale(apply: hasScale, scaleX: scaleX, scaleY: scaleY, animation: scaleAnimation, isAnimating: isAnimating))
-            .modifier(ConditionalOpacity(apply: hasOpacity, opacityValue: opacityValue, animation: opacityAnimation, isAnimating: isAnimating))
-            .modifier(ConditionalTranslation(apply: hasTranslation, x: translationX, y: translationY, animation: translationAnimation, isAnimating: isAnimating))
+            .rotationEffect(hasRotation ? rotationAngle : .zero)
+            .animation(hasRotation ? (isAnimating ? rotationAnimation : .default) : nil, value: isAnimating)
+            .scaleEffect(x: hasScale ? scaleX : 1.0, y: hasScale ? scaleY : 1.0)
+            .animation(hasScale ? (isAnimating ? scaleAnimation : .default) : nil, value: isAnimating)
+            .opacity(hasOpacity ? opacityValue : 1.0)
+            .animation(hasOpacity ? (isAnimating ? opacityAnimation : .default) : nil, value: isAnimating)
+            .offset(x: hasTranslation ? translationX : 0, y: hasTranslation ? translationY : 0)
+            .animation(hasTranslation ? (isAnimating ? translationAnimation : .default) : nil, value: isAnimating)
             .onAppear {
                 if isVisible {
                     isAnimating = true
@@ -158,77 +162,6 @@ struct NativeGPUAnimationModifier: ViewModifier {
             .onChange(of: isVisible) { _, newValue in
                 isAnimating = newValue
             }
-    }
-}
-
-// MARK: - Conditional Modifiers
-struct ConditionalRotation: ViewModifier {
-    let apply: Bool
-    let angle: Angle
-    let animation: Animation?
-    let isAnimating: Bool
-
-    func body(content: Content) -> some View {
-        if apply {
-            content
-                .rotationEffect(angle)
-                .animation(isAnimating ? animation : .default, value: isAnimating)
-        } else {
-            content
-        }
-    }
-}
-
-struct ConditionalScale: ViewModifier {
-    let apply: Bool
-    let scaleX: CGFloat
-    let scaleY: CGFloat
-    let animation: Animation?
-    let isAnimating: Bool
-
-    func body(content: Content) -> some View {
-        if apply {
-            content
-                .scaleEffect(x: scaleX, y: scaleY)
-                .animation(isAnimating ? animation : .default, value: isAnimating)
-        } else {
-            content
-        }
-    }
-}
-
-struct ConditionalOpacity: ViewModifier {
-    let apply: Bool
-    let opacityValue: Double
-    let animation: Animation?
-    let isAnimating: Bool
-
-    func body(content: Content) -> some View {
-        if apply {
-            content
-                .opacity(opacityValue)
-                .animation(isAnimating ? animation : .default, value: isAnimating)
-        } else {
-            content
-        }
-    }
-}
-
-struct ConditionalTranslation: ViewModifier {
-    let apply: Bool
-    let x: CGFloat
-    let y: CGFloat
-    let animation: Animation?
-    let isAnimating: Bool
-
-    func body(content: Content) -> some View {
-        if apply {
-            content
-                .offset(x: x, y: y)
-                .animation(isAnimating ? animation : .default, value: isAnimating)
-        } else {
-            content
-        }
     }
 }
 

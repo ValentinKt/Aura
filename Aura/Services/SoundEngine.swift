@@ -18,7 +18,6 @@ final class SoundEngine {
     enum SoundEngineError: Error {
         case engineStartFailed(String)
         case layerInitializationFailed(String)
-        case bufferLoadingFailed(String)
     }
 
     struct LayerNode {
@@ -30,8 +29,12 @@ final class SoundEngine {
     private let assetManager: AssetManager
     private let loopManager: LoopManager
     private let audioMixer: AudioMixer
+
+    // Resolved file URLs (tiny — just paths, no audio data)
+    private var layerURLs: [String: URL] = [:]
+
+    // Runtime nodes — only attached when the layer is actively playing
     private var layerNodes: [String: LayerNode] = [:]
-    private var buffers: [String: AVAudioPCMBuffer] = [:]
 
     // Custom audio player node for external files
     private let customPlayer = AVAudioPlayerNode()
@@ -40,21 +43,18 @@ final class SoundEngine {
     private(set) var state: EngineState = .uninitialized
     var volumes: [String: Float] = [:]
     var masterVolume: Float = 0.6 {
-        didSet {
-            updateOutputVolume()
-        }
+        didSet { updateOutputVolume() }
     }
 
     private var duckingMultiplier: Float = 1.0 {
-        didSet {
-            updateOutputVolume()
-        }
+        didSet { updateOutputVolume() }
     }
 
     private var duckingTask: Task<Void, Never>?
     private var randomizationTask: Task<Void, Never>?
     private var randomizationInterval: TimeInterval?
     private var randomizationRange: ClosedRange<Float>?
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
 
     private var isEngineRunning = false
 
@@ -62,11 +62,11 @@ final class SoundEngine {
         engine.mainMixerNode.outputVolume = masterVolume * duckingMultiplier
     }
 
+    // MARK: - Idle / Engine Lifecycle
+
     private func checkIdleState() {
-        // Check if any layer or custom player is active
         let hasActiveLayers = volumes.values.contains { $0 > 0.001 }
         let isCustomPlaying = customPlayer.isPlaying
-
         if !hasActiveLayers && !isCustomPlaying {
             stopEngineAndDetach()
         }
@@ -92,23 +92,26 @@ final class SoundEngine {
     private func startEngineIfNeeded() throws {
         if !isEngineRunning {
             Logger.sound.info("▶️ [SoundEngine] Waking engine from idle.")
-            // Ensure main mixer is attached (it is by default, but just in case)
             try engine.start()
             isEngineRunning = true
         }
     }
 
+    // MARK: - Node Attach / Detach
+
     private func ensureNodeAttachedAndPlaying(id: String, node: LayerNode) {
+        guard let url = layerURLs[id] else { return }
+
         if node.player.engine == nil {
             engine.attach(node.player)
             engine.attach(node.eq)
-            let format = buffers[id]?.format ?? AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)
+            // Use a minimal format (44.1 kHz stereo) for connection; AVAudioFile streaming
+            // will deliver frames in the file's native format via the render thread.
+            let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)
             engine.connect(node.player, to: node.eq, format: format)
             engine.connect(node.eq, to: engine.mainMixerNode, format: format)
-
-            if let buffer = buffers[id] {
-                loopManager.startLoop(on: node.player, buffer: buffer)
-            }
+            // Stream the file — no PCM buffer allocated
+            loopManager.startLoop(on: node.player, url: url)
         }
         if !node.player.isPlaying {
             node.player.play()
@@ -120,44 +123,17 @@ final class SoundEngine {
             node.player.stop()
             engine.detach(node.player)
         }
-
         if node.eq.engine != nil {
             engine.detach(node.eq)
         }
     }
 
-    func fadeDucking(to target: Float, duration: TimeInterval) {
-        duckingTask?.cancel()
-        let safeDuration = max(0.1, duration)
-        let steps = max(8, min(30, Int(safeDuration * 15)))
-        let interval = safeDuration / Double(steps)
-        let start = duckingMultiplier
-
-        guard abs(start - target) > 0.01 else {
-            duckingMultiplier = target
-            return
-        }
-
-        duckingTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            for step in 1...steps {
-                if Task.isCancelled { return }
-                let progress = Float(step) / Float(steps)
-                let value = start + (target - start) * progress
-                self.duckingMultiplier = value
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-            }
-            if !Task.isCancelled {
-                self.duckingMultiplier = target
-            }
-        }
-    }
+    // MARK: - Init & Prepare
 
     init(assetManager: AssetManager, loopManager: LoopManager, audioMixer: AudioMixer) {
         self.assetManager = assetManager
         self.loopManager = loopManager
         self.audioMixer = audioMixer
-
         engine.mainMixerNode.outputVolume = masterVolume
         for id in SoundLayerID.allCases.map(\.rawValue) {
             volumes[id] = 0
@@ -165,21 +141,16 @@ final class SoundEngine {
         Logger.sound.info("🟢 [SoundEngine] Initializing...")
     }
 
+    /// Prepare resolves file URLs and creates node stubs — NO audio data loaded into RAM.
     func prepare() async throws {
         guard state == .uninitialized || state == .error else { return }
         state = .preparing
-        Logger.sound.info("🟢 [SoundEngine] Starting engine...")
+        Logger.sound.info("🟢 [SoundEngine] Resolving audio URLs (no buffers loaded)...")
 
-        // 1. Preload buffers first to know their format
-        do {
-            try await preloadBuffers()
-        } catch {
-            Logger.sound.error("🟥 [SoundEngine] Failed to preload buffers: \(error.localizedDescription)")
-            state = .error
-            throw error
-        }
+        // Resolve URLs for every layer — this is just a file-exists check, ~0 ms, ~0 RAM.
+        await resolveLayerURLs()
 
-        // 2. Initialize layer nodes but do not attach them yet
+        // Create node stubs (not attached to engine yet — attached lazily on first play)
         for id in SoundLayerID.allCases.map(\.rawValue) {
             let player = AVAudioPlayerNode()
             let eq = AVAudioUnitEQ(numberOfBands: 1)
@@ -187,11 +158,23 @@ final class SoundEngine {
         }
 
         engine.prepare()
-
-        // Don't start engine here, only when a layer is > 0 volume
         state = .ready
-        Logger.sound.info("🟢 [SoundEngine] Engine ready (idle).")
+
+        // Start memory pressure monitoring
+        startMemoryPressureMonitoring()
+
+        Logger.sound.info("🟢 [SoundEngine] Engine ready (idle, 0 audio RAM used).")
     }
+
+    private func resolveLayerURLs() async {
+        for id in SoundLayerID.allCases.map(\.rawValue) {
+            if let url = await assetManager.resolveAudioURL(named: id) {
+                layerURLs[id] = url
+            }
+        }
+    }
+
+    // MARK: - Playback Control
 
     func stop() {
         Logger.sound.info("Stopping all audio")
@@ -238,12 +221,11 @@ final class SoundEngine {
         }
     }
 
+    // MARK: - Custom Audio
+
     func playCustomAudio(url: URL) async throws {
         Logger.sound.info("Playing custom audio from URL: \(url.path, privacy: .public)")
-        // Mute all other layers
         await crossfade(to: [:], duration: 1.0)
-
-        // Stop current custom audio if any
         customPlayer.stop()
 
         let file: AVAudioFile
@@ -255,7 +237,6 @@ final class SoundEngine {
         }
         let format = file.processingFormat
 
-        // Reconnect with correct format if needed
         if customPlayer.engine == nil {
             engine.attach(customPlayer)
             engine.attach(customEQ)
@@ -267,13 +248,13 @@ final class SoundEngine {
         engine.connect(customEQ, to: engine.mainMixerNode, format: format)
 
         await customPlayer.scheduleFile(file, at: nil)
-
         try? startEngineIfNeeded()
-
         customPlayer.volume = 1.0
         customPlayer.play()
         state = .playing
     }
+
+    // MARK: - Layer Volume
 
     func setLayer(_ id: String, volume: Float, pan: Float = 0, lowPassCutoff: Float = 12000) {
         guard SoundLayerID(rawValue: id) != nil else { return }
@@ -282,9 +263,9 @@ final class SoundEngine {
         volumes[id] = clampedVolume
         guard let node = layerNodes[id] else { return }
 
-        // Handle play/pause state based on volume
         let shouldPlay = clampedVolume > 0 && state == .playing
         let shouldPause = clampedVolume <= 0
+
         if shouldPlay {
             try? startEngineIfNeeded()
             ensureNodeAttachedAndPlaying(id: id, node: node)
@@ -297,9 +278,7 @@ final class SoundEngine {
             checkIdleState()
         }
 
-        if abs(previousVolume - clampedVolume) < 0.002 {
-            return
-        }
+        if abs(previousVolume - clampedVolume) < 0.002 { return }
 
         let cutoff = id == "brownnoise" ? min(lowPassCutoff, 1200) : lowPassCutoff
         if node.player.engine != nil {
@@ -307,42 +286,36 @@ final class SoundEngine {
         }
     }
 
+    // MARK: - Crossfade
+
     func crossfade(to targetMix: [String: Float], duration: TimeInterval) async {
         Logger.sound.debug("Crossfade started over \(duration, privacy: .public)s")
-        if state == .ready || state == .paused {
-            resume()
-        }
+        if state == .ready || state == .paused { resume() }
 
         let safeDuration = max(0.1, duration)
-        // Reduce the number of crossfade steps to lower CPU load and avoid HAL overload logs
         let steps = max(4, min(10, Int(safeDuration * 4)))
         let interval = safeDuration / Double(steps)
         let snapshot = volumes
         let allLayerIDs = SoundLayerID.allCases.map(\.rawValue)
         let affectedIDs = allLayerIDs.filter { id in
-            let start = snapshot[id] ?? 0
-            let target = targetMix[id] ?? 0
-            return abs(start - target) > 0.001
+            abs((snapshot[id] ?? 0) - (targetMix[id] ?? 0)) > 0.001
         }
 
-        if affectedIDs.isEmpty {
-            return
-        }
+        if affectedIDs.isEmpty { return }
 
         for step in 0...steps {
-            if Task.isCancelled {
-                return
-            }
+            if Task.isCancelled { return }
             let progress = Float(step) / Float(steps)
             for id in affectedIDs {
                 let start = snapshot[id] ?? 0
                 let target = targetMix[id] ?? 0
-                let value = start + (target - start) * progress
-                setLayer(id, volume: value)
+                setLayer(id, volume: start + (target - start) * progress)
             }
             try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
         }
     }
+
+    // MARK: - Randomization
 
     func startRandomization(interval: TimeInterval, validRange: ClosedRange<Float>) {
         guard interval > 0 else { return }
@@ -357,67 +330,26 @@ final class SoundEngine {
         stopRandomizationSchedule()
     }
 
-    func currentLayerCount() -> Int {
-        layerNodes.count
-    }
-
-    func volume(for id: String) -> Float {
-        volumes[id] ?? 0
-    }
-
-    private func preloadBuffers() async throws {
-        let assetManager = self.assetManager
-        await withTaskGroup(of: (String, AVAudioPCMBuffer?).self) { group in
-            for id in SoundLayerID.allCases.map(\.rawValue) {
-                group.addTask {
-                    let buffer = await assetManager.loadAudioBuffer(named: id)
-                    return (id, buffer)
-                }
-            }
-
-            for await (id, buffer) in group {
-                if let buffer = buffer {
-                    buffers[id] = buffer
-                }
-            }
-        }
-    }
-
-    private func startAllLoops() {
-        for (id, node) in layerNodes {
-            guard let buffer = buffers[id] else {
-                continue
-            }
-            loopManager.startLoop(on: node.player, buffer: buffer)
-            volumes[id] = 0
-            node.player.volume = 0 // Start muted
-        }
-    }
+    func currentLayerCount() -> Int { layerNodes.count }
+    func volume(for id: String) -> Float { volumes[id] ?? 0 }
 
     private func scheduleRandomizationIfNeeded() {
         stopRandomizationSchedule()
-
         guard state == .playing,
               let interval = randomizationInterval,
               interval > 0,
-              let validRange = randomizationRange else {
-            return
-        }
+              let validRange = randomizationRange else { return }
 
         randomizationTask = Task(priority: .background) { @MainActor [weak self] in
             guard let self else { return }
-
             while !Task.isCancelled {
                 await AuraBackgroundActor.sleep(for: .seconds(interval))
                 guard !Task.isCancelled else { return }
                 guard self.state == .playing else { continue }
-
                 let isSuspended = await AuraBackgroundActor.shared.isRenderingSuspended()
                 if isSuspended { continue }
-
                 for id in SoundLayerID.allCases.map(\.rawValue) {
-                    let random = Float.random(in: validRange)
-                    self.setLayer(id, volume: random)
+                    self.setLayer(id, volume: Float.random(in: validRange))
                 }
             }
         }
@@ -428,4 +360,49 @@ final class SoundEngine {
         randomizationTask = nil
     }
 
+    // MARK: - Ducking
+
+    func fadeDucking(to target: Float, duration: TimeInterval) {
+        duckingTask?.cancel()
+        let safeDuration = max(0.1, duration)
+        let steps = max(8, min(30, Int(safeDuration * 15)))
+        let interval = safeDuration / Double(steps)
+        let start = duckingMultiplier
+        guard abs(start - target) > 0.01 else {
+            duckingMultiplier = target
+            return
+        }
+        duckingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for step in 1...steps {
+                if Task.isCancelled { return }
+                let progress = Float(step) / Float(steps)
+                self.duckingMultiplier = start + (target - start) * progress
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+            }
+            if !Task.isCancelled { self.duckingMultiplier = target }
+        }
+    }
+
+    // MARK: - Memory Pressure
+
+    private func startMemoryPressureMonitoring() {
+        let src = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .main
+        )
+        src.setEventHandler { [weak self] in
+            guard let self else { return }
+            let level = src.mask
+            if level.contains(.critical) {
+                Logger.sound.warning("⚠️ [SoundEngine] Critical memory pressure — stopping engine.")
+                self.pause()
+            } else if level.contains(.warning) {
+                Logger.sound.warning("⚠️ [SoundEngine] Memory pressure warning — stopping idle nodes.")
+                self.checkIdleState()
+            }
+        }
+        src.activate()
+        memoryPressureSource = src
+    }
 }
