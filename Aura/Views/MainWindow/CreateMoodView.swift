@@ -748,10 +748,11 @@ struct CreateMoodView: View {
         let destinationURL = CustomAssetManager.makeCustomWallpaperURL(fileExtension: "heic")
 
         do {
+            try await prepareDynamicDesktopUpscalerIfNeeded()
             let generator = try DynamicDesktopGenerator()
             try await generator.generate(from: url, outputURL: destinationURL) { update in
                 Task { @MainActor in
-                    creationProgress = update.fractionCompleted
+                    creationProgress = 0.1 + (update.fractionCompleted * 0.9)
                     creationStatusMessage = update.statusMessage
                 }
             }
@@ -761,6 +762,19 @@ struct CreateMoodView: View {
                 try? FileManager.default.removeItem(at: destinationURL)
             }
             throw error
+        }
+    }
+
+    private func prepareDynamicDesktopUpscalerIfNeeded() async throws {
+        if try await UpscaleModelManager.shared.checkLocalCache() != nil {
+            return
+        }
+
+        try await UpscaleModelManager.shared.fetchModel { progress in
+            Task { @MainActor in
+                creationProgress = progress * 0.1
+                creationStatusMessage = "Downloading Dynamic Desktop upscaler…"
+            }
         }
     }
 

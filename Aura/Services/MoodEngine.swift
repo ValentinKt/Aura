@@ -649,7 +649,7 @@ final class MoodEngine {
                 theme: "Cosmos",
                 subtheme: "Aura",
                 layerMix: ["night": 0.5, "wind": 0.25, "piano": 0.2, "hum": 0.15],
-                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_2.mov"]),
+                wallpaper: WallpaperDescriptor(type: .animated, resources: ["Aura_2.mp4"]),
                 palette: ThemePalette(primary: ColorComponents(red: 0.08, green: 0.15, blue: 0.22), secondary: ColorComponents(red: 0.12, green: 0.25, blue: 0.32), accent: ColorComponents(red: 0.35, green: 0.75, blue: 0.55))
             ),
             Mood(
@@ -1096,15 +1096,6 @@ final class MoodEngine {
                 palette: ThemePalette(primary: ColorComponents(red: 0.16, green: 0.12, blue: 0.3), secondary: ColorComponents(red: 0.28, green: 0.22, blue: 0.5), accent: ColorComponents(red: 0.56, green: 0.46, blue: 0.88))
             ),
             // Time Subthemes
-            Mood(
-                id: "time_minimal",
-                name: "Minimalist Time",
-                theme: "Dynamic",
-                subtheme: "Time",
-                layerMix: ["hum": 0.2, "wind": 0.1],
-                wallpaper: WallpaperDescriptor(type: .time, resources: ["minimal"]),
-                palette: ThemePalette(primary: ColorComponents(red: 0.05, green: 0.05, blue: 0.08), secondary: ColorComponents(red: 0.1, green: 0.1, blue: 0.15), accent: ColorComponents(red: 0.9, green: 0.9, blue: 0.95))
-            ),
             Mood(
                 id: "time_analog",
                 name: "Analog Clock",
