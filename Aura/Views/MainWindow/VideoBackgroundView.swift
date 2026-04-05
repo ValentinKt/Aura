@@ -62,6 +62,7 @@ struct VideoBackgroundView: NSViewRepresentable {
             player.allowsExternalPlayback = false
             player.isMuted = true
             player.volume = 0
+            player.actionAtItemEnd = .advance
         }
 
         func attach(to view: VideoBackgroundSurfaceView) {
@@ -151,9 +152,9 @@ struct VideoBackgroundView: NSViewRepresentable {
         }
 
         private func configureVideoPlayback(for url: URL, in view: VideoBackgroundSurfaceView) {
-            // Explicitly clear previous asset and item to prevent video memory leak
             currentItem?.cancelPendingSeeks()
             currentAsset?.cancelLoading()
+            player.pause()
             player.replaceCurrentItem(with: nil)
             player.removeAllItems()
             looper?.disableLooping()
@@ -161,7 +162,7 @@ struct VideoBackgroundView: NSViewRepresentable {
             currentItem = nil
             currentAsset = nil
 
-            let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+            let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
             let item = AVPlayerItem(asset: asset)
 
             assetLoadTask?.cancel()
@@ -186,7 +187,6 @@ struct VideoBackgroundView: NSViewRepresentable {
 
             player.removeAllItems()
             player.replaceCurrentItem(with: nil)
-            player.insert(item, after: nil)
             looper = AVPlayerLooper(player: player, templateItem: item)
 
             if let playerLayer {
@@ -228,7 +228,7 @@ struct VideoBackgroundView: NSViewRepresentable {
             }
 
             playerLayer?.isHidden = false
-            player.play()
+            player.playImmediately(atRate: 1.0)
         }
     }
 }

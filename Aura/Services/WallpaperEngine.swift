@@ -1045,16 +1045,17 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func configureVideoPlayback(for url: URL) {
-        // Tear down any previous playback state completely first
         currentVideoItem?.cancelPendingSeeks()
         currentVideoAsset?.cancelLoading()
+        playerQueue?.pause()
+        playerQueue?.replaceCurrentItem(with: nil)
+        playerQueue?.removeAllItems()
         playerLooper?.disableLooping()
         playerLooper = nil
         currentVideoItem = nil
         currentVideoAsset = nil
-        // playerQueue is already nil'd by freezeVideoPlayback() before we get here.
 
-        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
         let item = AVPlayerItem(asset: asset)
 
         videoAssetLoadTask?.cancel()
@@ -1073,15 +1074,12 @@ final class WallpaperWindowController: NSObject {
             item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
         }
 
-        // Bug 2 fix: always create a fresh AVQueuePlayer — never reuse the old one.
-        // Reusing kept the old player's internal frame cache and decode state alive,
-        // contributing to the persistent RSS growth across mood switches.
         let player = AVQueuePlayer()
         player.isMuted = true
         player.allowsExternalPlayback = false
         player.automaticallyWaitsToMinimizeStalling = false
+        player.actionAtItemEnd = .advance
         player.volume = 0
-        player.insert(item, after: nil)
 
         currentVideoAsset = asset
         currentVideoItem = item
@@ -1117,8 +1115,6 @@ final class WallpaperWindowController: NSObject {
         playerQueue?.replaceCurrentItem(with: nil)
         playerLayer?.player = nil
         playerLayer?.isHidden = true
-        // Bug 2 fix: allow the AVQueuePlayer to deallocate so its internal
-        // frame buffer and decode state are freed before the next wallpaper loads.
         playerQueue = nil
     }
 
@@ -1130,7 +1126,7 @@ final class WallpaperWindowController: NSObject {
         }
 
         playerLayer?.isHidden = false
-        playerQueue?.play()
+        playerQueue?.playImmediately(atRate: 1.0)
     }
 
     private func ensureWebsiteContainerView() {
