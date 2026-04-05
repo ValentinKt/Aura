@@ -31,7 +31,13 @@ struct WallpaperPreviewView: View {
                 } else if let mood = appModel.moodViewModel.currentMood,
                           mood.wallpaper.type == .staticImage || mood.wallpaper.type == .dynamic || mood.wallpaper.type == .animated {
                     ZStack(alignment: .topTrailing) {
-                        if mood.wallpaper.type == .animated, let resource = mood.wallpaper.resources.first, let url = MediaUtils.resolveResourceURL(resource) {
+                        if let liveVideoURL = livePreviewVideoURL(for: mood) {
+                            IsolatedVideoBackgroundView(url: liveVideoURL)
+                                .equatable()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if mood.wallpaper.type == .animated,
+                                  let resource = mood.wallpaper.resources.first,
+                                  let url = MediaUtils.resolveResourceURL(resource) {
                             IsolatedVideoBackgroundView(url: url)
                                 .equatable()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,7 +85,14 @@ struct WallpaperPreviewView: View {
                             .padding(12)
                         }
                     }
-                    .task(id: mood.id) {
+                    .task(id: previewRefreshID(for: mood)) {
+                        guard livePreviewVideoURL(for: mood) == nil else {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                previewImage = nil
+                            }
+                            return
+                        }
+
                         if let resource = mood.wallpaper.resources.first {
                             let loaded = await loadPreviewImageAsync(resource)
                             withAnimation(.easeInOut(duration: 0.35)) {
@@ -178,5 +191,55 @@ struct WallpaperPreviewView: View {
 
     private static func isVideoURL(_ url: URL) -> Bool {
         ["mp4", "mov"].contains(url.pathExtension.lowercased())
+    }
+
+    private func previewRefreshID(for mood: Mood) -> String {
+        let resource = mood.wallpaper.resources.first ?? ""
+        let downloadStateDescription = {
+            switch DownloadManager.shared.downloadStates[resource] {
+            case .notDownloaded, .none:
+                return "not-downloaded"
+            case .downloaded:
+                return "downloaded"
+            case .downloading(let progress):
+                return "downloading-\(Int(progress * 1000))"
+            case .failed(let error):
+                return "failed-\(error)"
+            }
+        }()
+
+        let liveVideoPath = livePreviewVideoURL(for: mood)?.path ?? "no-video"
+        return "\(mood.id)|\(resource)|\(downloadStateDescription)|\(liveVideoPath)"
+    }
+
+    private func livePreviewVideoURL(for mood: Mood) -> URL? {
+        guard let resource = mood.wallpaper.resources.first else {
+            return nil
+        }
+
+        if let exactResourceURL = MediaUtils.resolveExactResourceURL(resource),
+           Self.isVideoURL(exactResourceURL) {
+            return exactResourceURL
+        }
+
+        if let currentPrimaryWallpaperURL = appModel.wallpaperEngine.currentPrimaryWallpaperURL,
+           Self.isVideoURL(currentPrimaryWallpaperURL),
+           matches(currentPrimaryWallpaperURL, resource: resource) {
+            return currentPrimaryWallpaperURL
+        }
+
+        if let backgroundImageURL = appModel.wallpaperEngine.backgroundImageURL,
+           Self.isVideoURL(backgroundImageURL),
+           matches(backgroundImageURL, resource: resource) {
+            return backgroundImageURL
+        }
+
+        return nil
+    }
+
+    private func matches(_ url: URL, resource: String) -> Bool {
+        let resolvedName = url.deletingPathExtension().lastPathComponent.lowercased()
+        let resourceName = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent.lowercased()
+        return !resolvedName.isEmpty && resolvedName == resourceName
     }
 }
