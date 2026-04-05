@@ -753,15 +753,8 @@ final class WallpaperEngine {
 final class WallpaperWindowController: NSObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "WallpaperWindow")
     private var window: NSWindow?
-    private var playerView: NSView?
-    private var playerLayer: AVPlayerLayer?
-    private var playerQueue: AVQueuePlayer?
-    private var playerLooper: AVPlayerLooper?
-    private var currentVideoAsset: AVURLAsset?
-    private var currentVideoItem: AVPlayerItem?
-    private var videoAssetLoadTask: Task<Void, Never>?
+    private var playerView: DualVideoPlayerSurfaceView?
     private var renderStateTask: Task<Void, Never>?
-    private var endObserver: NSObjectProtocol?
     private var websiteContainerView: NSView?
     private var websiteSnapshotView: NSImageView?
     private var websiteWebView: WKWebView?
@@ -841,7 +834,8 @@ final class WallpaperWindowController: NSObject {
         window.isOpaque = false
         window.hasShadow = false
 
-        let playerView = NSView(frame: screenFrame)
+        let playerView = DualVideoPlayerSurfaceView(frame: screenFrame)
+        playerView.setUsesAutomaticVisibilitySuspension(false)
         playerView.wantsLayer = true
         playerView.layer?.backgroundColor = NSColor.clear.cgColor
         playerView.autoresizingMask = [.width, .height]
@@ -897,12 +891,11 @@ final class WallpaperWindowController: NSObject {
     @objc private func screenChanged() {
         guard let screen = NSScreen.main else { return }
         window?.setFrame(screen.frame, display: true)
-        playerLayer?.frame = window?.contentView?.bounds ?? screen.frame
+        playerView?.frame = window?.contentView?.bounds ?? screen.frame
         updatePerformanceState()
     }
 
     private var currentURL: URL?
-    private var isSecurityScoped: Bool = false
     private var hostingContainerView: NSView?
     private var hostingView: NSHostingView<AnyView>?
 
@@ -970,12 +963,8 @@ final class WallpaperWindowController: NSObject {
         if let pv = self.playerView, window?.contentView !== pv {
             window?.contentView = pv
         }
-        let finalURL = url
-        let isScoped = finalURL.startAccessingSecurityScopedResource()
-        self.currentURL = finalURL
-        self.isSecurityScoped = isScoped
-        configureVideoPlayback(for: finalURL)
-        playerQueue?.play()
+        currentURL = url
+        configureVideoPlayback(for: url)
         window?.orderFront(nil)
         updatePerformanceState()
     }
@@ -1023,18 +1012,7 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func stopAndCleanup() {
-        videoAssetLoadTask?.cancel()
-        videoAssetLoadTask = nil
-
-        freezeVideoPlayback()
-        playerLayer?.removeFromSuperlayer()
-        playerLayer = nil
-
-        currentVideoAsset = nil
-        currentVideoItem = nil
-        // Bug 4 fix: nil the player here so AVPlayerLayer releases its
-        // IOSurface-backed GPU texture immediately (not deferred to next drain).
-        playerQueue = nil
+        playerView?.teardown()
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1045,88 +1023,17 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func configureVideoPlayback(for url: URL) {
-        currentVideoItem?.cancelPendingSeeks()
-        currentVideoAsset?.cancelLoading()
-        playerQueue?.pause()
-        playerQueue?.replaceCurrentItem(with: nil)
-        playerQueue?.removeAllItems()
-        playerLooper?.disableLooping()
-        playerLooper = nil
-        currentVideoItem = nil
-        currentVideoAsset = nil
-
-        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
-        let item = AVPlayerItem(asset: asset)
-
-        videoAssetLoadTask?.cancel()
-        videoAssetLoadTask = Task(priority: .utility) {
-            _ = try? await asset.load(.tracks)
-        }
-
-        item.audioTimePitchAlgorithm = .varispeed
-        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-        item.preferredForwardBufferDuration = 0
-
-        if let screen = self.window?.screen ?? NSScreen.main {
-            let scale = screen.backingScaleFactor
-            item.preferredMaximumResolution = CGSize(width: screen.frame.width * scale, height: screen.frame.height * scale)
-        } else {
-            item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
-        }
-
-        let player = AVQueuePlayer()
-        player.isMuted = true
-        player.allowsExternalPlayback = false
-        player.automaticallyWaitsToMinimizeStalling = false
-        player.actionAtItemEnd = .advance
-        player.volume = 0
-
-        currentVideoAsset = asset
-        currentVideoItem = item
-        playerQueue = player
-        playerLooper = AVPlayerLooper(player: player, templateItem: item)
-
-        if let playerLayer {
-            playerLayer.player = player
-            playerLayer.isHidden = false
-        } else {
-            let newLayer = AVPlayerLayer(player: player)
-            newLayer.videoGravity = .resizeAspectFill
-            newLayer.isOpaque = true
-            newLayer.drawsAsynchronously = true
-
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            newLayer.frame = self.playerView?.bounds ?? .zero
-            self.playerView?.layer?.addSublayer(newLayer)
-            self.playerLayer = newLayer
-            CATransaction.commit()
-        }
+        playerView?.setPlaybackSuspended(false)
+        playerView?.play(url: url)
     }
 
     private func freezeVideoPlayback() {
-        playerQueue?.pause()
-        playerQueue?.isMuted = true
-        currentVideoItem?.cancelPendingSeeks()
-        currentVideoAsset?.cancelLoading()
-        playerLooper?.disableLooping()
-        playerLooper = nil
-        playerQueue?.removeAllItems()
-        playerQueue?.replaceCurrentItem(with: nil)
-        playerLayer?.player = nil
-        playerLayer?.isHidden = true
-        playerQueue = nil
+        playerView?.setPlaybackSuspended(true)
     }
 
     private func resumeVideoPlaybackIfNeeded() {
-        guard let currentURL else { return }
-
-        if playerQueue == nil || playerQueue?.currentItem == nil || playerLayer?.player == nil {
-            configureVideoPlayback(for: currentURL)
-        }
-
-        playerLayer?.isHidden = false
-        playerQueue?.playImmediately(atRate: 1.0)
+        guard currentURL != nil else { return }
+        playerView?.setPlaybackSuspended(false)
     }
 
     private func ensureWebsiteContainerView() {
@@ -1415,14 +1322,7 @@ final class WallpaperWindowController: NSObject {
     func stopVideo() {
         stopAndCleanup()
 
-        // On libère le droit d'accès AU DERNIER MOMENT
-        if isSecurityScoped, let url = currentURL {
-            url.stopAccessingSecurityScopedResource()
-            logger.debug("Security scope released")
-        }
-
         currentURL = nil
-        isSecurityScoped = false
 
         if hostingView == nil {
             window?.orderOut(nil)
@@ -1450,13 +1350,13 @@ final class WallpaperWindowController: NSObject {
         // If the window is currently at (0,0,0,0) or incorrect for the main screen, update it
         if window.frame.size == .zero || window.frame != screen.frame {
             window.setFrame(screen.frame, display: true)
-            playerLayer?.frame = window.contentView?.bounds ?? screen.frame
+            playerView?.frame = window.contentView?.bounds ?? screen.frame
             logger.notice("Updated wallpaper window frame to match screen: \(String(describing: screen.frame))")
         }
     }
 
     func isPlaying() -> Bool {
-        return playerQueue != nil && playerQueue?.rate != 0 && window?.isVisible == true
+        return playerView?.isPlaying == true && window?.isVisible == true
     }
 
     private static let pauseWebsiteScript = """

@@ -20,81 +20,125 @@ extension View {
     }
 }
 
-struct VideoBackgroundView: NSViewRepresentable {
+struct VideoBackgroundView: View {
     let url: URL
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
+    var body: some View {
+        DualVideoPlayerView(url: url)
+            .allowsHitTesting(false)
     }
+}
 
-    func makeNSView(context: Context) -> VideoBackgroundSurfaceView {
-        let view = VideoBackgroundSurfaceView(frame: .zero)
-        context.coordinator.attach(to: view)
-        context.coordinator.play(url: url, in: view)
+struct DualVideoPlayerView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> DualVideoPlayerSurfaceView {
+        let view = DualVideoPlayerSurfaceView(frame: .zero)
+        view.play(url: url)
         return view
     }
 
-    func updateNSView(_ nsView: VideoBackgroundSurfaceView, context: Context) {
-        context.coordinator.attach(to: nsView)
-        context.coordinator.play(url: url, in: nsView)
+    func updateNSView(_ nsView: DualVideoPlayerSurfaceView, context: Context) {
+        nsView.play(url: url)
     }
 
-    static func dismantleNSView(_ nsView: VideoBackgroundSurfaceView, coordinator: Coordinator) {
-        coordinator.detach(from: nsView)
-        coordinator.teardown()
+    static func dismantleNSView(_ nsView: DualVideoPlayerSurfaceView, coordinator: ()) {
+        nsView.teardown()
     }
+}
 
-    final class Coordinator {
-        private var playerLayer: AVPlayerLayer?
-        private var imageLayer: CALayer?
-        private let player = AVQueuePlayer()
-        private var looper: AVPlayerLooper?
-        private var currentURL: URL?
-        private var currentAsset: AVURLAsset?
-        private var currentItem: AVPlayerItem?
-        private var isSecurityScoped = false
-        private var isFrozen = false
-        private weak var view: VideoBackgroundSurfaceView?
-        private var assetLoadTask: Task<Void, Never>?
+final class DualVideoPlayerSurfaceView: NSView {
+    private final class PlayerSlot {
+        let player: AVPlayer
+        let layer: AVPlayerLayer
 
         init() {
+            player = AVPlayer()
             player.automaticallyWaitsToMinimizeStalling = false
             player.allowsExternalPlayback = false
+            player.preventsDisplaySleepDuringVideoPlayback = false
             player.isMuted = true
             player.volume = 0
-            player.actionAtItemEnd = .advance
+            player.actionAtItemEnd = .pause
+
+            layer = AVPlayerLayer(player: player)
+            layer.videoGravity = .resizeAspectFill
+            layer.isOpaque = true
+            layer.drawsAsynchronously = true
+            layer.opacity = 0
         }
+    }
 
-        func attach(to view: VideoBackgroundSurfaceView) {
-            guard self.view !== view else { return }
-            self.view = view
-            view.visibilityDidChange = { [weak self] in
-                self?.updatePlaybackState()
-            }
-            if let playerLayer {
-                view.attachVideoLayer(playerLayer)
-            }
-            if let imageLayer {
-                view.attachImageLayer(imageLayer)
-            }
-            updatePlaybackState()
+    private enum SlotPosition: Int {
+        case a = 0
+        case b = 1
+
+        var other: SlotPosition {
+            self == .a ? .b : .a
         }
+    }
 
-        func detach(from view: VideoBackgroundSurfaceView) {
-            guard self.view === view else { return }
-            view.visibilityDidChange = nil
-            self.view = nil
+    private static let observerInterval = CMTime(value: 1, timescale: 30)
+    private static let defaultOverlapDuration: Double = 1
+    private static let minimumOverlapDuration: Double = 0.2
+
+    private let slots = [PlayerSlot(), PlayerSlot()]
+    private var activeSlot: SlotPosition = .a
+    private var currentURL: URL?
+    private var currentAsset: AVURLAsset?
+    private var assetLoadTask: Task<Void, Never>?
+    private var observedPlayer: AVPlayer?
+    private var periodicObserver: Any?
+    private var playbackGeneration = UUID()
+    private var currentDurationSeconds: Double?
+    private var currentOverlapDuration = 1.0
+    private var isPlaybackPrepared = false
+    private var isCrossfading = false
+    private var isSecurityScoped = false
+    private var usesAutomaticVisibilitySuspension = true
+    private var isManuallySuspended = false
+    private var imageLayer: CALayer?
+    private var windowObservation: NSKeyValueObservation?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.drawsAsynchronously = true
+
+        slots.forEach { slot in
+            layer?.addSublayer(slot.layer)
         }
+    }
 
-        func play(url: URL, in view: VideoBackgroundSurfaceView) {
-            attach(to: view)
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.drawsAsynchronously = true
 
-            if currentURL == url, playerLayer != nil || imageLayer != nil {
-                updatePlaybackState()
-                return
-            }
+        slots.forEach { slot in
+            layer?.addSublayer(slot.layer)
+        }
+    }
 
-            teardown()
+    var isPlaying: Bool {
+        slot(for: activeSlot).player.rate != 0
+    }
+
+    func setUsesAutomaticVisibilitySuspension(_ enabled: Bool) {
+        guard usesAutomaticVisibilitySuspension != enabled else { return }
+        usesAutomaticVisibilitySuspension = enabled
+        refreshVisibilityObservation()
+        updatePlaybackState()
+    }
+
+    func play(url: URL) {
+        if currentURL != url {
+            releaseSecurityScope()
+            teardownPlayback()
+            imageLayer?.removeFromSuperlayer()
+            imageLayer = nil
 
             currentURL = url
             isSecurityScoped = url.startAccessingSecurityScopedResource()
@@ -105,195 +149,37 @@ struct VideoBackgroundView: NSViewRepresentable {
 
             let ext = url.pathExtension.lowercased()
             if ["jpg", "jpeg", "png", "heic"].contains(ext) {
-                let layer = CALayer()
-                layer.contents = NSImage(contentsOf: url)
-                layer.contentsGravity = .resizeAspectFill
-                imageLayer = layer
-                isFrozen = false
-                view.attachImageLayer(layer)
-                updatePlaybackState()
-                return
-            }
-
-            configureVideoPlayback(for: url, in: view)
-            updatePlaybackState()
-        }
-
-        func teardown() {
-            assetLoadTask?.cancel()
-            assetLoadTask = nil
-            freezePlayback()
-            currentAsset = nil
-            currentItem = nil
-            imageLayer?.removeFromSuperlayer()
-            imageLayer = nil
-
-            if let currentURL, isSecurityScoped {
-                currentURL.stopAccessingSecurityScopedResource()
-            }
-            currentURL = nil
-            isSecurityScoped = false
-        }
-
-        private func updatePlaybackState() {
-            guard let view else {
-                freezePlayback()
-                return
-            }
-
-            let shouldRender = view.shouldRender
-            imageLayer?.isHidden = !shouldRender
-
-            if shouldRender {
-                resumePlaybackIfNeeded(in: view)
-            } else {
-                freezePlayback()
+                let newImageLayer = CALayer()
+                newImageLayer.contents = NSImage(contentsOf: url)
+                newImageLayer.contentsGravity = .resizeAspectFill
+                newImageLayer.drawsAsynchronously = true
+                newImageLayer.opacity = 1
+                layer?.addSublayer(newImageLayer)
+                imageLayer = newImageLayer
             }
         }
 
-        private func configureVideoPlayback(for url: URL, in view: VideoBackgroundSurfaceView) {
-            currentItem?.cancelPendingSeeks()
-            currentAsset?.cancelLoading()
-            player.pause()
-            player.replaceCurrentItem(with: nil)
-            player.removeAllItems()
-            looper?.disableLooping()
-            looper = nil
-            currentItem = nil
-            currentAsset = nil
-
-            let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
-            let item = AVPlayerItem(asset: asset)
-
-            assetLoadTask?.cancel()
-            assetLoadTask = Task {
-                _ = try? await asset.load(.tracks)
-            }
-
-            if let screen = view.window?.screen ?? NSScreen.main {
-                let scale = screen.backingScaleFactor
-                item.preferredMaximumResolution = CGSize(width: screen.frame.width * scale, height: screen.frame.height * scale)
-            } else {
-                item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
-            }
-            item.preferredPeakBitRate = 5_000_000
-            item.preferredForwardBufferDuration = 0
-            item.audioTimePitchAlgorithm = .varispeed
-            item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-
-            currentAsset = asset
-            currentItem = item
-            isFrozen = false
-
-            player.removeAllItems()
-            player.replaceCurrentItem(with: nil)
-            looper = AVPlayerLooper(player: player, templateItem: item)
-
-            if let playerLayer {
-                playerLayer.player = player
-                playerLayer.isHidden = false
-                view.attachVideoLayer(playerLayer)
-            } else {
-                let layer = AVPlayerLayer(player: player)
-                layer.videoGravity = .resizeAspectFill
-                layer.drawsAsynchronously = true
-                playerLayer = layer
-                view.attachVideoLayer(layer)
-            }
-        }
-
-        private func freezePlayback() {
-            player.pause()
-            currentItem?.cancelPendingSeeks()
-            currentAsset?.cancelLoading()
-            looper?.disableLooping()
-            looper = nil
-            player.removeAllItems()
-            player.replaceCurrentItem(with: nil)
-            playerLayer?.player = nil
-            playerLayer?.isHidden = true
-            isFrozen = true
-        }
-
-        private func resumePlaybackIfNeeded(in view: VideoBackgroundSurfaceView) {
-            guard imageLayer == nil else {
-                imageLayer?.isHidden = false
-                return
-            }
-
-            guard let currentURL else { return }
-
-            if isFrozen || player.currentItem == nil || playerLayer?.player == nil {
-                configureVideoPlayback(for: currentURL, in: view)
-            }
-
-            playerLayer?.isHidden = false
-            player.playImmediately(atRate: 1.0)
-        }
-    }
-}
-
-final class VideoBackgroundSurfaceView: NSView {
-    var visibilityDidChange: (() -> Void)?
-
-    private var windowObservation: NSKeyValueObservation?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
-        layer?.drawsAsynchronously = true
+        updatePlaybackState()
     }
 
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
-        layer?.drawsAsynchronously = true
+    func setPlaybackSuspended(_ suspended: Bool) {
+        guard isManuallySuspended != suspended else { return }
+        isManuallySuspended = suspended
+        updatePlaybackState()
     }
 
-    var shouldRender: Bool {
-        guard let window else { return false }
-        return window.isVisible &&
-            !window.isMiniaturized &&
-            window.occlusionState.contains(.visible) &&
-            !NSApp.isHidden
-    }
-
-    func attachVideoLayer(_ layer: AVPlayerLayer) {
-        self.layer?.addSublayer(layer)
-        needsLayout = true
-    }
-
-    func attachImageLayer(_ layer: CALayer) {
-        self.layer?.addSublayer(layer)
-        needsLayout = true
+    func teardown() {
+        teardownPlayback()
+        imageLayer?.removeFromSuperlayer()
+        imageLayer = nil
+        currentURL = nil
+        releaseSecurityScope()
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-
-        windowObservation?.invalidate()
-        windowObservation = nil
-        NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
-
-        if let window {
-            windowObservation = window.observe(\.isVisible, options: [.initial, .new]) { [weak self] _, _ in
-                self?.visibilityDidChange?()
-            }
-            NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didChangeOcclusionStateNotification, object: window)
-            NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didMiniaturizeNotification, object: window)
-            NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSWindow.didDeminiaturizeNotification, object: window)
-        } else {
-            visibilityDidChange?()
-        }
-
-        NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSApplication.didHideNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(windowOcclusionDidChange), name: NSApplication.didUnhideNotification, object: nil)
-    }
-
-    @objc private func windowOcclusionDidChange() {
-        visibilityDidChange?()
+        refreshVisibilityObservation()
+        updatePlaybackState()
     }
 
     override func layout() {
@@ -304,5 +190,360 @@ final class VideoBackgroundSurfaceView: NSView {
     deinit {
         windowObservation?.invalidate()
         NotificationCenter.default.removeObserver(self)
+        assetLoadTask?.cancel()
+        assetLoadTask = nil
+        currentAsset?.cancelLoading()
+        currentAsset = nil
+        removePeriodicObserver()
+
+        slots.forEach { slot in
+            slot.layer.removeAllAnimations()
+            slot.player.pause()
+            slot.player.currentItem?.cancelPendingSeeks()
+            slot.player.currentItem?.asset.cancelLoading()
+            slot.player.replaceCurrentItem(with: nil)
+        }
+
+        if let currentURL, isSecurityScoped {
+            currentURL.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    @objc private func visibilityChanged() {
+        updatePlaybackState()
+    }
+
+    private func updatePlaybackState() {
+        let shouldRender = !isManuallySuspended && (!usesAutomaticVisibilitySuspension || isWindowVisibleForRendering)
+        imageLayer?.isHidden = !shouldRender
+
+        if shouldRender {
+            resumePlaybackIfNeeded()
+        } else {
+            freezePlayback()
+        }
+    }
+
+    private var isWindowVisibleForRendering: Bool {
+        guard let window else { return false }
+        return window.isVisible &&
+            !window.isMiniaturized &&
+            window.occlusionState.contains(.visible) &&
+            !NSApp.isHidden
+    }
+
+    private func slot(for position: SlotPosition) -> PlayerSlot {
+        slots[position.rawValue]
+    }
+
+    private func refreshVisibilityObservation() {
+        windowObservation?.invalidate()
+        windowObservation = nil
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didMiniaturizeNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didDeminiaturizeNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSApplication.didHideNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: NSApplication.didUnhideNotification, object: nil)
+
+        guard usesAutomaticVisibilitySuspension else { return }
+
+        if let window {
+            windowObservation = window.observe(\.isVisible, options: [.initial, .new]) { [weak self] _, _ in
+                Task { @MainActor [weak self] in
+                    self?.updatePlaybackState()
+                }
+            }
+            NotificationCenter.default.addObserver(self, selector: #selector(visibilityChanged), name: NSWindow.didChangeOcclusionStateNotification, object: window)
+            NotificationCenter.default.addObserver(self, selector: #selector(visibilityChanged), name: NSWindow.didMiniaturizeNotification, object: window)
+            NotificationCenter.default.addObserver(self, selector: #selector(visibilityChanged), name: NSWindow.didDeminiaturizeNotification, object: window)
+        }
+
+        NotificationCenter.default.addObserver(self, selector: #selector(visibilityChanged), name: NSApplication.didHideNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(visibilityChanged), name: NSApplication.didUnhideNotification, object: nil)
+    }
+
+    private func resumePlaybackIfNeeded() {
+        guard imageLayer == nil else {
+            imageLayer?.isHidden = false
+            return
+        }
+
+        guard let currentURL else { return }
+
+        if !isPlaybackPrepared {
+            configureVideoPlayback(for: currentURL)
+        }
+
+        guard isPlaybackPrepared else {
+            return
+        }
+
+        let activePlayer = slot(for: activeSlot).player
+        slot(for: activeSlot).layer.isHidden = false
+        installPeriodicObserver(on: activePlayer)
+        activePlayer.playImmediately(atRate: 1)
+    }
+
+    private func configureVideoPlayback(for url: URL) {
+        teardownPlayback()
+
+        let generation = UUID()
+        playbackGeneration = generation
+
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+        currentAsset = asset
+        currentDurationSeconds = nil
+        currentOverlapDuration = DualVideoPlayerSurfaceView.defaultOverlapDuration
+        activeSlot = .a
+
+        for position in [SlotPosition.a, .b] {
+            let item = makePlayerItem(asset: asset)
+            let slot = slot(for: position)
+            slot.player.replaceCurrentItem(with: item)
+            slot.player.seek(to: .zero)
+            slot.layer.removeAllAnimations()
+            slot.layer.opacity = position == activeSlot ? 1 : 0
+            slot.layer.isHidden = false
+            slot.layer.zPosition = position == activeSlot ? 0 : 1
+        }
+
+        isPlaybackPrepared = true
+        isCrossfading = false
+
+        assetLoadTask?.cancel()
+        assetLoadTask = Task(priority: .utility) { [weak self] in
+            do {
+                async let loadedTracks = asset.load(.tracks)
+                async let loadedDuration = asset.load(.duration)
+                _ = try await loadedTracks
+                let duration = try await loadedDuration
+
+                await MainActor.run {
+                    guard let self, self.playbackGeneration == generation else { return }
+                    let seconds = duration.seconds
+                    self.currentDurationSeconds = seconds.isFinite ? seconds : nil
+                    self.currentOverlapDuration = self.resolvedOverlapDuration(for: self.currentDurationSeconds)
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self, self.playbackGeneration == generation else { return }
+                    self.currentDurationSeconds = nil
+                    self.currentOverlapDuration = DualVideoPlayerSurfaceView.defaultOverlapDuration
+                }
+            }
+        }
+    }
+
+    private func makePlayerItem(asset: AVURLAsset) -> AVPlayerItem {
+        let item = AVPlayerItem(asset: asset)
+        item.audioTimePitchAlgorithm = .varispeed
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
+        item.preferredForwardBufferDuration = 0
+        item.preferredPeakBitRate = 5_000_000
+
+        if let screen = window?.screen ?? NSScreen.main {
+            let scale = screen.backingScaleFactor
+            item.preferredMaximumResolution = CGSize(
+                width: screen.frame.width * scale,
+                height: screen.frame.height * scale
+            )
+        } else {
+            item.preferredMaximumResolution = CGSize(width: 1920, height: 1080)
+        }
+
+        return item
+    }
+
+    private func freezePlayback() {
+        guard isPlaybackPrepared || periodicObserver != nil else {
+            return
+        }
+
+        teardownPlayback()
+    }
+
+    private func teardownPlayback() {
+        assetLoadTask?.cancel()
+        assetLoadTask = nil
+        currentAsset?.cancelLoading()
+        currentAsset = nil
+        currentDurationSeconds = nil
+        currentOverlapDuration = DualVideoPlayerSurfaceView.defaultOverlapDuration
+        isPlaybackPrepared = false
+        isCrossfading = false
+        playbackGeneration = UUID()
+
+        removePeriodicObserver()
+
+        slots.forEach { slot in
+            slot.layer.removeAllAnimations()
+            slot.layer.opacity = 0
+            slot.layer.isHidden = true
+            slot.player.pause()
+            slot.player.currentItem?.cancelPendingSeeks()
+            slot.player.currentItem?.asset.cancelLoading()
+            slot.player.replaceCurrentItem(with: nil)
+        }
+    }
+
+    private func installPeriodicObserver(on player: AVPlayer) {
+        guard observedPlayer !== player else {
+            return
+        }
+
+        removePeriodicObserver()
+        observedPlayer = player
+        periodicObserver = player.addPeriodicTimeObserver(
+            forInterval: Self.observerInterval,
+            queue: .main
+        ) { [weak self] time in
+            self?.handlePlaybackTick(at: time)
+        }
+    }
+
+    private func removePeriodicObserver() {
+        if let periodicObserver, let observedPlayer {
+            observedPlayer.removeTimeObserver(periodicObserver)
+        }
+        periodicObserver = nil
+        observedPlayer = nil
+    }
+
+    private func handlePlaybackTick(at time: CMTime) {
+        guard isPlaybackPrepared, !isCrossfading else {
+            return
+        }
+
+        let currentSeconds = time.seconds
+        guard currentSeconds.isFinite, let durationSeconds = resolvedDurationSeconds() else {
+            return
+        }
+
+        let remainingSeconds = durationSeconds - currentSeconds
+        guard remainingSeconds <= currentOverlapDuration, remainingSeconds > 0 else {
+            return
+        }
+
+        beginCrossfade()
+    }
+
+    private func resolvedDurationSeconds() -> Double? {
+        if let currentDurationSeconds, currentDurationSeconds.isFinite {
+            return currentDurationSeconds
+        }
+
+        let seconds = slot(for: activeSlot).player.currentItem?.duration.seconds ?? .nan
+        return seconds.isFinite ? seconds : nil
+    }
+
+    private func resolvedOverlapDuration(for durationSeconds: Double?) -> Double {
+        guard let durationSeconds, durationSeconds.isFinite else {
+            return DualVideoPlayerSurfaceView.defaultOverlapDuration
+        }
+
+        return min(
+            DualVideoPlayerSurfaceView.defaultOverlapDuration,
+            max(DualVideoPlayerSurfaceView.minimumOverlapDuration, durationSeconds / 2)
+        )
+    }
+
+    private func beginCrossfade() {
+        guard isPlaybackPrepared else { return }
+
+        let generation = playbackGeneration
+        let outgoingPosition = activeSlot
+        let incomingPosition = outgoingPosition.other
+        let outgoingSlot = slot(for: outgoingPosition)
+        let incomingSlot = slot(for: incomingPosition)
+
+        guard incomingSlot.player.currentItem != nil else {
+            return
+        }
+
+        isCrossfading = true
+
+        incomingSlot.layer.removeAllAnimations()
+        outgoingSlot.layer.removeAllAnimations()
+        incomingSlot.layer.opacity = 0
+        incomingSlot.layer.isHidden = false
+        incomingSlot.layer.zPosition = 1
+        outgoingSlot.layer.zPosition = 0
+        incomingSlot.player.pause()
+
+        incomingSlot.player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            guard let self, finished, self.playbackGeneration == generation, self.isPlaybackPrepared else {
+                return
+            }
+
+            incomingSlot.player.playImmediately(atRate: 1)
+            self.animateCrossfade(
+                from: outgoingPosition,
+                to: incomingPosition,
+                overlapDuration: self.currentOverlapDuration,
+                generation: generation
+            )
+        }
+    }
+
+    private func animateCrossfade(
+        from outgoingPosition: SlotPosition,
+        to incomingPosition: SlotPosition,
+        overlapDuration: Double,
+        generation: UUID
+    ) {
+        let outgoingSlot = slot(for: outgoingPosition)
+        let incomingSlot = slot(for: incomingPosition)
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            guard let self, self.playbackGeneration == generation else { return }
+            self.completeCrossfade(from: outgoingPosition, to: incomingPosition)
+        }
+
+        let fadeIn = CABasicAnimation(keyPath: "opacity")
+        fadeIn.fromValue = 0
+        fadeIn.toValue = 1
+        fadeIn.duration = overlapDuration
+        fadeIn.timingFunction = CAMediaTimingFunction(name: .linear)
+
+        let fadeOut = CABasicAnimation(keyPath: "opacity")
+        fadeOut.fromValue = 1
+        fadeOut.toValue = 0
+        fadeOut.duration = overlapDuration
+        fadeOut.timingFunction = CAMediaTimingFunction(name: .linear)
+
+        incomingSlot.layer.add(fadeIn, forKey: "aura.crossfade.in")
+        outgoingSlot.layer.add(fadeOut, forKey: "aura.crossfade.out")
+        incomingSlot.layer.opacity = 1
+        outgoingSlot.layer.opacity = 0
+
+        CATransaction.commit()
+    }
+
+    private func completeCrossfade(from outgoingPosition: SlotPosition, to incomingPosition: SlotPosition) {
+        let outgoingSlot = slot(for: outgoingPosition)
+        let incomingSlot = slot(for: incomingPosition)
+
+        outgoingSlot.layer.removeAllAnimations()
+        incomingSlot.layer.removeAllAnimations()
+        outgoingSlot.player.pause()
+        outgoingSlot.player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        outgoingSlot.layer.opacity = 0
+        outgoingSlot.layer.isHidden = false
+        outgoingSlot.layer.zPosition = 0
+        incomingSlot.layer.zPosition = 1
+
+        activeSlot = incomingPosition
+        isCrossfading = false
+
+        installPeriodicObserver(on: incomingSlot.player)
+    }
+
+    private func releaseSecurityScope() {
+        if let currentURL, isSecurityScoped {
+            currentURL.stopAccessingSecurityScopedResource()
+        }
+
+        isSecurityScoped = false
     }
 }
