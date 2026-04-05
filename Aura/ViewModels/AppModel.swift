@@ -385,6 +385,14 @@ final class AppModel {
         }
     }
 
+    func purgeTransientCaches() {
+        URLCache.shared.removeAllCachedResponses()
+        MediaUtils.purgeCaches()
+        MoodCard.purgeImageCache()
+        startupWaiters.removeAll(keepingCapacity: false)
+        DownloadManager.shared.purgeTransientState()
+    }
+
     private func recordSceneActivation(moodID: String) {
         recentSceneIDs.removeAll { $0 == moodID }
         recentSceneIDs.insert(moodID, at: 0)
@@ -442,6 +450,21 @@ final class DownloadManager {
         let config = URLSessionConfiguration.default
         config.httpMaximumConnectionsPerHost = 2
         self.urlSession = URLSession(configuration: config)
+    }
+
+    func purgeTransientState() {
+        downloadStates = downloadStates.filter { _, state in
+            if case .downloading = state {
+                return true
+            }
+            return false
+        }
+        downloadWaiters = downloadWaiters.filter { key, _ in
+            if case .downloading = downloadStates[key] {
+                return true
+            }
+            return false
+        }
     }
 
     func isDownloaded(resource: String) -> Bool {

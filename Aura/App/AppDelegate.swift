@@ -4,6 +4,7 @@ import os
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var appModel: AppModel?
+    private var windowCloseObserver: NSObjectProtocol?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Disable state restoration early to avoid com.apple.appkit.restoration_storage errors
@@ -41,6 +42,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.titlebarAppearsTransparent = true
             }
         }
+
+        windowCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let window = notification.object as? NSWindow,
+                  window.identifier?.rawValue == "main" else { return }
+            self?.appModel?.purgeTransientCaches()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -61,5 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         return true
+    }
+
+    deinit {
+        if let windowCloseObserver {
+            NotificationCenter.default.removeObserver(windowCloseObserver)
+        }
     }
 }

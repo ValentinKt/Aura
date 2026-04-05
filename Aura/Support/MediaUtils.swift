@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import ImageIO
 import os
 
 enum MediaUtils {
@@ -11,6 +12,8 @@ enum MediaUtils {
     }()
 
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
+
+    private static let thumbnailMaxPixelSize: CGFloat = 200
 
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
         #if DEBUG
@@ -54,6 +57,11 @@ enum MediaUtils {
     nonisolated static func clearCache(for resource: String) {
         resolvedURLCache.removeObject(forKey: "\(resource)_true" as NSString)
         resolvedURLCache.removeObject(forKey: "\(resource)_false" as NSString)
+    }
+
+    nonisolated static func purgeCaches() {
+        imageCache.removeAllObjects()
+        resolvedURLCache.removeAllObjects()
     }
 
     nonisolated static func resolveResourceURL(_ resource: String, allowVideoFallback: Bool) -> URL? {
@@ -376,6 +384,36 @@ enum MediaUtils {
         }
     }
 
+    nonisolated static func thumbnailImage(for resource: String, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
+        if let url = resolveResourceURL(resource),
+           let image = await thumbnailImage(from: url, maxPixelSize: maxPixelSize) {
+            return image
+        }
+
+        let baseName = (resource as NSString).deletingPathExtension
+        if let image = await MainActor.run(body: {
+            renderedThumbnail(named: baseName, maxPixelSize: maxPixelSize)
+                ?? renderedThumbnail(named: resource, maxPixelSize: maxPixelSize)
+        }) {
+            return image
+        }
+
+        return nil
+    }
+
+    nonisolated static func thumbnailImage(from url: URL, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
+        let ext = url.pathExtension.lowercased()
+        if ["mp4", "mov", "m4v"].contains(ext) {
+            return await downsampledVideoPosterImage(from: url, maxPixelSize: maxPixelSize)
+        }
+
+        return await Task.detached(priority: .utility) {
+            autoreleasepool {
+                downsampledImage(from: url, maxPixelSize: maxPixelSize)
+            }
+        }.value
+    }
+
     nonisolated static func loadImage(from url: URL) async -> NSImage? {
         let cacheKey = url as NSURL
 
@@ -402,5 +440,78 @@ enum MediaUtils {
         }
 
         return image
+    }
+
+    nonisolated private static func downsampledVideoPosterImage(from url: URL, maxPixelSize: CGFloat) async -> NSImage? {
+        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
+        let time = CMTime(seconds: 2, preferredTimescale: 600)
+
+        do {
+            let (cgImage, _) = try await generator.image(at: time)
+            return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        } catch {
+            log.error("Failed to generate thumbnail for \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    nonisolated private static func downsampledImage(from url: URL, maxPixelSize: CGFloat) -> NSImage? {
+        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let options: CFDictionary = [
+            kCGImageSourceShouldCache: false
+        ] as CFDictionary
+
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, options) else {
+            return nil
+        }
+
+        let downsampleOptions: CFDictionary = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: max(1, Int(maxPixelSize)),
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: false,
+            kCGImageSourceShouldCache: false
+        ] as CFDictionary
+
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
+            return nil
+        }
+
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+    }
+
+    @MainActor
+    private static func renderedThumbnail(named name: String, maxPixelSize: CGFloat) -> NSImage? {
+        guard let image = NSImage(named: name) else { return nil }
+
+        let originalSize = image.size
+        guard originalSize.width > 0, originalSize.height > 0 else { return image }
+
+        let longestEdge = max(originalSize.width, originalSize.height)
+        let scale = min(1, maxPixelSize / longestEdge)
+        let targetSize = NSSize(width: max(1, originalSize.width * scale), height: max(1, originalSize.height * scale))
+        let thumbnail = NSImage(size: targetSize)
+
+        thumbnail.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: targetSize), from: NSRect(origin: .zero, size: originalSize), operation: .copy, fraction: 1)
+        thumbnail.unlockFocus()
+
+        return thumbnail
     }
 }

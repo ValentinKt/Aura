@@ -29,6 +29,7 @@ struct AuraApp: App {
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         UserDefaults.standard.set(false, forKey: "NSPersistentUIEnabled")
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+        URLCache.shared = URLCache(memoryCapacity: 10_000_000, diskCapacity: 50_000_000, directory: nil)
 
         Logger.app.info("🟢 [AuraApp] State restoration disabled")
 

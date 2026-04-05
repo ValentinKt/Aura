@@ -602,6 +602,9 @@ private struct MoodCarouselCard: View {
             }
             await loadPreviewImage()
         }
+        .onDisappear {
+            image = nil
+        }
         .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
             if newState == .downloaded {
                 Task {
@@ -676,37 +679,7 @@ private struct MoodCarouselCard: View {
 
         let loaded = await Task(priority: .utility) { () -> NSImage? in
             if Task.isCancelled { return nil }
-
-            let resolvedURL = MediaUtils.resolveResourceURL(resource)
-            let ext = (resolvedURL?.pathExtension ?? (resource as NSString).pathExtension).lowercased()
-            let isVideo = ["mp4", "mov"].contains(ext)
-
-            if let url = resolvedURL, url.isFileURL {
-                let path = url.path
-                let exists = FileManager.default.fileExists(atPath: path)
-
-                if exists {
-                    if isVideo {
-                        let poster = await MediaUtils.videoPosterImage(from: url)
-                        if let poster {
-                            return poster
-                        }
-                    } else if let img = NSImage(contentsOf: url) {
-                        return img
-                    }
-                }
-            }
-
-            let baseName = (resource as NSString).deletingPathExtension
-            if let image = NSImage(named: baseName) {
-                return image
-            }
-
-            if let image = NSImage(named: resource) {
-                return image
-            }
-
-            return nil
+            return await MediaUtils.thumbnailImage(for: resource)
         }.value
 
         if let loaded {

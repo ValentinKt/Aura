@@ -326,7 +326,12 @@ struct MoodCard: View {
     @State private var isHovered = false
     @State private var isPressed = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    static let imageCache = NSCache<NSString, NSImage>()
+    static let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 48
+        cache.totalCostLimit = 1024 * 1024 * 24
+        return cache
+    }()
 
     private var primaryResource: String {
         mood.wallpaper.resources.first ?? ""
@@ -435,6 +440,9 @@ struct MoodCard: View {
                 DownloadManager.shared.checkStatus(for: primaryResource)
             }
             await loadPreview()
+        }
+        .onDisappear {
+            image = nil
         }
         .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
             if newState == .downloaded {
@@ -622,16 +630,18 @@ struct MoodCard: View {
         }
     }
 
+    static func purgeImageCache() {
+        imageCache.removeAllObjects()
+    }
+
     @MainActor
     private func loadPreview() async {
         if mood.wallpaper.type == .time {
-            // No preview image needed for programmatic wallpapers, they render directly
             return
         }
 
         guard let resource = mood.wallpaper.resources.first, !resource.isEmpty else { return }
 
-        // Return cached image if available
         if let cached = MoodCard.imageCache.object(forKey: resource as NSString) {
             self.image = cached
             return
@@ -639,46 +649,7 @@ struct MoodCard: View {
 
         let loadedImage = await Task(priority: .utility) { () -> NSImage? in
             if Task.isCancelled { return nil }
-
-            // First check if the resource is an un-downloaded file from the Github release.
-            // Try to resolve the URL, but don't fail immediately if it's nil.
-            let resolvedURL = MediaUtils.resolveResourceURL(resource)
-
-            // Check if it's a known video file format that we might need to load from local cache or bundle
-            let ext = (resolvedURL?.pathExtension ?? (resource as NSString).pathExtension).lowercased()
-            let isVideo = ["mp4", "mov"].contains(ext)
-
-            if let url = resolvedURL {
-                if url.isFileURL {
-                    let path = url.path
-                    let exists = FileManager.default.fileExists(atPath: path)
-
-                    if exists {
-                        if isVideo {
-                            let poster = await MediaUtils.videoPosterImage(from: url)
-                            if let poster = poster {
-                                return poster
-                            }
-                        } else if let img = NSImage(contentsOf: url) {
-                            return img
-                        }
-                    }
-                }
-            }
-
-            // Fallback: If URL resolution failed or file doesn't exist locally,
-            // try to load an image with the same base name from the asset catalog (as a placeholder)
-            let baseName = (resource as NSString).deletingPathExtension
-            if let image = NSImage(named: baseName) {
-                return image
-            }
-
-            // If we have an image in the asset catalog matching the exact resource name
-            if let image = NSImage(named: resource) {
-                return image
-            }
-
-            return nil
+            return await MediaUtils.thumbnailImage(for: resource)
         }.value
 
         guard !Task.isCancelled else { return }
