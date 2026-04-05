@@ -94,17 +94,8 @@ struct ContentView: View {
                     .zIndex(100)
             }
         }
-        .sheet(isPresented: $isShowingCreateMood) {
-            let selectedSubtheme = appModel.moodViewModel.selectedSubtheme
-            let isCreateWithAISubtheme = selectedSubtheme?.caseInsensitiveCompare("Create with AI") == .orderedSame
-            let isDynamicDesktopSubtheme = selectedSubtheme?.caseInsensitiveCompare("Dynamic Desktop") == .orderedSame
-            let isImagePlaygroundSubtheme = selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame
-            CreateMoodView(
-                appModel: appModel,
-                defaultTheme: isCreateWithAISubtheme || isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
-                defaultSubtheme: isCreateWithAISubtheme ? "Create with AI" : (isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal")),
-                initialWallpaperSource: isCreateWithAISubtheme ? .aiGenerated : (isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia)
-            )
+        .sheet(isPresented: $appModel.showCreateMoodSheet) {
+            createMoodSheet(appModel: appModel)
         }
         .focusable()
         .onKeyPress(.rightArrow) {
@@ -471,7 +462,6 @@ struct ContentView: View {
         }
     }
 
-    @State private var isShowingCreateMood = false
     @State private var isHoveringNewMood = false
 
     private var headerView: some View {
@@ -494,7 +484,7 @@ struct ContentView: View {
             HStack(spacing: 16) {
                 // New Mood button
                 Button {
-                    isShowingCreateMood = true
+                    appModel.showCreateMoodSheet = true
                 } label: {
                     newMoodButtonLabel
                 }
@@ -582,6 +572,21 @@ struct ContentView: View {
 
     private var newMoodButtonShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
+    }
+
+    @ViewBuilder
+    private func createMoodSheet(appModel: AppModel) -> some View {
+        let selectedSubtheme = appModel.moodViewModel.selectedSubtheme
+        let isCreateWithAISubtheme = selectedSubtheme?.caseInsensitiveCompare("Create with AI") == .orderedSame
+        let isDynamicDesktopSubtheme = selectedSubtheme?.caseInsensitiveCompare("Dynamic Desktop") == .orderedSame
+        let isImagePlaygroundSubtheme = selectedSubtheme?.caseInsensitiveCompare("Image Playground") == .orderedSame
+
+        CreateMoodView(
+            appModel: appModel,
+            defaultTheme: isCreateWithAISubtheme || isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
+            defaultSubtheme: isCreateWithAISubtheme ? "Create with AI" : (isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal")),
+            initialWallpaperSource: isCreateWithAISubtheme ? .aiGenerated : (isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia)
+        )
     }
 }
 

@@ -39,6 +39,7 @@ final class AppModel {
     var settingsViewModel: SettingsViewModel
     var showImmersive: Bool = false
     var showCommandPalette: Bool = false
+    var showCreateMoodSheet: Bool = false
     var isReady: Bool = false
     var isStarting: Bool = false
     var favoriteSceneIDs: [String]
@@ -117,7 +118,7 @@ final class AppModel {
             resumeStartupWaiters()
         }
         let isFirstLaunch = !UserDefaults.standard.bool(forKey: StorageKey.initialAuraWallpaperApplied)
-        
+
         Logger.app.info("🟢 [AppModel] Starting engines (First launch: \(isFirstLaunch))...")
         let startupCompleted = await runInitialStartupSequence(isFirstLaunch: isFirstLaunch)
         if !startupCompleted {

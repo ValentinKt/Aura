@@ -7,7 +7,6 @@ struct MenuBarPopoverView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.openWindow) private var openWindow
 
-    @State private var isShowingCreateMood = false
     @State private var selectedSubtheme: String = ""
     @State private var expandedSections: Set<String> = []
 
@@ -71,16 +70,6 @@ struct MenuBarPopoverView: View {
                 }
             }
             Task { await loadBackgroundMedia() }
-        }
-        .sheet(isPresented: $isShowingCreateMood) {
-            let isDynamicDesktopSubtheme = selectedSubtheme.caseInsensitiveCompare("Dynamic Desktop") == .orderedSame
-            let isImagePlaygroundSubtheme = selectedSubtheme.caseInsensitiveCompare("Image Playground") == .orderedSame
-            CreateMoodView(
-                appModel: appModel,
-                defaultTheme: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? "Dynamic" : "Custom",
-                defaultSubtheme: isDynamicDesktopSubtheme ? "Dynamic Desktop" : (isImagePlaygroundSubtheme ? "Image Playground" : "Personal"),
-                initialWallpaperSource: isDynamicDesktopSubtheme || isImagePlaygroundSubtheme ? .imagePlayground : .importedMedia
-            )
         }
         .environment(\.colorScheme, .dark)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ReopenMainWindow"))) { _ in
@@ -301,13 +290,27 @@ struct MenuBarPopoverView: View {
                 }
 
                 NewMoodButtonContent {
-                    isShowingCreateMood = true
+                    presentCreateMoodSheet()
                 }
             }
         }
         .contentMargins(.horizontal, 24, for: .scrollContent)
         .frame(maxWidth: .infinity)
         .frame(height: 180)
+    }
+
+    private func presentCreateMoodSheet() {
+        appModel.moodViewModel.selectedSubtheme = selectedSubtheme
+        appModel.showCreateMoodSheet = true
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "main")
+
+        for window in NSApp.windows where window.identifier?.rawValue == "main" {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 
     // MARK: - Footer
