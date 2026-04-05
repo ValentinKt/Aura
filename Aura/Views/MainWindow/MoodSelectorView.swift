@@ -461,6 +461,13 @@ struct MoodCard: View {
                 TimeWallpaperPreview(mood: mood, isPressed: isPressed, selectedWallpaperURL: selectedWallpaperURL)
             } else if mood.wallpaper.type == .website {
                 WebsiteWallpaperPreview(mood: mood, isPressed: isPressed)
+            } else if isSelected,
+                      let resource = mood.wallpaper.resources.first,
+                      let url = MediaUtils.resolveResourceURL(resource),
+                      ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
+                IsolatedVideoBackgroundView(url: url)
+                    .equatable()
+                    .frame(width: 240, height: 160)
             } else if let image = image {
                 Image(nsImage: image)
                     .resizable()
