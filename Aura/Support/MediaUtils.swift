@@ -405,7 +405,7 @@ enum MediaUtils {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "size", value: "\(maxPixelSize)")]
         let cacheKey = (components?.url ?? url) as NSURL
-        
+
         if let cachedImage = imageCache.object(forKey: cacheKey) {
             return cachedImage
         }
@@ -425,13 +425,13 @@ enum MediaUtils {
                 downsampledImage(from: url, maxPixelSize: maxPixelSize)
             }
         }
-        
+
         let result = await withTaskCancellationHandler {
             await task.value
         } onCancel: {
             task.cancel()
         }
-        
+
         if let image = result {
             imageCache.setObject(image, forKey: cacheKey)
         }

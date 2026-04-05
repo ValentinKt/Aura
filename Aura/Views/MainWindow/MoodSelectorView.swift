@@ -658,7 +658,7 @@ struct MoodCard: View {
             self.image = cached
             return
         }
-        
+
         // Debounce: Wait a tiny bit to avoid loading thumbnails for views that just flash by during rapid scrolling
         try? await Task.sleep(for: .milliseconds(150))
         guard !Task.isCancelled else { return }
