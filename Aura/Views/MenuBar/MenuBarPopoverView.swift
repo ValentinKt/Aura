@@ -495,6 +495,7 @@ private struct MoodCarouselCard: View {
     var onDelete: (() -> Void)?
     let action: (Bool) -> Void
 
+    @State private var previewTask: Task<Void, Never>?
     @State private var image: NSImage?
     @State private var isHovered = false
     @State private var isPressed = false
@@ -603,14 +604,18 @@ private struct MoodCarouselCard: View {
             if !primaryResource.isEmpty {
                 DownloadManager.shared.checkStatus(for: primaryResource)
             }
-            await loadPreviewImage()
+            previewTask?.cancel()
+            previewTask = Task { await loadPreviewImage() }
         }
         .onDisappear {
+            previewTask?.cancel()
             image = nil
         }
         .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
             if newState == .downloaded {
-                Task {
+                previewTask?.cancel()
+                previewTask = Task {
+                    MoodCard.imageCache.removeObject(forKey: primaryResource as NSString)
                     await loadPreviewImage()
                 }
             }
@@ -680,10 +685,16 @@ private struct MoodCarouselCard: View {
             return
         }
 
+        // Debounce: Wait a tiny bit to avoid loading thumbnails for views that just flash by during rapid scrolling
+        try? await Task.sleep(for: .milliseconds(150))
+        guard !Task.isCancelled else { return }
+
         let loaded = await Task(priority: .utility) { () -> NSImage? in
             if Task.isCancelled { return nil }
             return await MediaUtils.thumbnailImage(for: resource)
         }.value
+
+        guard !Task.isCancelled else { return }
 
         if let loaded {
             popoverMoodCardLogger.debug("Setting image for \(resource, privacy: .public)")

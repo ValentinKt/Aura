@@ -8,9 +8,9 @@ struct MoodSelectorView: View {
     var body: some View {
         ScrollViewReader { proxy in
             let subthemeSections = appModel.moodViewModel.subthemeSections
-            VStack(alignment: .leading, spacing: 28) {
+            LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(subthemeSections) { section in
-                    VStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: 24) {
                         if subthemeSections.count > 1 {
                             Text(section.title.uppercased())
                                 .font(.system(size: 12, weight: .bold))
@@ -319,6 +319,7 @@ struct MoodCard: View {
     var onDelete: (() -> Void)?
     let action: (Bool) -> Void
 
+    @State private var previewTask: Task<Void, Never>?
     @State private var isExporting = false
     @State private var exportError: String?
     @State private var showExportSuccess = false
@@ -439,14 +440,18 @@ struct MoodCard: View {
             if !primaryResource.isEmpty {
                 DownloadManager.shared.checkStatus(for: primaryResource)
             }
-            await loadPreview()
+            previewTask?.cancel()
+            previewTask = Task { await loadPreview() }
         }
         .onDisappear {
+            previewTask?.cancel()
             image = nil
         }
         .onChange(of: DownloadManager.shared.downloadStates[primaryResource]) { _, newState in
             if newState == .downloaded {
-                Task {
+                previewTask?.cancel()
+                previewTask = Task {
+                    MoodCard.imageCache.removeObject(forKey: primaryResource as NSString)
                     await loadPreview()
                 }
             }
@@ -653,11 +658,12 @@ struct MoodCard: View {
             self.image = cached
             return
         }
+        
+        // Debounce: Wait a tiny bit to avoid loading thumbnails for views that just flash by during rapid scrolling
+        try? await Task.sleep(for: .milliseconds(150))
+        guard !Task.isCancelled else { return }
 
-        let loadedImage = await Task(priority: .utility) { () -> NSImage? in
-            if Task.isCancelled { return nil }
-            return await MediaUtils.thumbnailImage(for: resource)
-        }.value
+        let loadedImage = await MediaUtils.thumbnailImage(for: resource)
 
         guard !Task.isCancelled else { return }
 

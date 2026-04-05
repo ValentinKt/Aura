@@ -13,7 +13,7 @@ enum MediaUtils {
 
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
 
-    nonisolated static let thumbnailMaxPixelSize: CGFloat = 200
+    nonisolated static let thumbnailMaxPixelSize: CGFloat = 600
 
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
         #if DEBUG
@@ -402,16 +402,40 @@ enum MediaUtils {
     }
 
     nonisolated static func thumbnailImage(from url: URL, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
-        let ext = url.pathExtension.lowercased()
-        if ["mp4", "mov", "m4v"].contains(ext) {
-            return await downsampledVideoPosterImage(from: url, maxPixelSize: maxPixelSize)
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "size", value: "\(maxPixelSize)")]
+        let cacheKey = (components?.url ?? url) as NSURL
+        
+        if let cachedImage = imageCache.object(forKey: cacheKey) {
+            return cachedImage
         }
 
-        return await Task.detached(priority: .utility) {
-            autoreleasepool {
+        let ext = url.pathExtension.lowercased()
+        if ["mp4", "mov", "m4v"].contains(ext) {
+            if let image = await downsampledVideoPosterImage(from: url, maxPixelSize: maxPixelSize) {
+                imageCache.setObject(image, forKey: cacheKey)
+                return image
+            }
+            return nil
+        }
+
+        let task = Task.detached(priority: .utility) { () -> NSImage? in
+            if Task.isCancelled { return nil }
+            return autoreleasepool {
                 downsampledImage(from: url, maxPixelSize: maxPixelSize)
             }
-        }.value
+        }
+        
+        let result = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        
+        if let image = result {
+            imageCache.setObject(image, forKey: cacheKey)
+        }
+        return result
     }
 
     nonisolated static func loadImage(from url: URL) async -> NSImage? {
@@ -456,12 +480,18 @@ enum MediaUtils {
         generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
         let time = CMTime(seconds: 2, preferredTimescale: 600)
 
-        do {
-            let (cgImage, _) = try await generator.image(at: time)
-            return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        } catch {
-            log.error("Failed to generate thumbnail for \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
-            return nil
+        return await withTaskCancellationHandler {
+            do {
+                let (cgImage, _) = try await generator.image(at: time)
+                return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            } catch {
+                if !Task.isCancelled {
+                    log.error("Failed to generate thumbnail for \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+                }
+                return nil
+            }
+        } onCancel: {
+            generator.cancelAllCGImageGeneration()
         }
     }
 
