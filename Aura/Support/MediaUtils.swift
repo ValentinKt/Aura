@@ -13,7 +13,7 @@ enum MediaUtils {
 
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
 
-    private static let thumbnailMaxPixelSize: CGFloat = 200
+    nonisolated static let thumbnailMaxPixelSize: CGFloat = 200
 
     nonisolated static func resolveImageFallback(for name: String) -> URL? {
         #if DEBUG

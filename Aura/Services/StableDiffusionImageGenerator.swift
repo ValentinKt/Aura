@@ -202,6 +202,13 @@ actor StableDiffusionImageGenerator {
         pipeline = nil
     }
 
+    func deleteModelData() throws {
+        unloadResources()
+        if fileManager.fileExists(atPath: modelDirectory.path) {
+            try fileManager.removeItem(at: modelDirectory)
+        }
+    }
+
     func removeGeneratedPreview(at url: URL?) {
         guard let url else { return }
         if fileManager.fileExists(atPath: url.path) {

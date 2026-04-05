@@ -24,6 +24,9 @@ struct CreateMoodView: View {
     @State private var creationStatusMessage: String?
     @State private var errorMessage: String?
     @State private var aiPrompt = ""
+    @State private var retryAction: RecoveryAction?
+    @State private var isConfirmingPreviewRemoval = false
+    @State private var isConfirmingModelDeletion = false
 
     init(
         appModel: AppModel,
@@ -101,6 +104,7 @@ struct CreateMoodView: View {
             onCompletion: { url in
                 selectedFileURL = url
                 errorMessage = nil
+                retryAction = nil
 
                 if trimmedMoodName.isEmpty {
                     moodName = "Image Playground Mood"
@@ -108,10 +112,59 @@ struct CreateMoodView: View {
             },
             onCancellation: nil
         )
+        .sheet(
+            isPresented: Binding(
+                get: { aiViewModel.isShowingModelDownloadSheet },
+                set: { isPresented in
+                    if !isPresented {
+                        aiViewModel.dismissModelDownloadSheet()
+                    }
+                }
+            )
+        ) {
+            AuraModelDownloadSheet(
+                progress: aiViewModel.modelProgress,
+                statusMessage: aiViewModel.modelStatusMessage,
+                isDownloading: aiViewModel.isDownloadingModel,
+                errorMessage: retryAction == .downloadModel ? aiViewModel.errorMessage : nil,
+                onCancel: {
+                    if aiViewModel.isDownloadingModel {
+                        aiViewModel.cancelModelDownload()
+                    } else {
+                        aiViewModel.dismissModelDownloadSheet()
+                    }
+                },
+                onRetry: startModelDownloadFlow
+            )
+        }
         .task(id: initialWallpaperSource) {
             if initialWallpaperSource == .aiGenerated {
                 await appModel.aiImageGenerationViewModel.refreshModelAvailability()
             }
+        }
+        .confirmationDialog(
+            "Remove selected wallpaper?",
+            isPresented: $isConfirmingPreviewRemoval,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Wallpaper", role: .destructive, action: removeSelectedWallpaper)
+            Button("Keep Wallpaper", role: .cancel) {}
+        } message: {
+            Text("Aura will remove this preview from the current mood draft.")
+        }
+        .confirmationDialog(
+            "Remove downloaded model?",
+            isPresented: $isConfirmingModelDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Model", role: .destructive) {
+                Task {
+                    await aiViewModel.deleteModel()
+                }
+            }
+            Button("Keep Model", role: .cancel) {}
+        } message: {
+            Text("You’ll need to download the Stable Diffusion model again before generating another wallpaper.")
         }
         .onDisappear {
             guard initialWallpaperSource == .aiGenerated else { return }
@@ -359,9 +412,7 @@ struct CreateMoodView: View {
 
             HStack(spacing: 12) {
                 Button {
-                    Task {
-                        await aiViewModel.downloadModel()
-                    }
+                    startModelDownloadFlow()
                 } label: {
                     HStack(spacing: 8) {
                         if aiViewModel.isDownloadingModel {
@@ -383,12 +434,15 @@ struct CreateMoodView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(aiViewModel.isDownloadingModel || aiViewModel.isModelReady)
+                .help(aiViewModel.isModelReady ? "Stable Diffusion model is ready" : "Download the Stable Diffusion model")
 
                 Button {
                     Task {
+                        retryAction = .generateWallpaper
                         if let generatedURL = await aiViewModel.generateImage(prompt: aiPrompt) {
                             selectedFileURL = generatedURL
                             errorMessage = nil
+                            retryAction = nil
 
                             if trimmedMoodName.isEmpty {
                                 moodName = suggestedMoodName(from: aiPrompt)
@@ -416,6 +470,25 @@ struct CreateMoodView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!aiViewModel.isModelReady || aiViewModel.isGeneratingImage || trimmedAIPrompt.isEmpty)
+                .help("Generate a wallpaper from your prompt")
+
+                if aiViewModel.isModelReady {
+                    Button {
+                        isConfirmingModelDeletion = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background {
+                                buttonShape.fill(Color.red.opacity(0.16))
+                            }
+                            .foregroundStyle(.white)
+                            .contentShape(buttonShape)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(aiViewModel.isGeneratingImage || aiViewModel.isDownloadingModel)
+                    .help("Delete the downloaded Stable Diffusion model")
+                }
             }
         }
     }
@@ -497,13 +570,7 @@ struct CreateMoodView: View {
             }
 
             Button {
-                let shouldRemoveGeneratedPreview = initialWallpaperSource == .aiGenerated
-                selectedFileURL = nil
-                if shouldRemoveGeneratedPreview {
-                    Task {
-                        await aiViewModel.clearGeneratedImage(removeFile: true)
-                    }
-                }
+                isConfirmingPreviewRemoval = true
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.white.opacity(0.6))
@@ -512,6 +579,7 @@ struct CreateMoodView: View {
             }
             .buttonStyle(.plain)
             .padding(12)
+            .help("Remove this wallpaper from the draft")
         }
     }
 
@@ -533,98 +601,36 @@ struct CreateMoodView: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 12) {
-            if let error = activeErrorMessage {
-                Text(error)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-            }
-
-            if isCreatingMood, let creationStatusMessage {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(creationStatusMessage)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-
-                        Spacer()
-
-                        Text(creationProgress.formatted(.percent.precision(.fractionLength(0))))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    ProgressView(value: creationProgress)
-                        .controlSize(.small)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-            }
-
-            HStack(spacing: 16) {
-                Button(action: { dismiss() }) {
-                    Text("Cancel")
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.black.opacity(0.001))
-                        .background {
-                            if reduceTransparency {
-                                buttonShape.fill(.regularMaterial)
-                            } else {
-                                Color.clear
-                                    .glassEffect(.regular.interactive(), in: buttonShape)
-                            }
-                        }
-                        .contentShape(buttonShape)
-                }
-                .buttonStyle(.plain)
-                .disabled(isCreatingMood)
-
-                let isFormValid = !trimmedMoodName.isEmpty
-                    && selectedFileURL != nil
-                    && !isCreatingMood
-                    && !aiViewModel.isGeneratingImage
-                    && !aiViewModel.isDownloadingModel
-
-                Button {
-                    Task {
-                        await createMood()
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        if isCreatingMood {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.white)
-                        }
-
-                        Text(createButtonTitle)
-                            .font(.headline)
-                    }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.black.opacity(0.001))
-                        .background {
-                            if !isFormValid {
-                                if reduceTransparency {
-                                    buttonShape.fill(.regularMaterial)
-                                } else {
-                                    Color.clear
-                                        .glassEffect(.regular, in: buttonShape)
-                                }
-                            } else {
-                                Color.accentColor.opacity(0.8)
-                            }
-                        }
-                        .foregroundStyle(!isFormValid ? .white.opacity(0.5) : .white)
-                        .contentShape(buttonShape)
-                }
-                .buttonStyle(.plain)
-                .disabled(!isFormValid)
-            }
+        let onRetry: (() -> Void)?
+        if retryAction == nil {
+            onRetry = nil
+        } else {
+            onRetry = { retryLastAction() }
         }
-        .padding(.bottom, 32)
+
+        return CreateMoodFooterView(
+            errorMessage: activeErrorMessage,
+            feedbackTitle: feedbackTitle,
+            creationStatusMessage: creationStatusMessage,
+            creationProgress: creationProgress,
+            isCreatingMood: isCreatingMood,
+            createButtonTitle: createButtonTitle,
+            isCreateFormValid: isCreateFormValid,
+            onRetry: onRetry,
+            onCancel: dismissCreateMoodView,
+            onCreate: startMoodCreation
+        )
+    }
+
+    private func dismissCreateMoodView() {
+        dismiss()
+    }
+
+    private func startMoodCreation() {
+        Task {
+            retryAction = .createMood
+            await createMood()
+        }
     }
 
     private var sheetShape: RoundedRectangle {
@@ -653,6 +659,14 @@ struct CreateMoodView: View {
 
     private var activeErrorMessage: String? {
         errorMessage ?? aiViewModel.errorMessage
+    }
+
+    private var isCreateFormValid: Bool {
+        !trimmedMoodName.isEmpty
+            && selectedFileURL != nil
+            && !isCreatingMood
+            && !aiViewModel.isGeneratingImage
+            && !aiViewModel.isDownloadingModel
     }
 
     private var headerTitle: String {
@@ -713,6 +727,7 @@ struct CreateMoodView: View {
                 layerMix: appModel.playerViewModel.layerVolumes
             )
 
+            retryAction = nil
             dismiss()
         } catch {
             creationStatusMessage = nil
@@ -786,6 +801,59 @@ struct CreateMoodView: View {
         return words.joined(separator: " ")
     }
 
+    private var feedbackTitle: String {
+        switch retryAction {
+        case .downloadModel:
+            return "Model download failed"
+        case .generateWallpaper:
+            return "Wallpaper generation failed"
+        case .createMood:
+            return "Mood creation failed"
+        case nil:
+            return "Something went wrong"
+        }
+    }
+
+    private func startModelDownloadFlow() {
+        retryAction = .downloadModel
+        aiViewModel.startModelDownload()
+    }
+
+    private func removeSelectedWallpaper() {
+        let shouldRemoveGeneratedPreview = initialWallpaperSource == .aiGenerated
+        selectedFileURL = nil
+        if shouldRemoveGeneratedPreview {
+            Task {
+                await aiViewModel.clearGeneratedImage(removeFile: true)
+            }
+        }
+    }
+
+    private func retryLastAction() {
+        guard let retryAction else { return }
+
+        switch retryAction {
+        case .downloadModel:
+            startModelDownloadFlow()
+        case .generateWallpaper:
+            Task {
+                if let generatedURL = await aiViewModel.generateImage(prompt: aiPrompt) {
+                    selectedFileURL = generatedURL
+                    errorMessage = nil
+                    self.retryAction = nil
+
+                    if trimmedMoodName.isEmpty {
+                        moodName = suggestedMoodName(from: aiPrompt)
+                    }
+                }
+            }
+        case .createMood:
+            Task {
+                await createMood()
+            }
+        }
+    }
+
 }
 
 extension CreateMoodView {
@@ -793,5 +861,133 @@ extension CreateMoodView {
         case importedMedia
         case imagePlayground
         case aiGenerated
+    }
+
+    enum RecoveryAction {
+        case downloadModel
+        case generateWallpaper
+        case createMood
+    }
+}
+
+private struct CreateMoodFooterView: View {
+    let errorMessage: String?
+    let feedbackTitle: String
+    let creationStatusMessage: String?
+    let creationProgress: Double
+    let isCreatingMood: Bool
+    let createButtonTitle: String
+    let isCreateFormValid: Bool
+    let onRetry: (() -> Void)?
+    let onCancel: () -> Void
+    let onCreate: () -> Void
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let errorMessage {
+                AuraInlineFeedbackView(
+                    title: feedbackTitle,
+                    message: errorMessage,
+                    retryAction: onRetry,
+                    helpURL: AuraHelpLinks.troubleshooting
+                )
+                .padding(.horizontal, 24)
+            }
+
+            if isCreatingMood, let creationStatusMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(creationStatusMessage)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+
+                        Spacer()
+
+                        Text(creationProgress.formatted(.percent.precision(.fractionLength(0))))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ProgressView(value: creationProgress)
+                        .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+            }
+
+            HStack(spacing: 16) {
+                Button(action: onCancel) {
+                    footerButtonLabel(title: "Cancel", showsProgress: false, style: .secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(isCreatingMood)
+
+                Button(action: onCreate) {
+                    footerButtonLabel(
+                        title: createButtonTitle,
+                        showsProgress: isCreatingMood,
+                        style: isCreateFormValid ? .primary : .disabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCreateFormValid)
+            }
+        }
+        .padding(.bottom, 32)
+    }
+
+    private func footerButtonLabel(title: String, showsProgress: Bool, style: FooterButtonStyle) -> some View {
+        HStack(spacing: 8) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.white)
+            }
+
+            Text(title)
+                .font(.headline)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .background(Color.black.opacity(0.001))
+        .background {
+            switch style {
+            case .primary:
+                Color.accentColor.opacity(0.8)
+            case .secondary, .disabled:
+                if reduceTransparency {
+                    buttonShape.fill(.regularMaterial)
+                } else {
+                    Color.clear
+                        .glassEffect(.regular.interactive(), in: buttonShape)
+                }
+            }
+        }
+        .foregroundStyle(foregroundStyle(for: style))
+        .contentShape(buttonShape)
+    }
+
+    private func foregroundStyle(for style: FooterButtonStyle) -> some ShapeStyle {
+        switch style {
+        case .primary:
+            return Color.white
+        case .secondary:
+            return Color.white.opacity(0.8)
+        case .disabled:
+            return Color.white.opacity(0.5)
+        }
+    }
+
+    private var buttonShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+    }
+
+    private enum FooterButtonStyle {
+        case primary
+        case secondary
+        case disabled
     }
 }

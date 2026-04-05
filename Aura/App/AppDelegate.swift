@@ -50,7 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] notification in
             guard let window = notification.object as? NSWindow,
                   window.identifier?.rawValue == "main" else { return }
-            self?.appModel?.purgeTransientCaches()
+            Task { @MainActor [weak self] in
+                self?.appModel?.purgeTransientCaches()
+            }
         }
     }
 

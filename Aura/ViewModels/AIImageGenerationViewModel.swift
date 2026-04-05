@@ -8,6 +8,7 @@ final class AIImageGenerationViewModel {
 
     var isModelReady = false
     var isDownloadingModel = false
+    var isShowingModelDownloadSheet = false
     var modelProgress: Double = 0
     var modelStatusMessage = "Download the Stable Diffusion model to start generating wallpapers."
 
@@ -16,6 +17,8 @@ final class AIImageGenerationViewModel {
     var generationStatusMessage: String?
     var generatedImageURL: URL?
     var errorMessage: String?
+
+    private var modelDownloadTask: Task<Void, Never>?
 
     init(generator: StableDiffusionImageGenerator = StableDiffusionImageGenerator()) {
         self.generator = generator
@@ -34,6 +37,39 @@ final class AIImageGenerationViewModel {
             modelProgress = 0
             modelStatusMessage = "Download the Stable Diffusion model to start generating wallpapers."
         }
+    }
+
+    func presentModelDownloadSheet() {
+        isShowingModelDownloadSheet = true
+    }
+
+    func dismissModelDownloadSheet() {
+        guard !isDownloadingModel else { return }
+        isShowingModelDownloadSheet = false
+    }
+
+    func startModelDownload() {
+        guard modelDownloadTask == nil, !isDownloadingModel, !isModelReady else {
+            isShowingModelDownloadSheet = true
+            return
+        }
+
+        isShowingModelDownloadSheet = true
+        modelDownloadTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.downloadModel()
+            self.modelDownloadTask = nil
+        }
+    }
+
+    func cancelModelDownload() {
+        modelDownloadTask?.cancel()
+        modelDownloadTask = nil
+        isDownloadingModel = false
+        modelProgress = 0
+        modelStatusMessage = "Model download canceled."
+        errorMessage = nil
+        isShowingModelDownloadSheet = false
     }
 
     func downloadModel() async {
@@ -58,6 +94,11 @@ final class AIImageGenerationViewModel {
             isModelReady = true
             modelProgress = 1
             modelStatusMessage = "Stable Diffusion model ready."
+            isShowingModelDownloadSheet = false
+        } catch is CancellationError {
+            modelProgress = 0
+            modelStatusMessage = "Model download canceled."
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
             await refreshModelAvailability()
@@ -117,6 +158,18 @@ final class AIImageGenerationViewModel {
         await generator.unloadResources()
         generationProgress = 0
         generationStatusMessage = nil
+    }
+
+    func deleteModel() async {
+        do {
+            try await generator.deleteModelData()
+            isModelReady = false
+            modelProgress = 0
+            modelStatusMessage = "Download the Stable Diffusion model to start generating wallpapers."
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func clearGeneratedImage(removeFile: Bool = false) async {
