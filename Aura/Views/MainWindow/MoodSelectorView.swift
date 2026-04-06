@@ -8,6 +8,7 @@ struct MoodSelectorView: View {
     var body: some View {
         ScrollViewReader { proxy in
             let subthemeSections = appModel.moodViewModel.subthemeSections
+            let moodsBySubtheme = appModel.moodViewModel.moodsBySubtheme
             LazyVStack(alignment: .leading, spacing: 28) {
                 ForEach(subthemeSections) { section in
                     LazyVStack(alignment: .leading, spacing: 24) {
@@ -20,7 +21,7 @@ struct MoodSelectorView: View {
                         }
 
                         ForEach(section.subthemes, id: \.self) { subtheme in
-                            SubthemeRow(subtheme: subtheme, appModel: appModel)
+                            SubthemeRow(subtheme: subtheme, moods: moodsBySubtheme[subtheme] ?? [], appModel: appModel)
                                 .id(subtheme)
                         }
                     }
@@ -53,6 +54,7 @@ struct MoodSelectorView: View {
 
 struct SubthemeRow: View {
     let subtheme: String
+    let moods: [Mood]
     @Bindable var appModel: AppModel
     @State private var showingWebsiteManager = false
     @State private var showingImagePlaygroundDesigner = false
@@ -82,7 +84,7 @@ struct SubthemeRow: View {
                             // If this subtheme is currently selected but we are not currently playing a mood from it,
                             // scroll to the first mood of this subtheme.
                             if appModel.moodViewModel.selectedSubtheme == subtheme {
-                                if let firstMood = appModel.moodViewModel.moodsBySubtheme[subtheme]?.first {
+                                if let firstMood = moods.first {
                                     Task { @MainActor in
                                         await Task.yield()
                                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -122,8 +124,7 @@ struct SubthemeRow: View {
     @ViewBuilder
     private var moodList: some View {
         LazyHStack(spacing: 16) {
-            let subthemeMoods = appModel.moodViewModel.moodsBySubtheme[subtheme] ?? []
-            ForEach(subthemeMoods, id: \.id) { mood in
+            ForEach(moods, id: \.id) { mood in
                 MoodCard(
                     mood: mood,
                     isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
@@ -337,12 +338,6 @@ struct MoodCard: View {
     @State private var isHovered = false
     @State private var isPressed = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    static let imageCache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>()
-        cache.countLimit = 48
-        cache.totalCostLimit = 1024 * 1024 * 24
-        return cache
-    }()
 
     private var primaryResource: String {
         mood.wallpaper.resources.first ?? ""
@@ -461,7 +456,7 @@ struct MoodCard: View {
             if newState == .downloaded {
                 previewTask?.cancel()
                 previewTask = Task {
-                    MoodCard.imageCache.removeObject(forKey: primaryResource as NSString)
+                    // Cache is managed by MediaUtils now
                     await loadPreview()
                 }
             }
@@ -480,8 +475,7 @@ struct MoodCard: View {
                       let resource = mood.wallpaper.resources.first,
                       let url = MediaUtils.resolveResourceURL(resource),
                       ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-                IsolatedVideoBackgroundView(url: url)
-                    .equatable()
+                HoverPreviewVideoView(url: url)
                     .frame(width: Self.cardSize.width, height: Self.cardSize.height)
             } else if let image = image {
                 Image(nsImage: image)
@@ -610,7 +604,9 @@ struct MoodCard: View {
                 await DownloadManager.shared.download(primaryResource)
                 if DownloadManager.shared.isDownloaded(resource: primaryResource) {
                     await loadPreview()
-                    action(true) // Force re-apply to trigger wallpaper change
+                    await MainActor.run {
+                        action(true) // Force re-apply to trigger wallpaper change
+                    }
                 }
             }
         }
@@ -652,10 +648,6 @@ struct MoodCard: View {
         }
     }
 
-    static func purgeImageCache() {
-        imageCache.removeAllObjects()
-    }
-
     @MainActor
     private func loadPreview() async {
         if mood.wallpaper.type == .time {
@@ -664,22 +656,17 @@ struct MoodCard: View {
 
         guard let resource = mood.wallpaper.resources.first, !resource.isEmpty else { return }
 
-        if let cached = MoodCard.imageCache.object(forKey: resource as NSString) {
-            self.image = cached
-            return
-        }
-
         // Debounce: Wait a tiny bit to avoid loading thumbnails for views that just flash by during rapid scrolling
         try? await Task.sleep(for: .milliseconds(150))
         guard !Task.isCancelled else { return }
 
-        let loadedImage = await MediaUtils.thumbnailImage(for: resource)
+        let targetPixelSize = max(Self.cardSize.width, Self.cardSize.height) * 2
+        let loadedImage = await MediaUtils.thumbnailImage(for: resource, maxPixelSize: targetPixelSize)
 
         guard !Task.isCancelled else { return }
 
         if let loadedImage {
             Self.logger.debug("Setting image for \(resource, privacy: .public)")
-            MoodCard.imageCache.setObject(loadedImage, forKey: resource as NSString)
             self.image = loadedImage
         } else {
             Self.logger.error("Loaded image is nil for \(resource, privacy: .public)")
@@ -718,6 +705,83 @@ struct TimeWallpaperPreview: View {
     }
 }
 
+// MARK: - Performance Utilities
+
+/// Shared player to eliminate per-cell AVPlayer instances for video hover previews.
+/// Based on aura-performance skill §10.3
+@Observable @MainActor
+final class HoverPreviewPlayer {
+    static let shared = HoverPreviewPlayer()
+
+    private let player = AVQueuePlayer()
+    private var looper: AVPlayerLooper?
+    private(set) var activeURL: URL?
+
+    init() {
+        player.isMuted = true
+        player.volume = 0
+        player.allowsExternalPlayback = false
+    }
+
+    func activate(url: URL, in layer: AVPlayerLayer) {
+        guard url != activeURL else { return }
+        activeURL = url
+
+        player.pause()
+        looper = nil
+
+        let item = AVPlayerItem(url: url)
+        item.preferredForwardBufferDuration = 2
+        player.automaticallyWaitsToMinimizeStalling = false
+        looper = AVPlayerLooper(player: player, templateItem: item)
+
+        layer.player = player
+        player.play()
+    }
+
+    func deactivate() {
+        player.pause()
+        looper = nil
+        activeURL = nil
+        player.removeAllItems()
+        player.replaceCurrentItem(with: nil)
+    }
+}
+
+struct HoverPreviewVideoView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.wantsLayer = true
+        let playerLayer = AVPlayerLayer()
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.drawsAsynchronously = true
+        view.layer?.addSublayer(playerLayer)
+        context.coordinator.playerLayer = playerLayer
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let layer = context.coordinator.playerLayer {
+            layer.frame = nsView.bounds
+            HoverPreviewPlayer.shared.activate(url: url, in: layer)
+        }
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        HoverPreviewPlayer.shared.deactivate()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator {
+        var playerLayer: AVPlayerLayer?
+    }
+}
+
 struct WebsiteWallpaperPreview: View {
     let mood: Mood
     let isPressed: Bool
@@ -726,7 +790,7 @@ struct WebsiteWallpaperPreview: View {
     var body: some View {
         ZStack {
             if let urlString = mood.wallpaper.resources.first {
-                WebsiteWallpaperView(urlString: urlString, isPreview: true)
+                WebsitePreviewCard(urlString: urlString)
                     .frame(width: targetSize.width, height: targetSize.height)
                     .clipped()
                     .allowsHitTesting(false)

@@ -615,7 +615,7 @@ private struct MoodCarouselCard: View {
             if newState == .downloaded {
                 previewTask?.cancel()
                 previewTask = Task {
-                    MoodCard.imageCache.removeObject(forKey: primaryResource as NSString)
+                    // Cache is managed by MediaUtils now
                     await loadPreviewImage()
                 }
             }
@@ -680,11 +680,6 @@ private struct MoodCarouselCard: View {
               mood.wallpaper.type != .website,
               let resource = mood.wallpaper.resources.first else { return }
 
-        if let cached = MoodCard.imageCache.object(forKey: resource as NSString) {
-            self.image = cached
-            return
-        }
-
         // Debounce: Wait a tiny bit to avoid loading thumbnails for views that just flash by during rapid scrolling
         try? await Task.sleep(for: .milliseconds(150))
         guard !Task.isCancelled else { return }
@@ -698,7 +693,6 @@ private struct MoodCarouselCard: View {
 
         if let loaded {
             popoverMoodCardLogger.debug("Setting image for \(resource, privacy: .public)")
-            MoodCard.imageCache.setObject(loaded, forKey: resource as NSString)
             self.image = loaded
         } else {
             popoverMoodCardLogger.error("Loaded image is nil for \(resource, privacy: .public)")

@@ -3,44 +3,27 @@ import WebKit
 
 struct WebsiteWallpaperView: View {
     let urlString: String
-    var isPreview: Bool = false
     @State private var hasLoaded: Bool = false
 
     var body: some View {
-        Group {
-            if isPreview {
-                GeometryReader { geo in
-                    let baseSize = CGSize(width: 1920, height: 1080)
-                    let scaleX = geo.size.width / baseSize.width
-                    let scaleY = geo.size.height / baseSize.height
-                    let scale = max(scaleX, scaleY)
+        ZStack {
+            // Fallback background while loading
+            WebsitePreviewCard(urlString: urlString)
+                .opacity(hasLoaded ? 0 : 1)
+                .animation(.easeInOut(duration: 0.5), value: hasLoaded)
 
-                    ZStack {
-                        // Fallback background while loading
-                        WebsitePreviewCard(urlString: urlString)
-                            .opacity(hasLoaded ? 0 : 1)
-                            .animation(.easeInOut(duration: 0.5), value: hasLoaded)
-
-                        WebsiteWebView(urlString: urlString) {
-                            withAnimation {
-                                hasLoaded = true
-                            }
-                        }
-                        .frame(width: baseSize.width, height: baseSize.height)
-                        .scaleEffect(scale)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .opacity(hasLoaded ? 1 : 0)
-                        .animation(.easeInOut(duration: 0.5), value: hasLoaded)
-                    }
+            WebsiteWebView(urlString: urlString) {
+                withAnimation {
+                    hasLoaded = true
                 }
-            } else {
-                WebsiteWebView(urlString: urlString)
             }
+            .opacity(hasLoaded ? 1 : 0)
+            .animation(.easeInOut(duration: 0.5), value: hasLoaded)
         }
     }
 }
 
-private struct WebsitePreviewCard: View {
+struct WebsitePreviewCard: View {
     let urlString: String
 
     private var resolvedURL: URL? {
