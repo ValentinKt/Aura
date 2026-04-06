@@ -9,13 +9,7 @@ struct MenuBarPopoverView: View {
 
     @State private var selectedSubtheme: String = ""
     @State private var expandedSections: Set<String> = []
-
-    // ── Background media state ────────────────────────────────────────────────
-    // Only one of these is non-nil at a time.
-    // • backgroundVideoURL  → video wallpaper; VideoBackgroundView plays it live.
-    // • backgroundImage     → static/image wallpaper; rendered blurred as before.
-    @State private var backgroundImage: NSImage?
-    @State private var backgroundVideoURL: URL?
+    @State private var backgroundMedia: MenuBarBackgroundMedia = .none
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,7 +93,8 @@ struct MenuBarPopoverView: View {
                 // Neutral fallback colour while media is loading
                 Color(red: 0.08, green: 0.12, blue: 0.10)
 
-                if let videoURL = backgroundVideoURL {
+                switch backgroundMedia {
+                case .video(let videoURL):
                     // ── Video path: play live, no blur ────────────────────────
                     // VideoBackgroundView fills the frame; a single dark scrim
                     // (0.30 alpha) is sufficient for WCAG-AA white-text contrast
@@ -110,17 +105,17 @@ struct MenuBarPopoverView: View {
 
                     Color.black.opacity(0.30)
 
-                } else if let backgroundImage {
+                case .image(let imageSource):
                     // ── Image path: blurred wash, unchanged from original ─────
-                    Image(nsImage: backgroundImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+                    AsyncMenuBarBackgroundImageView(source: imageSource)
                         .blur(radius: 50, opaque: true)
                         .saturation(1.5)
                         .brightness(0.08)
                         .transition(.opacity.animation(.easeInOut(duration: 0.4)))
 
                     Color.black.opacity(0.08)
+                case .none:
+                    EmptyView()
                 }
             }
         }
@@ -394,45 +389,83 @@ struct MenuBarPopoverView: View {
               mood.wallpaper.type != .website,
               let resource = mood.wallpaper.resources.first else {
             withAnimation(.easeInOut(duration: 0.4)) {
-                backgroundImage = nil
-                backgroundVideoURL = nil
+                backgroundMedia = .none
             }
             return
         }
 
         guard let url = MediaUtils.resolveResourceURL(resource) else {
-            // Named-asset fallback (bundled image)
-            let img = NSImage(named: resource)
             withAnimation(.easeInOut(duration: 0.4)) {
-                backgroundVideoURL = nil
-                backgroundImage = img
+                backgroundMedia = .image(.resource(resource))
             }
             return
         }
 
         if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-            // ── Video mood ────────────────────────────────────────────────────
-            // Assign the URL immediately so VideoBackgroundView can start
-            // buffering; no need to extract a poster frame for the background.
             withAnimation(.easeInOut(duration: 0.4)) {
-                backgroundImage = nil
-                backgroundVideoURL = url
+                backgroundMedia = .video(url)
             }
         } else {
-            // ── Image mood ────────────────────────────────────────────────────
-            // Clear the video first so the neutral fallback shows while the
-            // image loads, then crossfade in the result.
             withAnimation(.easeInOut(duration: 0.4)) {
-                backgroundVideoURL = nil
+                backgroundMedia = .image(.url(url))
             }
+        }
+    }
+}
 
-            let loaded = await Task.detached(priority: .userInitiated) {
-                NSImage(contentsOf: url)
-            }.value
+private enum MenuBarBackgroundMedia: Equatable {
+    case none
+    case video(URL)
+    case image(MenuBarBackgroundImageSource)
+}
 
-            withAnimation(.easeInOut(duration: 0.4)) {
-                backgroundImage = loaded
+private enum MenuBarBackgroundImageSource: Equatable {
+    case resource(String)
+    case url(URL)
+}
+
+private struct AsyncMenuBarBackgroundImageView: View {
+    let source: MenuBarBackgroundImageSource
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Color.clear
             }
+        }
+        .task(id: cacheKey) {
+            let loaded = await loadImage()
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                image = loaded
+            }
+        }
+        .onDisappear {
+            image = nil
+        }
+    }
+
+    private var cacheKey: String {
+        switch source {
+        case .resource(let resource):
+            return resource
+        case .url(let url):
+            return url.absoluteString
+        }
+    }
+
+    private func loadImage() async -> NSImage? {
+        switch source {
+        case .resource(let resource):
+            return await MediaUtils.thumbnailImage(for: resource, maxPixelSize: 1200)
+        case .url(let url):
+            return await MediaUtils.thumbnailImage(from: url, maxPixelSize: 1200)
         }
     }
 }

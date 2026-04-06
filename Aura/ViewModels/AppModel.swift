@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import Combine
 import os
 
 @MainActor
@@ -46,7 +45,6 @@ final class AppModel {
     var recentSceneIDs: [String]
     var lastResumableSceneID: String?
     var sleepTimerEndDate: Date?
-    private var cancellables = Set<AnyCancellable>()
     private let startupTimeout: Duration = .seconds(8)
     private let recentSceneLimit = 6
     private var sleepTimerTask: Task<Void, Never>?

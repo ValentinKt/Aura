@@ -35,8 +35,6 @@ struct IsolatedWallpaperPreviewView: View, Equatable {
 struct WallpaperPreviewView: View {
     let snapshot: WallpaperPreviewSnapshot
     var showOverlay: Bool = true
-    @State private var previewImage: NSImage?
-    @State private var cachedPlaceholderImage: NSImage?
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -70,26 +68,27 @@ struct WallpaperPreviewView: View {
                             IsolatedVideoBackgroundView(url: url)
                                 .equatable()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else if let image = previewImage {
-                            GeometryReader { geo in
-                                Image(nsImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: geo.size.width, height: geo.size.height)
-                                    .clipped()
-                            }
-                            .transition(.opacity)
-                        } else if let placeholder = cachedPlaceholderImage {
-                            GeometryReader { geo in
-                                Image(nsImage: placeholder)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: geo.size.width, height: geo.size.height)
-                                    .clipped()
-                            }
-                            .opacity(0.6)
                         } else {
-                            Color.black.opacity(0.3)
+                            ZStack {
+                                if let backgroundImageURL = placeholderPreviewURL {
+                                    AsyncWallpaperPreviewImageView(
+                                        source: .url(backgroundImageURL),
+                                        maxPixelSize: 900,
+                                        idToken: backgroundImageURL.absoluteString
+                                    )
+                                    .opacity(0.6)
+                                } else {
+                                    Color.black.opacity(0.3)
+                                }
+
+                                if let resource = mood.wallpaper.resources.first {
+                                    AsyncWallpaperPreviewImageView(
+                                        source: .resource(resource),
+                                        maxPixelSize: 1400,
+                                        idToken: previewRefreshID(for: mood)
+                                    )
+                                }
+                            }
                         }
 
                         if mood.wallpaper.type == .dynamic && showOverlay {
@@ -112,35 +111,6 @@ struct WallpaperPreviewView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .padding(12)
                         }
-                    }
-                    .task(id: previewRefreshID(for: mood)) {
-                        guard livePreviewVideoURL(for: mood) == nil else {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                previewImage = nil
-                            }
-                            return
-                        }
-
-                        if let resource = mood.wallpaper.resources.first {
-                            let loaded = await loadPreviewImageAsync(resource)
-                            withAnimation(.easeInOut(duration: 0.35)) {
-                                previewImage = loaded
-                            }
-                        } else {
-                            withAnimation(.easeInOut(duration: 0.35)) {
-                                previewImage = nil
-                            }
-                        }
-                    }
-                    .task(id: snapshot.backgroundImageURL) {
-                        guard let bgURL = snapshot.backgroundImageURL,
-                              !Self.isVideoURL(bgURL) else {
-                            cachedPlaceholderImage = nil
-                            return
-                        }
-                        cachedPlaceholderImage = await Task(priority: .utility) {
-                            NSImage(contentsOf: bgURL)
-                        }.value
                     }
                 } else if let mood = snapshot.mood, mood.wallpaper.type == .time {
                     if let style = mood.wallpaper.resources.first {
@@ -196,21 +166,12 @@ struct WallpaperPreviewView: View {
         }
     }
 
-    private func loadPreviewImageAsync(_ resource: String) async -> NSImage? {
-        guard let url = MediaUtils.resolveResourceURL(resource) else {
-            return NSImage(named: resource)
+    private var placeholderPreviewURL: URL? {
+        guard let backgroundImageURL = snapshot.backgroundImageURL,
+              !Self.isVideoURL(backgroundImageURL) else {
+            return nil
         }
-
-        if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-            return await MediaUtils.videoPosterImage(from: url)
-        }
-
-        return await Task(priority: .userInitiated) {
-            if let image = NSImage(contentsOf: url) {
-                return image
-            }
-            return NSImage(named: resource)
-        }.value
+        return backgroundImageURL
     }
 
     private static func isVideoURL(_ url: URL) -> Bool {
@@ -274,5 +235,53 @@ struct WallpaperPreviewView: View {
         let resolvedName = url.deletingPathExtension().lastPathComponent.lowercased()
         let resourceName = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent.lowercased()
         return !resolvedName.isEmpty && resolvedName == resourceName
+    }
+}
+
+private enum WallpaperPreviewImageSource: Equatable {
+    case resource(String)
+    case url(URL)
+}
+
+private struct AsyncWallpaperPreviewImageView: View {
+    let source: WallpaperPreviewImageSource
+    let maxPixelSize: CGFloat
+    let idToken: String
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        GeometryReader { geo in
+            Group {
+                if let image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Color.black.opacity(0.3)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
+        }
+        .task(id: idToken) {
+            let loaded = await loadImage()
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                image = loaded
+            }
+        }
+        .onDisappear {
+            image = nil
+        }
+    }
+
+    private func loadImage() async -> NSImage? {
+        switch source {
+        case .resource(let resource):
+            return await MediaUtils.thumbnailImage(for: resource, maxPixelSize: maxPixelSize)
+        case .url(let url):
+            return await MediaUtils.thumbnailImage(from: url, maxPixelSize: maxPixelSize)
+        }
     }
 }

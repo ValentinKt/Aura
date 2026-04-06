@@ -445,19 +445,17 @@ enum MediaUtils {
             return cachedImage
         }
 
-        let data: Data? = await Task.detached(priority: .userInitiated) { () -> Data? in
+        let image: NSImage? = await Task.detached(priority: .userInitiated) { () -> NSImage? in
             let isSecurityScoped = url.startAccessingSecurityScopedResource()
             defer {
                 if isSecurityScoped {
                     url.stopAccessingSecurityScopedResource()
                 }
             }
-            return try? Data(contentsOf: url)
+            return autoreleasepool {
+                NSImage(contentsOf: url)
+            }
         }.value
-
-        guard let data else { return nil }
-
-        let image = await MainActor.run { NSImage(data: data) }
 
         if let image {
             await MainActor.run { imageCache.setObject(image, forKey: cacheKey) }

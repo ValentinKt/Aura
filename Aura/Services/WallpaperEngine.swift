@@ -762,7 +762,7 @@ final class WallpaperWindowController: NSObject {
     private var websiteShouldReceiveMouseEvents = true
     private var websiteGlobalEventMonitor: Any?
     private var websiteLocalEventMonitor: Any?
-    private var websiteHoverProbeWorkItem: DispatchWorkItem?
+    private var websiteHoverProbeTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -784,8 +784,8 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func stopWebsiteHoverProbing() {
-        websiteHoverProbeWorkItem?.cancel()
-        websiteHoverProbeWorkItem = nil
+        websiteHoverProbeTask?.cancel()
+        websiteHoverProbeTask = nil
         if let websiteGlobalEventMonitor {
             NSEvent.removeMonitor(websiteGlobalEventMonitor)
             self.websiteGlobalEventMonitor = nil
@@ -798,14 +798,12 @@ final class WallpaperWindowController: NSObject {
     }
 
     private func scheduleWebsiteHoverProbe() {
-        websiteHoverProbeWorkItem?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
+        websiteHoverProbeTask?.cancel()
+        websiteHoverProbeTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return }
             self?.probeWebsiteHoverState()
         }
-
-        websiteHoverProbeWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: workItem)
     }
 
     deinit {
