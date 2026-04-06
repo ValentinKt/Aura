@@ -50,6 +50,16 @@ final class AppModel {
     private var sleepTimerTask: Task<Void, Never>?
     private var startupWaiters: [CheckedContinuation<Void, Never>] = []
 
+    func suspend() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        startupWaiters.forEach { $0.resume() }
+        startupWaiters.removeAll()
+
+        showCommandPalette = false
+        showCreateMoodSheet = false
+    }
+
     init(persistence: PersistenceController) {
         let themeManager = ThemeManager()
         let settingsEngine = SettingsEngine(persistence: persistence)
