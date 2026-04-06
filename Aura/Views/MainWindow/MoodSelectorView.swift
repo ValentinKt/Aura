@@ -782,22 +782,24 @@ final class HoverPreviewPlayer {
         player.play()
     }
 
-    func deactivate() {
-        player.pause()
-        looper = nil
-        activeURL = nil
-        activeLayerIdentifier = nil
-        player.removeAllItems()
-        player.replaceCurrentItem(with: nil)
+    func deactivate(for layer: AVPlayerLayer) {
+        let layerIdentifier = ObjectIdentifier(layer)
+        if activeLayerIdentifier == layerIdentifier {
+            player.pause()
+            looper = nil
+            activeURL = nil
+            activeLayerIdentifier = nil
+            player.removeAllItems()
+            player.replaceCurrentItem(with: nil)
+        }
     }
 }
 
 struct HoverPreviewVideoView: NSViewRepresentable {
     let url: URL
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        view.wantsLayer = true
+    func makeNSView(context: Context) -> HoverPreviewSurfaceView {
+        let view = HoverPreviewSurfaceView()
         let playerLayer = AVPlayerLayer()
         playerLayer.videoGravity = .resizeAspectFill
         playerLayer.drawsAsynchronously = true
@@ -806,15 +808,17 @@ struct HoverPreviewVideoView: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_ nsView: HoverPreviewSurfaceView, context: Context) {
         if let layer = context.coordinator.playerLayer {
             layer.frame = nsView.bounds
             HoverPreviewPlayer.shared.activate(url: url, in: layer)
         }
     }
 
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        HoverPreviewPlayer.shared.deactivate()
+    static func dismantleNSView(_ nsView: HoverPreviewSurfaceView, coordinator: Coordinator) {
+        if let layer = coordinator.playerLayer {
+            HoverPreviewPlayer.shared.deactivate(for: layer)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -823,6 +827,23 @@ struct HoverPreviewVideoView: NSViewRepresentable {
 
     class Coordinator {
         var playerLayer: AVPlayerLayer?
+    }
+}
+
+final class HoverPreviewSurfaceView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+    }
+
+    override func layout() {
+        super.layout()
+        layer?.sublayers?.forEach { $0.frame = bounds }
     }
 }
 
