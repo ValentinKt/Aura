@@ -64,7 +64,8 @@ struct WallpaperPreviewView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if mood.wallpaper.type == .animated,
                                   let resource = mood.wallpaper.resources.first,
-                                  let url = MediaUtils.resolveResourceURL(resource) {
+                                  let url = MediaUtils.resolveResourceURL(resource),
+                                  Self.isVideoURL(url) {
                             IsolatedVideoBackgroundView(url: url)
                                 .equatable()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
