@@ -30,27 +30,9 @@ struct ContentView: View {
     private func mainContent(appModel: AppModel) -> some View {
         @Bindable var appModel = appModel
         ZStack {
-            // Background Layer
-            if let tab = selectedTab {
-                if tab == .moods || tab == .playlists || tab == .settings {
-                    WallpaperPreviewView(appModel: appModel, showOverlay: false)
-                        .ignoresSafeArea()
-                        .overlay(Color.black.opacity(0.4))
-                        .overlay {
-                            if tab != .moods {
-                                backgroundGlassOverlay
-                            }
-                        }
-                } else {
-                    fallbackGlassBackground
-                        .ignoresSafeArea()
-                }
-            } else {
-                fallbackGlassBackground
-                    .ignoresSafeArea()
-            }
+            ContentBackgroundView(snapshot: contentBackgroundSnapshot)
+                .equatable()
 
-            // Foreground Layout
             HStack(spacing: 0) {
                 floatingSidebar
                     .frame(width: 240)
@@ -114,6 +96,13 @@ struct ContentView: View {
             appModel.moodViewModel.selectPreviousSubtheme()
             return .handled
         }
+    }
+
+    private var contentBackgroundSnapshot: ContentBackgroundSnapshot {
+        ContentBackgroundSnapshot(
+            selectedTab: selectedTab,
+            wallpaperPreview: WallpaperPreviewSnapshot(appModel: appModel)
+        )
     }
 
     @ViewBuilder
@@ -590,6 +579,64 @@ struct ContentView: View {
     }
 }
 
+private struct ContentBackgroundSnapshot: Equatable {
+    let selectedTab: ContentView.Tab?
+    let wallpaperPreview: WallpaperPreviewSnapshot
+}
+
+private struct ContentBackgroundView: View, Equatable {
+    let snapshot: ContentBackgroundSnapshot
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    static func == (lhs: ContentBackgroundView, rhs: ContentBackgroundView) -> Bool {
+        lhs.snapshot == rhs.snapshot
+    }
+
+    var body: some View {
+        Group {
+            if let tab = snapshot.selectedTab {
+                if tab == .moods || tab == .playlists || tab == .settings {
+                    IsolatedWallpaperPreviewView(snapshot: snapshot.wallpaperPreview, showOverlay: false)
+                        .equatable()
+                        .overlay(Color.black.opacity(0.4))
+                        .overlay {
+                            if tab != .moods {
+                                backgroundGlassOverlay
+                            }
+                        }
+                } else {
+                    fallbackGlassBackground
+                }
+            } else {
+                fallbackGlassBackground
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private var backgroundGlassOverlay: some View {
+        if reduceTransparency {
+            Rectangle()
+                .fill(.regularMaterial.opacity(0.35))
+        } else {
+            Color.clear
+                .glassEffect(.clear, in: Rectangle())
+        }
+    }
+
+    @ViewBuilder
+    private var fallbackGlassBackground: some View {
+        if reduceTransparency {
+            Rectangle()
+                .fill(.regularMaterial)
+        } else {
+            Color.clear
+                .glassEffect(.regular, in: Rectangle())
+        }
+    }
+}
+
 // MARK: - GlassNavLink
 /// NavigationLink replacement that shows a Liquid Glass background
 /// both when hovered and when selected, matching the SidebarItem style.
@@ -836,43 +883,47 @@ private struct AtmospheresWheelMenu: View {
     }
 
     private func carouselRow(_ repeatedItem: RepeatedAtmosphereCarouselItem, containerCenterY: CGFloat) -> some View {
-        Button {
+        let isSelected = selectedID == repeatedItem.item.id
+
+        return Button {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
                 selectedID = repeatedItem.item.id
                 scrollPositionID = repeatedItem.id
             }
             onItemActivated(repeatedItem.item.id)
         } label: {
-            GeometryReader { itemGeometry in
-                let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
-                let appearance = itemAppearance(for: distance)
-                let isSelected = selectedID == repeatedItem.item.id
+            TimelineView(.animation(minimumInterval: 1 / 60)) { _ in
+                GeometryReader { itemGeometry in
+                    let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
+                    let appearance = itemAppearance(for: distance)
 
-                HStack(spacing: 14) {
-                    Image(systemName: repeatedItem.item.systemImage)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
-                        .frame(width: 20)
+                    HStack(spacing: 14) {
+                        Image(systemName: repeatedItem.item.systemImage)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
+                            .frame(width: 20)
 
-                    Text(repeatedItem.item.title)
-                        .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
-                        .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
-                        .lineLimit(1)
+                        Text(repeatedItem.item.title)
+                            .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                            .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
+                            .lineLimit(1)
 
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .scaleEffect(appearance.scale, anchor: .leading)
-                .opacity(appearance.opacity)
-                .background {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.white.opacity(0.05))
+                        Spacer(minLength: 0)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .scaleEffect(appearance.scale, anchor: .leading)
+                    .opacity(appearance.opacity)
                 }
                 .contentShape(Rectangle())
             }
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.05))
+                }
+            }
+            .contentShape(Rectangle())
             .frame(height: Self.rowHeight)
         }
         .buttonStyle(.plain)

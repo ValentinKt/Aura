@@ -1,19 +1,48 @@
 import AVFoundation
 import SwiftUI
 
+struct WallpaperPreviewSnapshot: Equatable {
+    let keepCurrentWallpaper: Bool
+    let mood: Mood?
+    let backgroundImageURL: URL?
+    let currentPrimaryWallpaperURL: URL?
+    let primaryColor: ColorComponents
+    let secondaryColor: ColorComponents
+
+    init(appModel: AppModel) {
+        keepCurrentWallpaper = appModel.settingsViewModel.settings.keepCurrentWallpaper
+        mood = appModel.moodViewModel.currentMood
+        backgroundImageURL = appModel.wallpaperEngine.backgroundImageURL
+        currentPrimaryWallpaperURL = appModel.wallpaperEngine.currentPrimaryWallpaperURL
+        primaryColor = appModel.themeManager.palette.primary
+        secondaryColor = appModel.themeManager.palette.secondary
+    }
+}
+
+struct IsolatedWallpaperPreviewView: View, Equatable {
+    let snapshot: WallpaperPreviewSnapshot
+    var showOverlay: Bool = true
+
+    static func == (lhs: IsolatedWallpaperPreviewView, rhs: IsolatedWallpaperPreviewView) -> Bool {
+        lhs.snapshot == rhs.snapshot && lhs.showOverlay == rhs.showOverlay
+    }
+
+    var body: some View {
+        WallpaperPreviewView(snapshot: snapshot, showOverlay: showOverlay)
+    }
+}
+
 struct WallpaperPreviewView: View {
-    @Bindable var appModel: AppModel
+    let snapshot: WallpaperPreviewSnapshot
     var showOverlay: Bool = true
     @State private var previewImage: NSImage?
-    /// Async-loaded placeholder shown while the next image loads — avoids any synchronous disk reads in the body.
     @State private var cachedPlaceholderImage: NSImage?
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Group {
-                if appModel.settingsViewModel.settings.keepCurrentWallpaper {
-                    // Show current wallpaper indicator
+                if snapshot.keepCurrentWallpaper {
                     ZStack {
                         Color.black.opacity(0.8)
                         VStack(spacing: 8) {
@@ -28,7 +57,7 @@ struct WallpaperPreviewView: View {
                         }
                         .foregroundStyle(.white.opacity(0.7))
                     }
-                } else if let mood = appModel.moodViewModel.currentMood,
+                } else if let mood = snapshot.mood,
                           mood.wallpaper.type == .staticImage || mood.wallpaper.type == .dynamic || mood.wallpaper.type == .animated {
                     ZStack(alignment: .topTrailing) {
                         if let liveVideoURL = livePreviewVideoURL(for: mood) {
@@ -51,7 +80,6 @@ struct WallpaperPreviewView: View {
                             }
                             .transition(.opacity)
                         } else if let placeholder = cachedPlaceholderImage {
-                            // Async-loaded placeholder so we never block the main thread
                             GeometryReader { geo in
                                 Image(nsImage: placeholder)
                                     .resizable()
@@ -104,9 +132,8 @@ struct WallpaperPreviewView: View {
                             }
                         }
                     }
-                    // Async-load the placeholder from backgroundImageURL so the body never blocks
-                    .task(id: appModel.wallpaperEngine.backgroundImageURL) {
-                        guard let bgURL = appModel.wallpaperEngine.backgroundImageURL,
+                    .task(id: snapshot.backgroundImageURL) {
+                        guard let bgURL = snapshot.backgroundImageURL,
                               !Self.isVideoURL(bgURL) else {
                             cachedPlaceholderImage = nil
                             return
@@ -115,43 +142,40 @@ struct WallpaperPreviewView: View {
                             NSImage(contentsOf: bgURL)
                         }.value
                     }
-                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .time {
+                } else if let mood = snapshot.mood, mood.wallpaper.type == .time {
                     if let style = mood.wallpaper.resources.first {
-                        TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL, isPreview: true)
+                        TimeWallpaperView(style: style, palette: mood.palette, selectedWallpaperURL: snapshot.backgroundImageURL, isPreview: true)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        TimeWallpaperView(style: "minimal", palette: mood.palette, selectedWallpaperURL: appModel.wallpaperEngine.backgroundImageURL, isPreview: true)
+                        TimeWallpaperView(style: "minimal", palette: mood.palette, selectedWallpaperURL: snapshot.backgroundImageURL, isPreview: true)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                } else if let mood = appModel.moodViewModel.currentMood, mood.wallpaper.type == .website {
+                } else if let mood = snapshot.mood, mood.wallpaper.type == .website {
                     if let urlString = mood.wallpaper.resources.first {
                         WebsiteWallpaperView(urlString: urlString)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .allowsHitTesting(false)
                     } else {
-                        // Fallback to gradient
                         RoundedRectangle(cornerRadius: 8)
                             .fill(LinearGradient(colors: [
-                                appModel.themeManager.color(from: appModel.themeManager.palette.primary),
-                                appModel.themeManager.color(from: appModel.themeManager.palette.secondary)
+                                color(from: snapshot.primaryColor),
+                                color(from: snapshot.secondaryColor)
                             ], startPoint: .topLeading, endPoint: .bottomTrailing))
                     }
                 } else {
-                    // Fallback to gradient
                     RoundedRectangle(cornerRadius: 8)
                         .fill(LinearGradient(colors: [
-                            appModel.themeManager.color(from: appModel.themeManager.palette.primary),
-                            appModel.themeManager.color(from: appModel.themeManager.palette.secondary)
+                            color(from: snapshot.primaryColor),
+                            color(from: snapshot.secondaryColor)
                         ], startPoint: .topLeading, endPoint: .bottomTrailing))
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            // Subtle border around the wallpaper
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(.white.opacity(0.2), lineWidth: 1)
 
-            if showOverlay && !appModel.settingsViewModel.settings.keepCurrentWallpaper, appModel.moodViewModel.currentMood != nil {
+            if showOverlay && !snapshot.keepCurrentWallpaper, snapshot.mood != nil {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Current Atmosphere")
                         .font(.system(size: 11, weight: .bold))
@@ -159,7 +183,7 @@ struct WallpaperPreviewView: View {
                         .kerning(1)
                         .textCase(.uppercase)
 
-                    Text(appModel.moodViewModel.currentMood?.name ?? "Default")
+                    Text(snapshot.mood?.name ?? "Default")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
                 }
@@ -193,6 +217,15 @@ struct WallpaperPreviewView: View {
         ["mp4", "mov"].contains(url.pathExtension.lowercased())
     }
 
+    private func color(from components: ColorComponents) -> Color {
+        Color(
+            red: components.red,
+            green: components.green,
+            blue: components.blue,
+            opacity: components.alpha
+        )
+    }
+
     private func previewRefreshID(for mood: Mood) -> String {
         let resource = mood.wallpaper.resources.first ?? ""
         let downloadStateDescription = {
@@ -222,13 +255,13 @@ struct WallpaperPreviewView: View {
             return exactResourceURL
         }
 
-        if let currentPrimaryWallpaperURL = appModel.wallpaperEngine.currentPrimaryWallpaperURL,
+        if let currentPrimaryWallpaperURL = snapshot.currentPrimaryWallpaperURL,
            Self.isVideoURL(currentPrimaryWallpaperURL),
            matches(currentPrimaryWallpaperURL, resource: resource) {
             return currentPrimaryWallpaperURL
         }
 
-        if let backgroundImageURL = appModel.wallpaperEngine.backgroundImageURL,
+        if let backgroundImageURL = snapshot.backgroundImageURL,
            Self.isVideoURL(backgroundImageURL),
            matches(backgroundImageURL, resource: resource) {
             return backgroundImageURL

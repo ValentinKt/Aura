@@ -102,6 +102,9 @@ struct SubthemeRow: View {
                         }
                 }
             }
+            .scrollTargetBehavior(.viewAligned)
+            .contentMargins(.horizontal, 40, for: .scrollContent)
+            .frame(height: MoodCard.cardSize.height + 12)
         }
         .sheet(isPresented: $showingWebsiteManager) {
             WebsiteManagerView(appModel: appModel)
@@ -137,6 +140,12 @@ struct SubthemeRow: View {
                     action: { force in selectMood(mood, forceApply: force) }
                 )
                 .id(mood.id)
+                .compositingGroup()
+                .shadow(
+                    color: .black.opacity(appModel.moodViewModel.currentMood?.id == mood.id ? 0.28 : 0.18),
+                    radius: appModel.moodViewModel.currentMood?.id == mood.id ? 10 : 6,
+                    y: 4
+                )
             }
 
             if ["Website", "Websites"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
@@ -157,7 +166,7 @@ struct SubthemeRow: View {
                 )
             }
         }
-        .padding(.horizontal, 40)
+        .scrollTargetLayout()
         .padding(.vertical, 4)
     }
 
@@ -310,6 +319,7 @@ struct CreateImagePlaygroundCard: View {
 
 struct MoodCard: View {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "MoodCard")
+    static let cardSize = CGSize(width: 240, height: 160)
 
     let mood: Mood
     let isSelected: Bool
@@ -472,12 +482,12 @@ struct MoodCard: View {
                       ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
                 IsolatedVideoBackgroundView(url: url)
                     .equatable()
-                    .frame(width: 240, height: 160)
+                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
             } else if let image = image {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 240, height: 160)
+                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
                     .clipped()
                     .overlay {
                         LinearGradient(
@@ -496,7 +506,7 @@ struct MoodCard: View {
                             .glassEffect(.regular, in: Rectangle())
                     }
                 }
-                .frame(width: 240, height: 160)
+                .frame(width: Self.cardSize.width, height: Self.cardSize.height)
                 .overlay {
                     Image(systemName: "sparkles.rectangle.stack")
                         .font(.system(size: 18, weight: .semibold))
@@ -567,7 +577,7 @@ struct MoodCard: View {
                 }
             }
         }
-        .frame(width: 240, height: 160)
+        .frame(width: Self.cardSize.width, height: Self.cardSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 

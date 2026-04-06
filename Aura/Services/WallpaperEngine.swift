@@ -180,10 +180,8 @@ final class WallpaperEngine {
     var backgroundImageURL: URL?
     var currentPrimaryWallpaperURL: URL?
     var currentSecondaryWallpaperURL: URL?
-    
     private var isPresentationSuppressed = false
     private var pendingDescriptor: WallpaperDescriptor?
-
 
     var displayWallpaperPreviews: [WallpaperDisplayPreview] {
         let screens = NSScreen.screens
@@ -232,7 +230,7 @@ final class WallpaperEngine {
     func setPresentationSuppressed(_ suppressed: Bool) {
         let changed = isPresentationSuppressed != suppressed
         isPresentationSuppressed = suppressed
-        
+
         if changed && !suppressed, let pending = pendingDescriptor {
             pendingDescriptor = nil
             Task {
@@ -277,7 +275,6 @@ final class WallpaperEngine {
             return WallpaperApplyResult(success: true, permissionDenied: false)
         }
 
-
         let isStatic = descriptor.type == .staticImage || descriptor.type == .dynamic || descriptor.type == .current
 
         // For non-static types (animated, time, website, particle, gradient),
@@ -318,7 +315,6 @@ final class WallpaperEngine {
         return result
     }
 
-
     private func applyStaticAsync(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         guard let resource = descriptor.resources.first else {
             return WallpaperApplyResult(success: false, permissionDenied: false)
@@ -332,8 +328,6 @@ final class WallpaperEngine {
         logger.error("Could not find wallpaper resource \(resource, privacy: .public)")
         return WallpaperApplyResult(success: false, permissionDenied: false)
     }
-
-
 
     private func applyGradientAsync(_ descriptor: WallpaperDescriptor) async -> WallpaperApplyResult {
         if let image = await renderGradientImageAsync(stops: descriptor.gradientStops),
@@ -500,13 +494,12 @@ final class WallpaperEngine {
         return WallpaperApplyResult(success: applied, permissionDenied: permissionDenied)
     }
 
-
     private func renderGradientImageAsync(stops: [ColorComponents]) async -> NSImage? {
         let size = NSScreen.main?.frame.size ?? CGSize(width: 1920, height: 1080)
         return await Task(priority: .userInitiated) { [imageProcessingContext] in
             var color0 = CIColor.black
             var color1 = CIColor.gray
-            
+
             if stops.count >= 2 {
                 color0 = CIColor(red: CGFloat(stops[0].red), green: CGFloat(stops[0].green), blue: CGFloat(stops[0].blue), alpha: CGFloat(stops[0].alpha))
                 color1 = CIColor(red: CGFloat(stops.last!.red), green: CGFloat(stops.last!.green), blue: CGFloat(stops.last!.blue), alpha: CGFloat(stops.last!.alpha))
@@ -514,18 +507,18 @@ final class WallpaperEngine {
                 let c = CIColor(red: CGFloat(stops[0].red), green: CGFloat(stops[0].green), blue: CGFloat(stops[0].blue), alpha: CGFloat(stops[0].alpha))
                 color0 = c; color1 = c
             }
-            
+
             guard let filter = CIFilter(name: "CILinearGradient") else { return nil }
             filter.setValue(CIVector(x: 0, y: 0), forKey: "inputPoint0")
             filter.setValue(CIVector(x: size.width, y: size.height), forKey: "inputPoint1")
             filter.setValue(color0, forKey: "inputColor0")
             filter.setValue(color1, forKey: "inputColor1")
-            
+
             guard let outputImage = filter.outputImage?.cropped(to: CGRect(origin: .zero, size: size)),
                   let cgImage = imageProcessingContext.createCGImage(outputImage, from: outputImage.extent) else {
                 return nil
             }
-            
+
             return NSImage(cgImage: cgImage, size: size)
         }.value
     }
@@ -551,7 +544,6 @@ final class WallpaperEngine {
             alpha: color.alpha
         )
     }
-
 
     private func writeImageAsync(_ image: NSImage) async -> URL? {
         await withCheckedContinuation { continuation in
@@ -740,15 +732,13 @@ final class WallpaperEngine {
 
         guard let image else { return nil }
         return await writeImageAsync(image)
-    }
-
+        }
 
     private func updateCurrentWallpaperURLs(primaryURL: URL?, secondaryURL: URL?) {
         currentPrimaryWallpaperURL = primaryURL
         currentSecondaryWallpaperURL = secondaryURL ?? primaryURL
     }
 }
-
 
 final class WallpaperWindowController: NSObject {
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.valentinkt.Aura", category: "WallpaperWindow")
@@ -925,7 +915,7 @@ final class WallpaperWindowController: NSObject {
 
         // Remove existing hosting view if any
         hostingView?.removeFromSuperview()
-        
+
         ensureCorrectFrame()
 
         // Create and pin the SwiftUI hosting view
@@ -961,7 +951,7 @@ final class WallpaperWindowController: NSObject {
             ensureCorrectFrame() // Still ensure frame is correct even if already playing
             return
         }
-        
+
         ensureCorrectFrame()
 
         stopVideo()
@@ -1434,11 +1424,11 @@ final class WallpaperWindowController: NSObject {
         stopWebsite()
         hideSwiftUIView()
         window?.orderOut(nil)
-        
+
         if let pv = playerView {
             pv.layer?.backgroundColor = NSColor.clear.cgColor
         }
-        
+
         if let scv = websiteContainerView {
             scv.isHidden = true
         }
@@ -1446,7 +1436,7 @@ final class WallpaperWindowController: NSObject {
 
     private func ensureCorrectFrame() {
         guard let window = self.window, let screen = NSScreen.main else { return }
-        
+
         // If the window is currently at (0,0,0,0) or incorrect for the main screen, update it
         if window.frame.size == .zero || window.frame != screen.frame {
             window.setFrame(screen.frame, display: true)
