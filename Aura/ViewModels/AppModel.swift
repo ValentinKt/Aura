@@ -389,7 +389,6 @@ final class AppModel {
     func purgeTransientCaches() {
         URLCache.shared.removeAllCachedResponses()
         MediaUtils.purgeCaches()
-        MoodCard.purgeImageCache()
         startupWaiters.removeAll(keepingCapacity: false)
         DownloadManager.shared.purgeTransientState()
     }
