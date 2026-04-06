@@ -765,6 +765,7 @@ final class HoverPreviewPlayer {
             activeURL = url
             player.pause()
             looper = nil
+            player.removeAllItems()
 
             let item = AVPlayerItem(url: url)
             item.preferredForwardBufferDuration = 2
