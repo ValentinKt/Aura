@@ -580,12 +580,22 @@ struct MoodCard: View {
 
     private var selectedPreviewVideoURL: URL? {
         guard isSelected,
-              let resource = mood.wallpaper.resources.first,
-              let url = MediaUtils.resolveExactResourceURL(resource),
-              ["mp4", "mov", "m4v"].contains(url.pathExtension.lowercased()) else {
+              let resource = mood.wallpaper.resources.first else {
             return nil
         }
-        return url
+
+        if let selectedWallpaperURL,
+           Self.isVideoURL(selectedWallpaperURL),
+           Self.matches(selectedWallpaperURL, resource: resource) {
+            return selectedWallpaperURL
+        }
+
+        if let resolvedURL = MediaUtils.resolveExactResourceURL(resource),
+           Self.isVideoURL(resolvedURL) {
+            return resolvedURL
+        }
+
+        return nil
     }
 
     private var canToggleFavorite: Bool {
@@ -686,6 +696,16 @@ struct MoodCard: View {
             self.image = nil
         }
     }
+
+    private static func isVideoURL(_ url: URL) -> Bool {
+        ["mp4", "mov", "m4v"].contains(url.pathExtension.lowercased())
+    }
+
+    private static func matches(_ url: URL, resource: String) -> Bool {
+        let resolvedName = url.deletingPathExtension().lastPathComponent.lowercased()
+        let resourceName = URL(fileURLWithPath: resource).deletingPathExtension().lastPathComponent.lowercased()
+        return !resolvedName.isEmpty && resolvedName == resourceName
+    }
 }
 
 struct TimeWallpaperPreview: View {
@@ -729,6 +749,7 @@ final class HoverPreviewPlayer {
     private let player = AVQueuePlayer()
     private var looper: AVPlayerLooper?
     private(set) var activeURL: URL?
+    private var activeLayerIdentifier: ObjectIdentifier?
 
     init() {
         player.isMuted = true
@@ -737,17 +758,26 @@ final class HoverPreviewPlayer {
     }
 
     func activate(url: URL, in layer: AVPlayerLayer) {
-        guard url != activeURL else { return }
-        activeURL = url
+        let layerIdentifier = ObjectIdentifier(layer)
+        let shouldReconfigurePlayer = url != activeURL
 
-        player.pause()
-        looper = nil
+        if shouldReconfigurePlayer {
+            activeURL = url
+            player.pause()
+            looper = nil
 
-        let item = AVPlayerItem(url: url)
-        item.preferredForwardBufferDuration = 2
-        player.automaticallyWaitsToMinimizeStalling = false
-        looper = AVPlayerLooper(player: player, templateItem: item)
+            let item = AVPlayerItem(url: url)
+            item.preferredForwardBufferDuration = 2
+            player.automaticallyWaitsToMinimizeStalling = false
+            looper = AVPlayerLooper(player: player, templateItem: item)
+        }
 
+        if layer.player !== player || activeLayerIdentifier != layerIdentifier {
+            layer.player = player
+            activeLayerIdentifier = layerIdentifier
+        }
+
+        layer.isHidden = false
         layer.player = player
         player.play()
     }
@@ -756,6 +786,7 @@ final class HoverPreviewPlayer {
         player.pause()
         looper = nil
         activeURL = nil
+        activeLayerIdentifier = nil
         player.removeAllItems()
         player.replaceCurrentItem(with: nil)
     }
