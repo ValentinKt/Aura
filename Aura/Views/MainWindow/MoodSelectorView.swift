@@ -465,47 +465,12 @@ struct MoodCard: View {
 
     private var cardContent: some View {
         ZStack(alignment: .bottomLeading) {
-            // Background Image
-            if mood.wallpaper.type == .time {
-                // Time wallpaper specific preview
-                TimeWallpaperPreview(mood: mood, isPressed: isPressed, selectedWallpaperURL: selectedWallpaperURL)
-            } else if mood.wallpaper.type == .website {
-                WebsiteWallpaperPreview(mood: mood, isPressed: isPressed)
-            } else if isSelected,
-                      let resource = mood.wallpaper.resources.first,
-                      let url = MediaUtils.resolveResourceURL(resource),
-                      ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
-                HoverPreviewVideoView(url: url)
+            backgroundContent
+
+            if let selectedPreviewVideoURL {
+                HoverPreviewVideoView(url: selectedPreviewVideoURL)
                     .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-            } else if let image = image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-                    .clipped()
-                    .overlay {
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.3)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-            } else {
-                Group {
-                    if reduceTransparency {
-                        Rectangle()
-                            .fill(.regularMaterial)
-                    } else {
-                        Color.clear
-                            .glassEffect(.regular, in: Rectangle())
-                    }
-                }
-                .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-                .overlay {
-                    Image(systemName: "sparkles.rectangle.stack")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
+                    .transition(.opacity)
             }
 
             if isHovered && !isSelected {
@@ -573,6 +538,54 @@ struct MoodCard: View {
         }
         .frame(width: Self.cardSize.width, height: Self.cardSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var backgroundContent: some View {
+        if mood.wallpaper.type == .time {
+            TimeWallpaperPreview(mood: mood, isPressed: isPressed, selectedWallpaperURL: selectedWallpaperURL)
+        } else if mood.wallpaper.type == .website {
+            WebsiteWallpaperPreview(mood: mood, isPressed: isPressed)
+        } else if let image = image {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: Self.cardSize.width, height: Self.cardSize.height)
+                .clipped()
+                .overlay {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        } else {
+            Group {
+                if reduceTransparency {
+                    Rectangle()
+                        .fill(.regularMaterial)
+                } else {
+                    Color.clear
+                        .glassEffect(.regular, in: Rectangle())
+                }
+            }
+            .frame(width: Self.cardSize.width, height: Self.cardSize.height)
+            .overlay {
+                Image(systemName: "sparkles.rectangle.stack")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+    }
+
+    private var selectedPreviewVideoURL: URL? {
+        guard isSelected,
+              let resource = mood.wallpaper.resources.first,
+              let url = MediaUtils.resolveExactResourceURL(resource),
+              ["mp4", "mov", "m4v"].contains(url.pathExtension.lowercased()) else {
+            return nil
+        }
+        return url
     }
 
     private var canToggleFavorite: Bool {
