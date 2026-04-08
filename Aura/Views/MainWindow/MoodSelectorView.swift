@@ -126,27 +126,26 @@ struct SubthemeRow: View {
         LazyHStack(spacing: 16) {
             ForEach(moods, id: \.id) { mood in
                 MoodCard(
-                    mood: mood,
-                    isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
-                    isFavorite: appModel.favoriteSceneIDs.contains(mood.id),
-                    selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
-                    onToggleFavorite: {
-                        appModel.toggleFavoriteScene(mood.id)
-                    },
-                    onDelete: UUID(uuidString: mood.id) != nil ? {
-                        withAnimation {
-                            appModel.moodViewModel.removeMood(mood)
+                            mood: mood,
+                            isSelected: appModel.moodViewModel.currentMood?.id == mood.id,
+                            isFavorite: appModel.favoriteSceneIDs.contains(mood.id),
+                            selectedWallpaperURL: appModel.wallpaperEngine.selectedWallpaperURL,
+                            onToggleFavorite: {
+                                appModel.toggleFavoriteScene(mood.id)
+                            },
+                            onDelete: UUID(uuidString: mood.id) != nil ? {
+                                withAnimation {
+                                    appModel.moodViewModel.removeMood(mood)
+                                }
+                            } : nil,
+                            action: { force in selectMood(mood, forceApply: force) }
+                        )
+                        .id(mood.id)
+                        .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                            content
+                                .scaleEffect(phase.isIdentity ? 1 : 0.96)
+                                .opacity(phase.isIdentity ? 1 : 0.8)
                         }
-                    } : nil,
-                    action: { force in selectMood(mood, forceApply: force) }
-                )
-                .id(mood.id)
-                .compositingGroup()
-                .shadow(
-                    color: .black.opacity(appModel.moodViewModel.currentMood?.id == mood.id ? 0.28 : 0.18),
-                    radius: appModel.moodViewModel.currentMood?.id == mood.id ? 10 : 6,
-                    y: 4
-                )
             }
 
             if ["Website", "Websites"].contains(where: { subtheme.caseInsensitiveCompare($0) == .orderedSame }) {
@@ -356,8 +355,12 @@ struct MoodCard: View {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(.regularMaterial)
                         } else {
-                            Color.clear
-                                .glassEffect(isSelected ? .regular.interactive() : .clear.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            if isSelected {
+                                Color.clear
+                                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            } else {
+                                Color.clear
+                            }
                         }
                     }
                     .shadow(color: .black.opacity(isSelected ? 0.4 : 0.2), radius: isSelected ? 15 : 10, y: 5)
@@ -565,8 +568,11 @@ struct MoodCard: View {
                     Rectangle()
                         .fill(.regularMaterial)
                 } else {
-                    Color.clear
-                        .glassEffect(.regular, in: Rectangle())
+                    Color.white.opacity(0.05)
+                        .overlay {
+                            Rectangle()
+                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                        }
                 }
             }
             .frame(width: Self.cardSize.width, height: Self.cardSize.height)

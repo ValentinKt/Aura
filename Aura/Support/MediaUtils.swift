@@ -6,8 +6,8 @@ import os
 enum MediaUtils {
     nonisolated(unsafe) static let imageCache: NSCache<NSURL, NSImage> = {
         let cache = NSCache<NSURL, NSImage>()
-        cache.countLimit = 50 // Limit to 50 images to save memory
-        cache.totalCostLimit = 1024 * 1024 * 100 // 100 MB max
+        cache.countLimit = 200 // Increased from 50 to 200 to prevent cache thrashing during scroll
+        cache.totalCostLimit = 1024 * 1024 * 200 // Increased to 200 MB max
         return cache
     }()
 
@@ -385,10 +385,14 @@ enum MediaUtils {
     }
 
     nonisolated static func thumbnailImage(for resource: String, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
+        if Task.isCancelled { return nil }
+        
         if let url = resolveResourceURL(resource),
            let image = await thumbnailImage(from: url, maxPixelSize: maxPixelSize) {
             return image
         }
+
+        if Task.isCancelled { return nil }
 
         let baseName = (resource as NSString).deletingPathExtension
         if let image = await MainActor.run(body: {
@@ -402,6 +406,8 @@ enum MediaUtils {
     }
 
     nonisolated static func thumbnailImage(from url: URL, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
+        if Task.isCancelled { return nil }
+        
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "size", value: "\(maxPixelSize)")]
         let cacheKey = (components?.url ?? url) as NSURL
@@ -409,10 +415,13 @@ enum MediaUtils {
         if let cachedImage = imageCache.object(forKey: cacheKey) {
             return cachedImage
         }
+        
+        if Task.isCancelled { return nil }
 
         let ext = url.pathExtension.lowercased()
         if ["mp4", "mov", "m4v"].contains(ext) {
             if let image = await downsampledVideoPosterImage(from: url, maxPixelSize: maxPixelSize) {
+                if Task.isCancelled { return nil }
                 imageCache.setObject(image, forKey: cacheKey)
                 return image
             }
@@ -431,6 +440,8 @@ enum MediaUtils {
         } onCancel: {
             task.cancel()
         }
+
+        if Task.isCancelled { return nil }
 
         if let image = result {
             imageCache.setObject(image, forKey: cacheKey)
