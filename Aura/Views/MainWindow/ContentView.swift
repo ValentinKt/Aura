@@ -918,27 +918,27 @@ private struct AtmospheresWheelMenu: View {
             }
             onItemActivated(repeatedItem.item.id)
         } label: {
-            GeometryReader { itemGeometry in
-                let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
+            HStack(spacing: 14) {
+                Image(systemName: repeatedItem.item.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
+                    .frame(width: 20)
+
+                Text(repeatedItem.item.title)
+                    .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                    .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .visualEffect { content, proxy in
+                let distance = abs(proxy.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
                 let appearance = itemAppearance(for: distance)
-
-                HStack(spacing: 14) {
-                    Image(systemName: repeatedItem.item.systemImage)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
-                        .frame(width: 20)
-
-                    Text(repeatedItem.item.title)
-                        .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
-                        .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
-                        .lineLimit(1)
-
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .scaleEffect(appearance.scale, anchor: .leading)
-                .opacity(appearance.opacity)
+                return content
+                    .scaleEffect(appearance.scale, anchor: .leading)
+                    .opacity(appearance.opacity)
             }
             .contentShape(Rectangle())
             .background {
