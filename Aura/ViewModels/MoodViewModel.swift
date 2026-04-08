@@ -148,6 +148,7 @@ final class MoodViewModel {
     }
 
     var selectedSubtheme: String?
+    var visibleSubtheme: String?
 
     func selectNextMood() {
         guard let current = currentMood,

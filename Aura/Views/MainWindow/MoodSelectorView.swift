@@ -104,11 +104,18 @@ struct SubthemeRow: View {
                         }
                 }
             }
-            .scrollTargetBehavior(.viewAligned)
-            .contentMargins(.horizontal, 40, for: .scrollContent)
-            .frame(height: MoodCard.cardSize.height + 12)
+        .scrollTargetBehavior(.viewAligned)
+        .contentMargins(.horizontal, 40, for: .scrollContent)
+        .frame(height: MoodCard.cardSize.height + 12)
+        .onScrollVisibilityChange(threshold: 0.5) { isVisible in
+            if isVisible {
+                Task { @MainActor in
+                    appModel.moodViewModel.visibleSubtheme = subtheme
+                }
+            }
         }
-        .sheet(isPresented: $showingWebsiteManager) {
+    }
+    .sheet(isPresented: $showingWebsiteManager) {
             WebsiteManagerView(appModel: appModel)
         }
         .sheet(isPresented: $showingImagePlaygroundDesigner) {

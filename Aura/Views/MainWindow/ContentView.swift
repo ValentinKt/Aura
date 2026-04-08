@@ -174,6 +174,11 @@ struct ContentView: View {
                     return selectedSubtheme
                 }
 
+                if let visibleSubtheme = appModel.moodViewModel.visibleSubtheme,
+                   atmosphereMenuItems.contains(where: { $0.id == visibleSubtheme }) {
+                    return visibleSubtheme
+                }
+
                 if let last = lastSelectedAtmosphereID {
                     return last
                 }
@@ -193,6 +198,27 @@ struct ContentView: View {
                 }
 
                 guard appModel.moodViewModel.selectedSubtheme != newValue else {
+                    return
+                }
+
+                // If the user manually selected an item in the carousel, we want to scroll the main view.
+                // If it was just updated because of visibleSubtheme, we shouldn't trigger a scroll.
+                // Wait, this setter is called when the carousel scrolls (e.g. user drags the wheel).
+                // If the user drags the wheel, `visibleSubtheme` hasn't changed yet, so we DO want to scroll the main view.
+                // If the main view scrolls, `visibleSubtheme` changes, `selectedAtmosphereID` changes, which triggers the carousel to update its scrollPositionID.
+                // When `scrollPositionID` changes, it updates `selectedID` (which is `selectedAtmosphereID`).
+                // BUT `selectedAtmosphereID` already returns the new `visibleSubtheme`, so it won't be set to a DIFFERENT value.
+                // Let's verify:
+                // Main view scrolls -> visibleSubtheme = "forest"
+                // selectedAtmosphereID.get -> "forest"
+                // Carousel's onChange(of: selectedID) -> scrollPositionID = "forest"
+                // Carousel's onChange(of: scrollPositionID) -> selectedID = "forest". Wait, selectedID.set("forest") is called!
+                // selectedAtmosphereID.set("forest") is called!
+                // This calls selectMoodSubtheme("forest"), which sets selectedSubtheme = "forest", which triggers main view scrollTo!
+                // We need to prevent selectMoodSubtheme if the user didn't initiate it!
+                
+                // If newValue is the same as visibleSubtheme, the scroll was initiated by the main view.
+                if newValue == appModel.moodViewModel.visibleSubtheme {
                     return
                 }
 
@@ -892,31 +918,29 @@ private struct AtmospheresWheelMenu: View {
             }
             onItemActivated(repeatedItem.item.id)
         } label: {
-            TimelineView(.animation(minimumInterval: 1 / 60)) { _ in
-                GeometryReader { itemGeometry in
-                    let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
-                    let appearance = itemAppearance(for: distance)
+            GeometryReader { itemGeometry in
+                let distance = abs(itemGeometry.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
+                let appearance = itemAppearance(for: distance)
 
-                    HStack(spacing: 14) {
-                        Image(systemName: repeatedItem.item.systemImage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
-                            .frame(width: 20)
+                HStack(spacing: 14) {
+                    Image(systemName: repeatedItem.item.systemImage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.78))
+                        .frame(width: 20)
 
-                        Text(repeatedItem.item.title)
-                            .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
-                            .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
-                            .lineLimit(1)
+                    Text(repeatedItem.item.title)
+                        .font(.system(size: 13, weight: isSelected ? .bold : .semibold))
+                        .foregroundStyle(.white.opacity(isSelected ? 0.98 : 0.82))
+                        .lineLimit(1)
 
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .scaleEffect(appearance.scale, anchor: .leading)
-                    .opacity(appearance.opacity)
+                    Spacer(minLength: 0)
                 }
-                .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .scaleEffect(appearance.scale, anchor: .leading)
+                .opacity(appearance.opacity)
             }
+            .contentShape(Rectangle())
             .background {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
