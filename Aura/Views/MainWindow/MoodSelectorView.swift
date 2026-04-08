@@ -4,6 +4,7 @@ import os
 
 struct MoodSelectorView: View {
     @Bindable var appModel: AppModel
+    private let activeSubthemeLineY: CGFloat = 84
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -23,11 +24,23 @@ struct MoodSelectorView: View {
                         ForEach(section.subthemes, id: \.self) { subtheme in
                             SubthemeRow(subtheme: subtheme, moods: moodsBySubtheme[subtheme] ?? [], appModel: appModel)
                                 .id(subtheme)
+                                .background {
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(
+                                            key: SubthemeFramePreferenceKey.self,
+                                            value: [subtheme: proxy.frame(in: .named("MoodSelectorScrollView"))]
+                                        )
+                                    }
+                                }
                         }
                     }
                 }
             }
             .padding(.vertical, 24)
+            .coordinateSpace(name: "MoodSelectorScrollView")
+            .onPreferenceChange(SubthemeFramePreferenceKey.self) { frames in
+                updateVisibleSubtheme(using: frames, validSubthemes: Set(moodsBySubtheme.keys))
+            }
             .onChange(of: appModel.moodViewModel.selectedSubtheme) { _, newSubtheme in
                 if let subtheme = newSubtheme {
                     Task { @MainActor in
@@ -49,6 +62,44 @@ struct MoodSelectorView: View {
                 }
             }
         }
+    }
+
+    private func updateVisibleSubtheme(using frames: [String: CGRect], validSubthemes: Set<String>) {
+        guard !frames.isEmpty else {
+            return
+        }
+
+        let sortedFrames = frames
+            .filter { validSubthemes.contains($0.key) }
+            .sorted { lhs, rhs in
+                lhs.value.minY < rhs.value.minY
+            }
+
+        guard !sortedFrames.isEmpty else {
+            return
+        }
+
+        let targetSubtheme =
+            sortedFrames.last(where: { frame in
+                frame.value.minY <= activeSubthemeLineY && frame.value.maxY > activeSubthemeLineY
+            })?.key
+            ?? sortedFrames.first(where: { $0.value.maxY > activeSubthemeLineY })?.key
+            ?? sortedFrames.last?.key
+
+        guard let targetSubtheme,
+              appModel.moodViewModel.visibleSubtheme != targetSubtheme else {
+            return
+        }
+
+        appModel.moodViewModel.visibleSubtheme = targetSubtheme
+    }
+}
+
+private struct SubthemeFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }
 
@@ -107,13 +158,6 @@ struct SubthemeRow: View {
         .scrollTargetBehavior(.viewAligned)
         .contentMargins(.horizontal, 40, for: .scrollContent)
         .frame(height: MoodCard.cardSize.height + 12)
-        .onScrollVisibilityChange(threshold: 0.5) { isVisible in
-            if isVisible {
-                Task { @MainActor in
-                    appModel.moodViewModel.visibleSubtheme = subtheme
-                }
-            }
-        }
     }
     .sheet(isPresented: $showingWebsiteManager) {
             WebsiteManagerView(appModel: appModel)
@@ -186,7 +230,7 @@ struct SubthemeRow: View {
         }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             appModel.moodViewModel.selectMood(mood)
-            appModel.moodViewModel.selectedSubtheme = nil
+            appModel.moodViewModel.selectedSubtheme = mood.subtheme
         }
     }
 }

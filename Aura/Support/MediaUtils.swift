@@ -11,6 +11,11 @@ enum MediaUtils {
         return cache
     }()
 
+    nonisolated private static func cacheImage(_ image: NSImage, forKey key: NSURL) {
+        let cost = max(1, Int(image.size.width * image.size.height * 4))
+        imageCache.setObject(image, forKey: key, cost: cost)
+    }
+
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Aura", category: "MediaUtils")
 
     nonisolated static let thumbnailMaxPixelSize: CGFloat = 600
@@ -376,7 +381,7 @@ enum MediaUtils {
             let (cgImage, _) = try await generator.image(at: time)
             log.debug("Generated thumbnail for \(url.lastPathComponent, privacy: .public)")
             let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-            imageCache.setObject(image, forKey: cacheKey)
+            cacheImage(image, forKey: cacheKey)
             return image
         } catch {
             log.error("Failed to generate thumbnail for \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
@@ -386,7 +391,7 @@ enum MediaUtils {
 
     nonisolated static func thumbnailImage(for resource: String, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
         if Task.isCancelled { return nil }
-        
+
         if let url = resolveResourceURL(resource),
            let image = await thumbnailImage(from: url, maxPixelSize: maxPixelSize) {
             return image
@@ -407,7 +412,7 @@ enum MediaUtils {
 
     nonisolated static func thumbnailImage(from url: URL, maxPixelSize: CGFloat = thumbnailMaxPixelSize) async -> NSImage? {
         if Task.isCancelled { return nil }
-        
+
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "size", value: "\(maxPixelSize)")]
         let cacheKey = (components?.url ?? url) as NSURL
@@ -415,14 +420,14 @@ enum MediaUtils {
         if let cachedImage = imageCache.object(forKey: cacheKey) {
             return cachedImage
         }
-        
+
         if Task.isCancelled { return nil }
 
         let ext = url.pathExtension.lowercased()
         if ["mp4", "mov", "m4v"].contains(ext) {
             if let image = await downsampledVideoPosterImage(from: url, maxPixelSize: maxPixelSize) {
                 if Task.isCancelled { return nil }
-                imageCache.setObject(image, forKey: cacheKey)
+                cacheImage(image, forKey: cacheKey)
                 return image
             }
             return nil
@@ -444,7 +449,7 @@ enum MediaUtils {
         if Task.isCancelled { return nil }
 
         if let image = result {
-            imageCache.setObject(image, forKey: cacheKey)
+            cacheImage(image, forKey: cacheKey)
         }
         return result
     }
@@ -452,11 +457,11 @@ enum MediaUtils {
     nonisolated static func loadImage(from url: URL) async -> NSImage? {
         let cacheKey = url as NSURL
 
-        if let cachedImage = await MainActor.run(body: { imageCache.object(forKey: cacheKey) }) {
+        if let cachedImage = imageCache.object(forKey: cacheKey) {
             return cachedImage
         }
 
-        let image: NSImage? = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+        let image: NSImage? = await Task.detached(priority: .utility) { () -> NSImage? in
             let isSecurityScoped = url.startAccessingSecurityScopedResource()
             defer {
                 if isSecurityScoped {
@@ -469,7 +474,7 @@ enum MediaUtils {
         }.value
 
         if let image {
-            await MainActor.run { imageCache.setObject(image, forKey: cacheKey) }
+            cacheImage(image, forKey: cacheKey)
         }
 
         return image

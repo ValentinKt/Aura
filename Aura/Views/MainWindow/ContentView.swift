@@ -164,19 +164,25 @@ struct ContentView: View {
     }
 
     @State private var lastSelectedAtmosphereID: String?
+    @State private var pendingAtmosphereID: String?
 
     private var selectedAtmosphereID: Binding<String?> {
         Binding(
             get: {
+                if let visibleSubtheme = appModel.moodViewModel.visibleSubtheme,
+                   atmosphereMenuItems.contains(where: { $0.id == visibleSubtheme }) {
+                    return visibleSubtheme
+                }
+
+                if let pendingAtmosphereID,
+                   atmosphereMenuItems.contains(where: { $0.id == pendingAtmosphereID }) {
+                    return pendingAtmosphereID
+                }
+
                 let selectedSubtheme = appModel.moodViewModel.selectedSubtheme
                 if let selectedSubtheme,
                    atmosphereMenuItems.contains(where: { $0.id == selectedSubtheme }) {
                     return selectedSubtheme
-                }
-
-                if let visibleSubtheme = appModel.moodViewModel.visibleSubtheme,
-                   atmosphereMenuItems.contains(where: { $0.id == visibleSubtheme }) {
-                    return visibleSubtheme
                 }
 
                 if let last = lastSelectedAtmosphereID {
@@ -197,32 +203,13 @@ struct ContentView: View {
                     lastSelectedAtmosphereID = newValue
                 }
 
-                guard appModel.moodViewModel.selectedSubtheme != newValue else {
-                    return
-                }
-
-                // If the user manually selected an item in the carousel, we want to scroll the main view.
-                // If it was just updated because of visibleSubtheme, we shouldn't trigger a scroll.
-                // Wait, this setter is called when the carousel scrolls (e.g. user drags the wheel).
-                // If the user drags the wheel, `visibleSubtheme` hasn't changed yet, so we DO want to scroll the main view.
-                // If the main view scrolls, `visibleSubtheme` changes, `selectedAtmosphereID` changes, which triggers the carousel to update its scrollPositionID.
-                // When `scrollPositionID` changes, it updates `selectedID` (which is `selectedAtmosphereID`).
-                // BUT `selectedAtmosphereID` already returns the new `visibleSubtheme`, so it won't be set to a DIFFERENT value.
-                // Let's verify:
-                // Main view scrolls -> visibleSubtheme = "forest"
-                // selectedAtmosphereID.get -> "forest"
-                // Carousel's onChange(of: selectedID) -> scrollPositionID = "forest"
-                // Carousel's onChange(of: scrollPositionID) -> selectedID = "forest". Wait, selectedID.set("forest") is called!
-                // selectedAtmosphereID.set("forest") is called!
-                // This calls selectMoodSubtheme("forest"), which sets selectedSubtheme = "forest", which triggers main view scrollTo!
-                // We need to prevent selectMoodSubtheme if the user didn't initiate it!
-                
-                // If newValue is the same as visibleSubtheme, the scroll was initiated by the main view.
                 if newValue == appModel.moodViewModel.visibleSubtheme {
+                    pendingAtmosphereID = nil
                     return
                 }
 
-                selectMoodSubtheme(newValue)
+                pendingAtmosphereID = newValue
+                selectMoodSubtheme(newValue, shouldRequestScroll: true)
             }
         )
     }
@@ -238,7 +225,7 @@ struct ContentView: View {
             appModel.moodViewModel.selectedSubtheme = subtheme
         }
 
-        if shouldRequestScroll || didChangeSelection {
+        if shouldRequestScroll {
             moodScrollRequest = MoodScrollRequest(subtheme: subtheme)
         }
     }
@@ -450,9 +437,23 @@ struct ContentView: View {
                         if atmosphereMenuItems.contains(where: { $0.id == subtheme }) {
                             lastSelectedAtmosphereID = subtheme
                         }
+                        guard moodScrollRequest?.subtheme != subtheme else {
+                            return
+                        }
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                             proxy.scrollTo(subtheme, anchor: .top)
                         }
+                    }
+                }
+                .onChange(of: appModel.moodViewModel.visibleSubtheme) { _, newValue in
+                    guard let subtheme = newValue else {
+                        return
+                    }
+
+                    pendingAtmosphereID = nil
+
+                    if atmosphereMenuItems.contains(where: { $0.id == subtheme }) {
+                        lastSelectedAtmosphereID = subtheme
                     }
                 }
                 .onChange(of: appModel.moodViewModel.currentMood) { _, newValue in
@@ -793,11 +794,6 @@ private struct AtmosphereCarouselMenuItem: Identifiable, Hashable {
     let systemImage: String
 }
 
-private struct AtmosphereCarouselItemAppearance {
-    let scale: CGFloat
-    let opacity: Double
-}
-
 private struct MoodScrollRequest: Equatable {
     let id = UUID()
     let subtheme: String
@@ -833,8 +829,6 @@ private struct AtmospheresWheelMenu: View {
     let onItemActivated: (String) -> Void
     @State private var scrollPositionID: String?
 
-    private let coordinateSpaceName = "atmospheres-wheel"
-
     private var repeatedItems: [RepeatedAtmosphereCarouselItem] {
         guard !items.isEmpty else { return [] }
 
@@ -850,65 +844,58 @@ private struct AtmospheresWheelMenu: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let containerCenterY = geometry.size.height / 2
-            let verticalInset = max(0, containerCenterY - (Self.rowHeight / 2))
-
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: Self.rowSpacing) {
-                    ForEach(repeatedItems) { repeatedItem in
-                        carouselRow(repeatedItem, containerCenterY: containerCenterY)
-                            .id(repeatedItem.id)
-                    }
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: Self.rowSpacing) {
+                ForEach(repeatedItems) { repeatedItem in
+                    carouselRow(repeatedItem)
+                        .id(repeatedItem.id)
                 }
-                .scrollTargetLayout()
-                .drawingGroup()
             }
-            .contentMargins(.vertical, verticalInset, for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $scrollPositionID, anchor: .center)
-            .coordinateSpace(name: coordinateSpaceName)
-            .onAppear {
-                let initialID = selectedID ?? items.first?.id
-                guard let initialID else { return }
-                selectedID = initialID
-                scrollPositionID = repeatedID(for: initialID, cycle: middleCycle)
+            .scrollTargetLayout()
+        }
+        .contentMargins(.vertical, Self.viewportHeight / 2 - Self.rowHeight / 2, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $scrollPositionID, anchor: .center)
+        .onAppear {
+            let initialID = selectedID ?? items.first?.id
+            guard let initialID else { return }
+            selectedID = initialID
+            scrollPositionID = repeatedID(for: initialID, cycle: middleCycle)
+        }
+        .onChange(of: selectedID) { _, newValue in
+            guard let newValue else {
+                return
             }
-            .onChange(of: selectedID) { _, newValue in
-                guard let newValue else {
-                    return
-                }
 
-                if let scrollPositionID,
-                   let currentItem = repeatedItems.first(where: { $0.id == scrollPositionID }),
-                   currentItem.item.id == newValue {
-                    return
-                }
-
-                guard let normalizedID = repeatedID(for: newValue, cycle: middleCycle),
-                      scrollPositionID != normalizedID else {
-                    return
-                }
-
-                scrollPositionID = normalizedID
+            if let scrollPositionID,
+               let currentItem = repeatedItems.first(where: { $0.id == scrollPositionID }),
+               currentItem.item.id == newValue {
+                return
             }
-            .onChange(of: scrollPositionID) { _, newValue in
-                guard let newValue,
-                      let repeatedItem = repeatedItems.first(where: { $0.id == newValue }) else {
-                    return
-                }
 
-                normalizeScrollPositionIfNeeded(for: repeatedItem)
-
-                guard repeatedItem.item.id != selectedID else {
-                    return
-                }
-                selectedID = repeatedItem.item.id
+            guard let normalizedID = repeatedID(for: newValue, cycle: middleCycle),
+                  scrollPositionID != normalizedID else {
+                return
             }
+
+            scrollPositionID = normalizedID
+        }
+        .onChange(of: scrollPositionID) { _, newValue in
+            guard let newValue,
+                  let repeatedItem = repeatedItems.first(where: { $0.id == newValue }) else {
+                return
+            }
+
+            normalizeScrollPositionIfNeeded(for: repeatedItem)
+
+            guard repeatedItem.item.id != selectedID else {
+                return
+            }
+            selectedID = repeatedItem.item.id
         }
     }
 
-    private func carouselRow(_ repeatedItem: RepeatedAtmosphereCarouselItem, containerCenterY: CGFloat) -> some View {
+    private func carouselRow(_ repeatedItem: RepeatedAtmosphereCarouselItem) -> some View {
         let isSelected = selectedID == repeatedItem.item.id
 
         return Button {
@@ -933,13 +920,6 @@ private struct AtmospheresWheelMenu: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .visualEffect { content, proxy in
-                let distance = abs(proxy.frame(in: .named(coordinateSpaceName)).midY - containerCenterY)
-                let appearance = itemAppearance(for: distance)
-                return content
-                    .scaleEffect(appearance.scale, anchor: .leading)
-                    .opacity(appearance.opacity)
-            }
             .contentShape(Rectangle())
             .background {
                 if isSelected {
@@ -953,6 +933,11 @@ private struct AtmospheresWheelMenu: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity)
+        .scrollTransition(.interactive, axis: .vertical) { content, phase in
+            content
+                .scaleEffect(max(0.74, 1 - (abs(phase.value) * 0.26)), anchor: .leading)
+                .opacity(max(0.24, 1 - (abs(phase.value) * 0.76)))
+        }
     }
 
     private func repeatedID(for itemID: String, cycle: Int) -> String? {
@@ -973,15 +958,6 @@ private struct AtmospheresWheelMenu: View {
         }
 
         scrollPositionID = normalizedID
-    }
-
-    private func itemAppearance(for distance: CGFloat) -> AtmosphereCarouselItemAppearance {
-        let falloffDistance = (Self.rowHeight + Self.rowSpacing) * 2.2
-        let normalizedDistance = min(distance / falloffDistance, 1)
-        let scale = max(0.74, 1 - (normalizedDistance * 0.26))
-        let opacity = max(0.24, 1 - (normalizedDistance * 0.76))
-
-        return AtmosphereCarouselItemAppearance(scale: scale, opacity: opacity)
     }
 }
 
